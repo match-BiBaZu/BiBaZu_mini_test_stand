@@ -9,6 +9,7 @@ const int allValveMask = (1 << valveCount) - 1;
 const int valveOpenSignal = HIGH;
 const int valveClosedSignal = LOW;
 
+
 const float pressureTargets[] = {0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50, 0.60, 0.70, 0.80};
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
 const int pressureSettingCount = sizeof(pressureTargets) / sizeof(pressureTargets[0]);
