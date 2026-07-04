@@ -1,0 +1,5 @@
+bin/
+.arduino-cli/data/
+.arduino-cli/downloads/
+.arduino-cli/user/
+__pycache__/
