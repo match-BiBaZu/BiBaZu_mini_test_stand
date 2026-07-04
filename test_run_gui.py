@@ -14,8 +14,13 @@ except ImportError:
 
 
 BAUD_RATE = 230400
+SERIAL_WRITE_TIMEOUT = 1.0
+SERIAL_COMMAND_SPACING_SECONDS = 0.08
 MAX_LOG_LINES = 400
 MAX_QUEUE_DRAIN_PER_TICK = 250
+MOTOR_MM_PER_STEP = 0.009985846
+MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
+MAX_MOTOR_STEPS_PER_SECOND = 5000
 
 
 class TestRunGui(tk.Tk):
@@ -26,9 +31,12 @@ class TestRunGui(tk.Tk):
 
         self.serial_port = None
         self.reader_thread = None
+        self.writer_thread = None
         self.reader_running = False
+        self.writer_running = False
         self.rows = []
         self.messages = queue.Queue()
+        self.commands = queue.Queue()
         self.port_devices = {}
 
         self.port_var = tk.StringVar()
@@ -40,11 +48,12 @@ class TestRunGui(tk.Tk):
         self.increment_count_var = tk.IntVar(value=0)
         self.stream_var = tk.BooleanVar(value=True)
         self.motor_enabled_var = tk.BooleanVar(value=False)
-        self.motor_steps_var = tk.IntVar(value=200)
-        self.motor_speed_var = tk.IntVar(value=400)
+        self.motor_distance_var = tk.DoubleVar(value=10.0)
+        self.motor_speed_var = tk.DoubleVar(value=5.0)
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
         self.nozzle_checkbuttons = []
         self.motor_controls = []
+        self.last_motor_speed_steps_s = None
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
 
@@ -196,30 +205,31 @@ class TestRunGui(tk.Tk):
         )
         self.motor_enable_checkbutton.pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Label(motor_controls, text="Steps").pack(side=tk.LEFT, padx=(18, 0))
-        self.motor_steps_spinbox = ttk.Spinbox(
+        ttk.Label(motor_controls, text="Distance").pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_distance_spinbox = ttk.Spinbox(
             motor_controls,
-            from_=1,
-            to=200000,
-            increment=10,
-            textvariable=self.motor_steps_var,
+            from_=0.01,
+            to=2000.0,
+            increment=1.0,
+            textvariable=self.motor_distance_var,
             width=8,
             state=tk.DISABLED,
         )
-        self.motor_steps_spinbox.pack(side=tk.LEFT, padx=(6, 0))
+        self.motor_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(motor_controls, text="mm").pack(side=tk.LEFT)
 
         ttk.Label(motor_controls, text="Speed").pack(side=tk.LEFT, padx=(18, 0))
         self.motor_speed_spinbox = ttk.Spinbox(
             motor_controls,
-            from_=1,
-            to=5000,
-            increment=50,
+            from_=0.01,
+            to=50.0,
+            increment=0.5,
             textvariable=self.motor_speed_var,
             width=8,
             state=tk.DISABLED,
         )
         self.motor_speed_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(motor_controls, text="steps/s").pack(side=tk.LEFT)
+        ttk.Label(motor_controls, text="mm/s").pack(side=tk.LEFT)
 
         self.motor_reverse_button = ttk.Button(
             motor_controls,
@@ -244,7 +254,7 @@ class TestRunGui(tk.Tk):
         self.motor_stop_button.pack(side=tk.LEFT, padx=(8, 0))
         self.motor_controls = [
             self.motor_enable_checkbutton,
-            self.motor_steps_spinbox,
+            self.motor_distance_spinbox,
             self.motor_speed_spinbox,
             self.motor_reverse_button,
             self.motor_forward_button,
@@ -318,7 +328,7 @@ class TestRunGui(tk.Tk):
             return
 
         try:
-            self.serial_port = serial.Serial(port, BAUD_RATE, timeout=0.1)
+            self.serial_port = serial.Serial(port, BAUD_RATE, timeout=0.1, write_timeout=SERIAL_WRITE_TIMEOUT)
             time.sleep(2.0)
         except serial.SerialException as exc:
             self.serial_port = None
@@ -326,8 +336,11 @@ class TestRunGui(tk.Tk):
             return
 
         self.reader_running = True
+        self.writer_running = True
         self.reader_thread = threading.Thread(target=self._read_serial, daemon=True)
+        self.writer_thread = threading.Thread(target=self._write_serial, daemon=True)
         self.reader_thread.start()
+        self.writer_thread.start()
         self.connect_button.configure(text="Disconnect")
         self.start_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.NORMAL)
@@ -351,12 +364,17 @@ class TestRunGui(tk.Tk):
         return self.port_devices.get(selected, selected)
 
     def _disconnect(self):
+        self.writer_running = False
+        self.commands.put(None)
+        if self.writer_thread:
+            self.writer_thread.join(timeout=0.5)
         self.reader_running = False
         if self.reader_thread:
             self.reader_thread.join(timeout=0.5)
         if self.serial_port:
             self.serial_port.close()
         self.serial_port = None
+        self._clear_pending_commands()
         self.connect_button.configure(text="Connect")
         self.start_button.configure(state=tk.DISABLED)
         self.stop_button.configure(state=tk.DISABLED)
@@ -371,6 +389,7 @@ class TestRunGui(tk.Tk):
         self._set_pulse_buttons_enabled(False)
         self._set_motor_controls_enabled(False)
         self.motor_enabled_var.set(False)
+        self.last_motor_speed_steps_s = None
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
         self.mode_var.set("Mode: disconnected")
@@ -477,12 +496,17 @@ class TestRunGui(tk.Tk):
         self._send(f"MOTOR_ENABLE:{1 if self.motor_enabled_var.get() else 0}")
 
     def _apply_motor_speed(self):
-        speed = self._validated_int(self.motor_speed_var, "motor speed", 1, 5000)
-        if speed is None:
+        speed_mm_s = self._validated_float(self.motor_speed_var, "motor speed", 0.01, 50.0)
+        if speed_mm_s is None:
             return None
 
-        self._send(f"MOTOR_SPEED:{speed}")
-        return speed
+        speed_steps_s = self._mm_per_second_to_steps_per_second(speed_mm_s)
+        if speed_steps_s == self.last_motor_speed_steps_s:
+            return speed_steps_s
+
+        if not self._send(f"MOTOR_SPEED:{speed_steps_s}"):
+            return None
+        return speed_steps_s
 
     def _motor_jog_forward(self):
         self._motor_jog(direction=1)
@@ -495,12 +519,14 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Motor disabled", "Enable the stepper output before jogging.")
             return
 
-        steps = self._validated_int(self.motor_steps_var, "motor steps", 1, 200000)
-        if steps is None or self._apply_motor_speed() is None:
+        distance_mm = self._validated_float(self.motor_distance_var, "motor distance", 0.01, 2000.0)
+        speed_steps_s = self._apply_motor_speed()
+        if distance_mm is None or speed_steps_s is None:
             return
 
+        steps = self._mm_to_steps(distance_mm)
         signed_steps = direction * steps
-        self.mode_var.set("Mode: stepper jog")
+        self.mode_var.set(f"Mode: stepper jog | {direction * distance_mm:.3f} mm")
         self._send(f"MOTOR_MOVE:{signed_steps}")
 
     def _motor_stop(self):
@@ -517,13 +543,67 @@ class TestRunGui(tk.Tk):
         variable.set(value)
         return value
 
+    def _validated_float(self, variable, label, minimum, maximum):
+        try:
+            value = float(variable.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid motor setting", f"Enter a numeric {label}.")
+            return None
+
+        value = min(max(value, minimum), maximum)
+        variable.set(round(value, 3))
+        return value
+
+    def _mm_to_steps(self, distance_mm):
+        return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
+
+    def _steps_to_mm(self, steps):
+        return steps * MOTOR_MM_PER_STEP
+
+    def _mm_per_second_to_steps_per_second(self, speed_mm_s):
+        return min(max(1, round(speed_mm_s * MOTOR_STEPS_PER_MM)), MAX_MOTOR_STEPS_PER_SECOND)
+
+    def _steps_per_second_to_mm_per_second(self, speed_steps_s):
+        return speed_steps_s * MOTOR_MM_PER_STEP
+
     def _send(self, command, flush_live_backlog=False):
-        if not self.serial_port:
-            return
+        if not self.serial_port or not self.writer_running:
+            return False
         if flush_live_backlog:
             self._clear_pending_live_messages()
-        self.serial_port.write(f"{command}\n".encode("ascii"))
-        self.status_var.set(f"Sent {command}")
+        self.commands.put(command)
+        self.status_var.set(f"Queued {command}")
+        return True
+
+    def _clear_pending_commands(self):
+        while True:
+            try:
+                self.commands.get_nowait()
+            except queue.Empty:
+                break
+
+    def _write_serial(self):
+        while self.writer_running and self.serial_port:
+            try:
+                command = self.commands.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if command is None:
+                break
+
+            try:
+                self.serial_port.write(f"{command}\n".encode("ascii"))
+            except serial.SerialTimeoutException:
+                self.messages.put(("status", f"Serial write timed out while sending {command}"))
+            except serial.SerialException as exc:
+                self.messages.put(("status", f"Serial write failed: {exc}"))
+                break
+            else:
+                self.messages.put(("status", f"Sent {command}"))
+                time.sleep(SERIAL_COMMAND_SPACING_SECONDS)
+
+        self.writer_running = False
 
     def _clear_pending_live_messages(self):
         kept_messages = []
@@ -667,11 +747,26 @@ class TestRunGui(tk.Tk):
             return
 
         if len(parts) >= 3 and parts[1] == "SPEED":
-            self.status_var.set(f"Stepper speed applied: {parts[2]} steps/s")
+            try:
+                speed_steps_s = int(float(parts[2]))
+            except ValueError:
+                self.status_var.set(";".join(parts))
+                return
+            self.last_motor_speed_steps_s = speed_steps_s
+            speed_mm_s = self._steps_per_second_to_mm_per_second(speed_steps_s)
+            self.status_var.set(f"Stepper speed applied: {speed_mm_s:.3f} mm/s")
             return
 
         if len(parts) >= 5 and parts[1] == "MOVE":
-            self.mode_var.set(f"Mode: stepper moving | {parts[2]} steps at {parts[4]} steps/s")
+            try:
+                move_steps = int(float(parts[2]))
+                speed_steps_s = int(float(parts[4]))
+            except ValueError:
+                self.status_var.set(";".join(parts))
+                return
+            move_mm = self._steps_to_mm(move_steps)
+            speed_mm_s = self._steps_per_second_to_mm_per_second(speed_steps_s)
+            self.mode_var.set(f"Mode: stepper moving | {move_mm:.3f} mm at {speed_mm_s:.3f} mm/s")
             return
 
         if len(parts) >= 2 and parts[1] == "DONE":
