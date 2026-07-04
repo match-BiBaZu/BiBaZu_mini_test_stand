@@ -9,6 +9,17 @@ const int allValveMask = (1 << valveCount) - 1;
 const int valveOpenSignal = HIGH;
 const int valveClosedSignal = LOW;
 
+const int stepperStepPin = 8;
+const int stepperDirPin = 9;
+const int stepperEnablePin = 10;
+const int stepperStepActiveSignal = LOW;
+const int stepperStepIdleSignal = HIGH;
+const int stepperPositiveDirSignal = HIGH;
+const int stepperNegativeDirSignal = LOW;
+const int stepperEnableSignal = HIGH;
+const int stepperDisableSignal = LOW;
+const unsigned int stepperPulseWidthMicros = 5;
+
 
 const float pressureTargets[] = {0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50, 0.60, 0.70, 0.80};
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
@@ -31,6 +42,7 @@ int streamCounter = 0;
 int loopCounter = 0;
 int waitTime = 1999;
 int activeValveMask = allValveMask;
+int stepperSpeed = 400;
 
 int rawPressureBeforeValve = 0;
 int rawRegulatorFeedback = 0;
@@ -49,6 +61,13 @@ bool pulseRequested = false;
 bool testRunning = false;
 bool writeSamples = false;
 bool streamContinuously = false;
+bool stepperEnabled = false;
+bool stepperPulseActive = false;
+
+long stepperRemainingSteps = 0;
+unsigned long stepperStepIntervalMicros = 2500;
+unsigned long stepperLastStepMicros = 0;
+unsigned long stepperPulseStartMicros = 0;
 
 enum OperatingMode {
   MODE_IDLE,
@@ -69,8 +88,14 @@ void setup() {
     pinMode(valvePins[i], OUTPUT);
     digitalWrite(valvePins[i], valveClosedSignal);
   }
+  pinMode(stepperStepPin, OUTPUT);
+  pinMode(stepperDirPin, OUTPUT);
+  pinMode(stepperEnablePin, OUTPUT);
 
   analogWrite(regulatorOutPin, 0);
+  digitalWrite(stepperStepPin, stepperStepIdleSignal);
+  digitalWrite(stepperDirPin, stepperPositiveDirSignal);
+  digitalWrite(stepperEnablePin, stepperDisableSignal);
   Serial.println("READY");
   Serial.println("Send START from the GUI to begin the test.");
 }
@@ -79,6 +104,8 @@ void loop() {
   handleSerialCommands();
 
   unsigned long currentMicros = micros();
+  updateStepper(currentMicros);
+
   if (currentMicros - previousMicros >= interval) {
     previousMicros += interval;
 
@@ -114,6 +141,14 @@ void handleSerialCommands() {
     setTargetPressure(command);
   } else if (command.startsWith("PULSE")) {
     startManualPulse(command);
+  } else if (command.startsWith("MOTOR_ENABLE")) {
+    setStepperEnabled(commandValue(command) > 0.0);
+  } else if (command.startsWith("MOTOR_SPEED")) {
+    setStepperSpeed(command);
+  } else if (command.startsWith("MOTOR_MOVE")) {
+    startStepperMove(command);
+  } else if (command == "MOTOR_STOP") {
+    stopStepper();
   }
 }
 
@@ -206,6 +241,92 @@ void startManualPulse(String command) {
 
   Serial.print("PULSE;START;");
   Serial.println(activeValveMask);
+}
+
+void setStepperEnabled(bool enabled) {
+  stepperEnabled = enabled;
+  if (!stepperEnabled) {
+    stepperRemainingSteps = 0;
+    stepperPulseActive = false;
+    digitalWrite(stepperStepPin, stepperStepIdleSignal);
+  }
+  digitalWrite(stepperEnablePin, stepperEnabled ? stepperEnableSignal : stepperDisableSignal);
+
+  Serial.print("MOTOR;ENABLED;");
+  Serial.println(stepperEnabled);
+}
+
+void setStepperSpeed(String command) {
+  int requestedSpeed = round(commandValue(command));
+  stepperSpeed = constrain(requestedSpeed, 1, 5000);
+  stepperStepIntervalMicros = 1000000UL / stepperSpeed;
+
+  Serial.print("MOTOR;SPEED;");
+  Serial.println(stepperSpeed);
+}
+
+void startStepperMove(String command) {
+  long requestedSteps = round(commandValue(command));
+
+  if (!stepperEnabled) {
+    Serial.println("MOTOR;ERROR;DISABLED");
+    return;
+  }
+
+  if (requestedSteps == 0) {
+    Serial.println("MOTOR;ERROR;NO_STEPS");
+    return;
+  }
+
+  if (requestedSteps > 0) {
+    digitalWrite(stepperDirPin, stepperPositiveDirSignal);
+    stepperRemainingSteps = requestedSteps;
+  } else {
+    digitalWrite(stepperDirPin, stepperNegativeDirSignal);
+    stepperRemainingSteps = -requestedSteps;
+  }
+
+  stepperPulseActive = false;
+  digitalWrite(stepperStepPin, stepperStepIdleSignal);
+  stepperLastStepMicros = micros();
+
+  Serial.print("MOTOR;MOVE;");
+  Serial.print(requestedSteps);
+  Serial.print(";SPEED;");
+  Serial.println(stepperSpeed);
+}
+
+void stopStepper() {
+  stepperRemainingSteps = 0;
+  stepperPulseActive = false;
+  digitalWrite(stepperStepPin, stepperStepIdleSignal);
+  Serial.println("MOTOR;STOPPED");
+}
+
+void updateStepper(unsigned long currentMicros) {
+  if (stepperPulseActive) {
+    if (currentMicros - stepperPulseStartMicros >= stepperPulseWidthMicros) {
+      digitalWrite(stepperStepPin, stepperStepIdleSignal);
+      stepperPulseActive = false;
+    }
+    return;
+  }
+
+  if (!stepperEnabled || stepperRemainingSteps <= 0) {
+    return;
+  }
+
+  if (currentMicros - stepperLastStepMicros >= stepperStepIntervalMicros) {
+    digitalWrite(stepperStepPin, stepperStepActiveSignal);
+    stepperPulseStartMicros = currentMicros;
+    stepperLastStepMicros = currentMicros;
+    stepperRemainingSteps--;
+
+    if (stepperRemainingSteps == 0) {
+      Serial.println("MOTOR;DONE");
+    }
+    stepperPulseActive = true;
+  }
 }
 
 float commandValue(String command) {

@@ -22,7 +22,7 @@ class TestRunGui(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Pneumatic Test Run")
-        self.geometry("900x560")
+        self.geometry("980x640")
 
         self.serial_port = None
         self.reader_thread = None
@@ -39,8 +39,12 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_var = tk.DoubleVar(value=0.05)
         self.increment_count_var = tk.IntVar(value=0)
         self.stream_var = tk.BooleanVar(value=True)
+        self.motor_enabled_var = tk.BooleanVar(value=False)
+        self.motor_steps_var = tk.IntVar(value=200)
+        self.motor_speed_var = tk.IntVar(value=400)
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
         self.nozzle_checkbuttons = []
+        self.motor_controls = []
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
 
@@ -179,6 +183,74 @@ class TestRunGui(tk.Tk):
         )
         self.reset_increment_button.pack(side=tk.LEFT, padx=(10, 0))
 
+        motor_controls = ttk.Frame(root)
+        motor_controls.pack(fill=tk.X, pady=(10, 0))
+
+        ttk.Label(motor_controls, text="Stepper").pack(side=tk.LEFT)
+        self.motor_enable_checkbutton = ttk.Checkbutton(
+            motor_controls,
+            text="Enable",
+            variable=self.motor_enabled_var,
+            command=self._apply_motor_enable,
+            state=tk.DISABLED,
+        )
+        self.motor_enable_checkbutton.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(motor_controls, text="Steps").pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_steps_spinbox = ttk.Spinbox(
+            motor_controls,
+            from_=1,
+            to=200000,
+            increment=10,
+            textvariable=self.motor_steps_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.motor_steps_spinbox.pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(motor_controls, text="Speed").pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_speed_spinbox = ttk.Spinbox(
+            motor_controls,
+            from_=1,
+            to=5000,
+            increment=50,
+            textvariable=self.motor_speed_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.motor_speed_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(motor_controls, text="steps/s").pack(side=tk.LEFT)
+
+        self.motor_reverse_button = ttk.Button(
+            motor_controls,
+            text="Jog -",
+            command=self._motor_jog_reverse,
+            state=tk.DISABLED,
+        )
+        self.motor_reverse_button.pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_forward_button = ttk.Button(
+            motor_controls,
+            text="Jog +",
+            command=self._motor_jog_forward,
+            state=tk.DISABLED,
+        )
+        self.motor_forward_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.motor_stop_button = ttk.Button(
+            motor_controls,
+            text="Stop motor",
+            command=self._motor_stop,
+            state=tk.DISABLED,
+        )
+        self.motor_stop_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.motor_controls = [
+            self.motor_enable_checkbutton,
+            self.motor_steps_spinbox,
+            self.motor_speed_spinbox,
+            self.motor_reverse_button,
+            self.motor_forward_button,
+            self.motor_stop_button,
+        ]
+
         ttk.Label(root, textvariable=self.mode_var).pack(fill=tk.X, pady=(10, 0))
         ttk.Label(root, textvariable=self.status_var).pack(fill=tk.X, pady=(10, 8))
 
@@ -268,6 +340,7 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_spinbox.configure(state=tk.NORMAL)
         self.reset_increment_button.configure(state=tk.NORMAL)
         self._set_pulse_buttons_enabled(True)
+        self._set_motor_controls_enabled(True)
         self.mode_var.set("Mode: connected")
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
         self._apply_pressure_settings()
@@ -296,6 +369,8 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_spinbox.configure(state=tk.DISABLED)
         self.reset_increment_button.configure(state=tk.DISABLED)
         self._set_pulse_buttons_enabled(False)
+        self._set_motor_controls_enabled(False)
+        self.motor_enabled_var.set(False)
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
         self.mode_var.set("Mode: disconnected")
@@ -393,6 +468,55 @@ class TestRunGui(tk.Tk):
     def _apply_stream_setting(self):
         self._send("STREAM_ON" if self.stream_var.get() else "STREAM_OFF")
 
+    def _set_motor_controls_enabled(self, enabled):
+        state = tk.NORMAL if enabled and self.serial_port else tk.DISABLED
+        for control in self.motor_controls:
+            control.configure(state=state)
+
+    def _apply_motor_enable(self):
+        self._send(f"MOTOR_ENABLE:{1 if self.motor_enabled_var.get() else 0}")
+
+    def _apply_motor_speed(self):
+        speed = self._validated_int(self.motor_speed_var, "motor speed", 1, 5000)
+        if speed is None:
+            return None
+
+        self._send(f"MOTOR_SPEED:{speed}")
+        return speed
+
+    def _motor_jog_forward(self):
+        self._motor_jog(direction=1)
+
+    def _motor_jog_reverse(self):
+        self._motor_jog(direction=-1)
+
+    def _motor_jog(self, direction):
+        if not self.motor_enabled_var.get():
+            messagebox.showerror("Motor disabled", "Enable the stepper output before jogging.")
+            return
+
+        steps = self._validated_int(self.motor_steps_var, "motor steps", 1, 200000)
+        if steps is None or self._apply_motor_speed() is None:
+            return
+
+        signed_steps = direction * steps
+        self.mode_var.set("Mode: stepper jog")
+        self._send(f"MOTOR_MOVE:{signed_steps}")
+
+    def _motor_stop(self):
+        self._send("MOTOR_STOP")
+
+    def _validated_int(self, variable, label, minimum, maximum):
+        try:
+            value = int(variable.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid motor setting", f"Enter a numeric {label}.")
+            return None
+
+        value = min(max(value, minimum), maximum)
+        variable.set(value)
+        return value
+
     def _send(self, command, flush_live_backlog=False):
         if not self.serial_port:
             return
@@ -459,6 +583,10 @@ class TestRunGui(tk.Tk):
 
         if parts[0] == "PULSE":
             self._handle_pulse_line(parts)
+            return
+
+        if parts[0] == "MOTOR":
+            self._handle_motor_line(parts)
             return
 
         if not parts or not parts[0].isdigit():
@@ -531,6 +659,33 @@ class TestRunGui(tk.Tk):
                 self._advance_increment_target(completed_increment_direction)
             else:
                 self.mode_var.set("Mode: manual pressure")
+
+    def _handle_motor_line(self, parts):
+        if len(parts) >= 3 and parts[1] == "ENABLED":
+            self.motor_enabled_var.set(parts[2] not in ("0", "FALSE"))
+            self.status_var.set(f"Stepper enabled: {self.motor_enabled_var.get()}")
+            return
+
+        if len(parts) >= 3 and parts[1] == "SPEED":
+            self.status_var.set(f"Stepper speed applied: {parts[2]} steps/s")
+            return
+
+        if len(parts) >= 5 and parts[1] == "MOVE":
+            self.mode_var.set(f"Mode: stepper moving | {parts[2]} steps at {parts[4]} steps/s")
+            return
+
+        if len(parts) >= 2 and parts[1] == "DONE":
+            self.mode_var.set("Mode: stepper done")
+            self.status_var.set("Stepper move complete")
+            return
+
+        if len(parts) >= 2 and parts[1] == "STOPPED":
+            self.mode_var.set("Mode: stepper stopped")
+            self.status_var.set("Stepper stopped")
+            return
+
+        if len(parts) >= 3 and parts[1] == "ERROR":
+            self.status_var.set(";".join(parts))
 
     def _advance_increment_target(self, direction):
         starting_pressure = self._validated_pressure(self.starting_pressure_var, "starting pressure")

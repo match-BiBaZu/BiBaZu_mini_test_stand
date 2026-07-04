@@ -1,0 +1,6 @@
+board_manager:
+    additional_urls: []
+directories:
+    data: /home/rosmatch/BiBaZu_ws/src/BiBaZu_mini_test_stand/.arduino-cli/data
+    downloads: /home/rosmatch/BiBaZu_ws/src/BiBaZu_mini_test_stand/.arduino-cli/downloads
+    user: /home/rosmatch/BiBaZu_ws/src/BiBaZu_mini_test_stand/.arduino-cli/user
