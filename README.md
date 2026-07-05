@@ -192,6 +192,7 @@ Motorkommandos:
 | 1 | STOP | Halt mit Rampe |
 | 2 | REF | Referenzfahrt |
 | 5 | REMOTE | Remote-/PC-Betrieb setzen |
+| 8 | Position ist Referenzpunkt | aktuelle Position als Null/Referenzpunkt setzen |
 | 10 | EXITREM | Remote-Betrieb beenden |
 | 11 | DISABLE | Endstufe ausschalten |
 | 12 | ENABLE | Endstufe einschalten |
@@ -246,6 +247,7 @@ COLIBRI_SLAVE_ADDRESS = 0xFF
 COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 200.0
 COLIBRI_TRAVEL_MM = 75.0
+COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 ```
 
 Die GUI hat zwei getrennte serielle Verbindungen:
@@ -258,12 +260,28 @@ Colibri-Funktionen in der GUI:
 - eigenen Colibri-Port verbinden
 - Status/Position lesen
 - Endstufe ein/aus
-- Referenzfahrt starten
+- negative Referenzfahrt starten (`Reference -`)
+- aktuelle Position als Nullpunkt setzen (`Set zero here`)
 - Relativ-Jog in mm
 - Absolutposition in mm anfahren
 - Stop Colibri
 
 Die GUI setzt vor Bewegungen automatisch `REMOTE` und `ENABLE`.
+Der Referenzbutton setzt vor dem Start die Referenzart temporaer auf
+`Drehueberwachung negativ` und den Referenzstrom auf 20 %. Die Achse soll damit
+kontrolliert in die negative Endlage fahren, den Anschlag ueber die
+Drehueberwachung erkennen, ein paar Freifahrschritte zurueckfahren und diesen
+Punkt als Null/Referenz setzen.
+
+Falls eine Halterung oder ein Anbauteil den mechanischen Anschlag bereits kurz
+vor dem eigentlichen Achsanschlag beruehrt, ist der praktisch nutzbare Nullpunkt
+dieser Kontaktpunkt. Empfohlener Ablauf:
+
+1. Mit kleinen negativen Jogs vorsichtig bis an diesen Kontaktpunkt fahren.
+2. `Set zero here` druecken.
+3. Optional mit `Jog +` um 0.1 mm oder einen passenden Sicherheitsabstand
+   freifahren.
+4. Danach alle Arbeitspositionen positiv relativ zu diesem Nullpunkt anfahren.
 
 ## Debug-Log
 
@@ -305,6 +323,13 @@ Die zweite Antwort enthaelt die Position als little-endian 32-Bit Integer.
 - Der Servo/Colibri bewegt sich aus der GUI.
 - Es gab Hinweise auf `ERR_UMOT` / Motorspannungsfehler. Das sollte mit dem
   Debug-Log weiter eingegrenzt werden.
+- Bei einem Jog von 8.5 mm sendete die GUI korrekt 1700 Schritte. Die Achse
+  stoppte jedoch deutlich vor dem Ziel und meldete `error_byte=0x11`, also
+  allgemeinen Fehler plus Motorspannungsfehler. Die Motorspannung kann im
+  Ruhezustand trotzdem ca. 24 V anzeigen; entscheidend ist der Einbruch unter
+  Last. Netzteil, Sicherung, Klemmen, Kabel und Strombegrenzung pruefen.
+- Die GUI wartet bei Jog/Absolutfahrt inzwischen bis Ziel erreicht, vorzeitig
+  gestoppt, Timeout oder Fehlerbyte erkannt wird.
 
 ## Vorsicht beim Testen
 

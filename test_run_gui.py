@@ -27,6 +27,7 @@ COLIBRI_SLAVE_ADDRESS = 0xFF
 COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
+COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 
 
 class ColibriProtocolError(Exception):
@@ -41,12 +42,15 @@ class ColibriController:
     TG_REQ_STATUS = 0x01
     TG_REQ_ERROR = 0x02
     TG_REQ_POSITION = 0x03
+    TG_REQ_PARAM = 0x06
     TG_MOVE_REL = 0x15
     TG_MOTOR = 0x16
     TG_MOVE_ABS = 0x1A
+    TG_SET_PARAM = 0x1F
 
     TG_STATUS = 0x80
     TG_ERROR = 0x81
+    TG_PARAM = 0x83
     TG_POSITION = 0x84
     TG_MOVING = 0x85
 
@@ -54,6 +58,7 @@ class ColibriController:
     MOTOR_STOP = 1
     MOTOR_REF = 2
     MOTOR_REMOTE = 5
+    MOTOR_SET_REFERENCE_POINT = 8
     MOTOR_EXIT_REMOTE = 10
     MOTOR_DISABLE = 11
     MOTOR_ENABLE = 12
@@ -102,6 +107,25 @@ class ColibriController:
             "details": response[4],
         }
 
+    def parameter(self, index, subindex):
+        response = self._request(self.TG_REQ_PARAM, index, subindex, expected_type=self.TG_PARAM)
+        if len(response) < 6:
+            raise ColibriProtocolError(f"Short parameter response: {response.hex(' ')}")
+        if response[3] != index or response[4] != subindex:
+            raise ColibriProtocolError(f"Unexpected parameter response: {response.hex(' ')}")
+        return int.from_bytes(response[5:-1], byteorder="little", signed=False)
+
+    def set_parameter(self, index, subindex, value, byte_count):
+        value_bytes = int(value).to_bytes(byte_count, byteorder="little", signed=False)
+        return self._request(
+            self.TG_SET_PARAM,
+            index,
+            subindex,
+            *value_bytes,
+            expected_type=None,
+            retry_on_timeout=False,
+        )
+
     def set_remote(self):
         return self.motor_command(self.MOTOR_REMOTE)
 
@@ -120,20 +144,29 @@ class ColibriController:
     def reference(self):
         return self.motor_command(self.MOTOR_REF)
 
+    def set_current_position_as_reference(self):
+        return self.motor_command(self.MOTOR_SET_REFERENCE_POINT)
+
+    def configure_negative_reference(self):
+        self.set_parameter(4, 1, 2, 1)
+        self.set_parameter(5, 2, COLIBRI_REFERENCE_CURRENT_PERCENT, 1)
+
     def motor_command(self, command):
-        return self._request(self.TG_MOTOR, command, expected_type=None)
+        return self._request(self.TG_MOTOR, command, expected_type=None, retry_on_timeout=False)
 
     def move_relative_steps(self, steps):
-        return self._request(self.TG_MOVE_REL, *self._int32_bytes(steps), expected_type=self.TG_MOVING)
+        return self._request(self.TG_MOVE_REL, *self._int32_bytes(steps), expected_type=None, retry_on_timeout=False)
 
     def move_absolute_steps(self, steps):
-        return self._request(self.TG_MOVE_ABS, *self._int32_bytes(steps), expected_type=self.TG_MOVING)
+        return self._request(self.TG_MOVE_ABS, *self._int32_bytes(steps), expected_type=None, retry_on_timeout=False)
 
-    def _request(self, *data, expected_type):
+    def _request(self, *data, expected_type, retry_on_timeout=True):
         with self.lock:
             last_response = None
+            last_error = None
             request_frame = self._build_frame(data)
-            for attempt in range(2):
+            attempts = 2 if retry_on_timeout else 1
+            for attempt in range(attempts):
                 self.serial_port.reset_input_buffer()
                 self._trace(f"TX {request_frame.hex(' ')}")
                 self.serial_port.write(request_frame)
@@ -144,16 +177,23 @@ class ColibriController:
                     if response is None:
                         continue
                     self._trace(f"RX {response.hex(' ')}")
-                    self._validate_response(response)
+                    try:
+                        self._validate_response(response)
+                    except ColibriProtocolError as exc:
+                        last_error = exc
+                        self._trace(f"RX ignored {exc}")
+                        continue
                     last_response = response
                     if len(response) >= 3 and response[2] == self.TG_ERROR and expected_type != self.TG_ERROR:
                         continue
                     if expected_type is None or (len(response) >= 3 and response[2] == expected_type):
                         return response
-                if attempt == 0:
+                if attempt + 1 < attempts:
                     time.sleep(0.05)
             if last_response is not None:
                 raise ColibriProtocolError(f"Unexpected response: {last_response.hex(' ')}")
+            if last_error is not None:
+                raise last_error
             raise TimeoutError("No response from Colibri")
 
     def _build_frame(self, data):
@@ -530,11 +570,19 @@ class TestRunGui(tk.Tk):
 
         self.colibri_reference_button = ttk.Button(
             colibri_motion_controls,
-            text="Reference",
+            text="Reference -",
             command=self._colibri_reference,
             state=tk.DISABLED,
         )
         self.colibri_reference_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.colibri_set_zero_button = ttk.Button(
+            colibri_motion_controls,
+            text="Set zero here",
+            command=self._colibri_set_zero_here,
+            state=tk.DISABLED,
+        )
+        self.colibri_set_zero_button.pack(side=tk.LEFT, padx=(8, 0))
 
         ttk.Label(colibri_motion_controls, text="Relative").pack(side=tk.LEFT, padx=(18, 0))
         self.colibri_distance_spinbox = ttk.Spinbox(
@@ -596,6 +644,7 @@ class TestRunGui(tk.Tk):
             self.colibri_refresh_button,
             self.colibri_enable_checkbutton,
             self.colibri_reference_button,
+            self.colibri_set_zero_button,
             self.colibri_distance_spinbox,
             self.colibri_reverse_button,
             self.colibri_forward_button,
@@ -1037,18 +1086,38 @@ class TestRunGui(tk.Tk):
     def _colibri_reference(self):
         if not messagebox.askyesno(
             "Start reference run",
-            "Start the Colibri reference run now? Make sure the axis can move freely.",
+            "Start the negative Colibri reference run now? Make sure the axis can move toward the negative endstop.",
         ):
             return
 
         def task():
             self.colibri.set_remote()
             self.colibri.enable()
+            self.colibri.configure_negative_reference()
+            self._write_debug_log(
+                "COLIBRI configured reference type=2 (Drehueberwachung negativ), "
+                f"reference_current={COLIBRI_REFERENCE_CURRENT_PERCENT}%"
+            )
             self.colibri.reference()
+            return self._wait_for_colibri_reference()
+
+        self._run_colibri_task("Start Colibri negative reference run", task)
+
+    def _colibri_set_zero_here(self):
+        if not messagebox.askyesno(
+            "Set zero here",
+            "Set the current Colibri position as 0.0 mm / reference point?",
+        ):
+            return
+
+        def task():
+            self.colibri.set_remote()
+            self.colibri.enable()
+            self.colibri.set_current_position_as_reference()
             time.sleep(0.1)
             return self._read_colibri_snapshot()
 
-        self._run_colibri_task("Start Colibri reference run", task)
+        self._run_colibri_task("Set Colibri zero here", task)
 
     def _colibri_jog_forward(self):
         self._colibri_jog(direction=1)
@@ -1065,9 +1134,10 @@ class TestRunGui(tk.Tk):
         def task():
             self.colibri.set_remote()
             self.colibri.enable()
+            start_steps = self.colibri.position_steps()
+            target_steps = start_steps + signed_steps
             self.colibri.move_relative_steps(signed_steps)
-            time.sleep(0.1)
-            return self._read_colibri_snapshot()
+            return self._wait_for_colibri_move(target_steps)
 
         self._run_colibri_task(f"Colibri jog {direction * distance_mm:.3f} mm", task)
 
@@ -1086,8 +1156,7 @@ class TestRunGui(tk.Tk):
             self.colibri.set_remote()
             self.colibri.enable()
             self.colibri.move_absolute_steps(target_steps)
-            time.sleep(0.1)
-            return self._read_colibri_snapshot()
+            return self._wait_for_colibri_move(target_steps)
 
         self._run_colibri_task(f"Colibri absolute move {position_mm:.3f} mm", task)
 
@@ -1136,6 +1205,85 @@ class TestRunGui(tk.Tk):
             "position_mm": self._colibri_steps_to_mm(position_steps),
             "error": error,
         }
+
+    def _wait_for_colibri_reference(self, timeout_seconds=30.0):
+        deadline = time.time() + timeout_seconds
+        last_snapshot = None
+        time.sleep(0.2)
+
+        while time.time() < deadline:
+            snapshot = self._read_colibri_snapshot()
+            last_snapshot = snapshot
+            status = snapshot["status"]
+            self._write_debug_log(
+                "COLIBRI reference poll "
+                f"position_mm={snapshot['position_mm']:.3f} moving={status['moving']} "
+                f"referenced={status['referenced']} error_byte=0x{status['error_byte']:02X}"
+            )
+
+            if status["error_byte"]:
+                raise ColibriProtocolError(
+                    f"Reference failed with error_byte=0x{status['error_byte']:02X}"
+                )
+            if status["referenced"] and not status["moving"]:
+                return snapshot
+            if not status["moving"] and last_snapshot is not None and time.time() > deadline - timeout_seconds + 0.7:
+                break
+            time.sleep(0.2)
+
+        if last_snapshot is None:
+            raise TimeoutError("No reference status received from Colibri")
+        if not last_snapshot["status"]["referenced"]:
+            raise ColibriProtocolError("Reference run ended without referenced status bit")
+        return last_snapshot
+
+    def _wait_for_colibri_move(self, target_steps, timeout_seconds=20.0, tolerance_steps=5):
+        deadline = time.time() + timeout_seconds
+        last_snapshot = None
+        stable_stopped_reads = 0
+        last_position_steps = None
+        time.sleep(0.1)
+
+        while time.time() < deadline:
+            snapshot = self._read_colibri_snapshot()
+            last_snapshot = snapshot
+            status = snapshot["status"]
+            position_steps = snapshot["position_steps"]
+            remaining_steps = target_steps - position_steps
+            self._write_debug_log(
+                "COLIBRI move poll "
+                f"position_mm={snapshot['position_mm']:.3f} target_mm={self._colibri_steps_to_mm(target_steps):.3f} "
+                f"remaining_steps={remaining_steps} moving={status['moving']} error_byte=0x{status['error_byte']:02X}"
+            )
+
+            if status["error_byte"]:
+                raise ColibriProtocolError(
+                    f"Move aborted at {snapshot['position_mm']:.3f} mm, "
+                    f"target {self._colibri_steps_to_mm(target_steps):.3f} mm, "
+                    f"error_byte=0x{status['error_byte']:02X}"
+                )
+            if abs(remaining_steps) <= tolerance_steps and not status["moving"]:
+                return snapshot
+
+            if not status["moving"] and position_steps == last_position_steps:
+                stable_stopped_reads += 1
+            else:
+                stable_stopped_reads = 0
+            if stable_stopped_reads >= 2:
+                raise ColibriProtocolError(
+                    f"Move stopped at {snapshot['position_mm']:.3f} mm, "
+                    f"target {self._colibri_steps_to_mm(target_steps):.3f} mm"
+                )
+
+            last_position_steps = position_steps
+            time.sleep(0.2)
+
+        if last_snapshot is None:
+            raise TimeoutError("No move status received from Colibri")
+        raise TimeoutError(
+            f"Move timed out at {last_snapshot['position_mm']:.3f} mm, "
+            f"target {self._colibri_steps_to_mm(target_steps):.3f} mm"
+        )
 
     def _handle_colibri_snapshot(self, snapshot, prefix=None):
         status = snapshot["status"]
