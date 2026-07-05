@@ -1,4 +1,5 @@
 import csv
+import datetime as dt
 import queue
 import threading
 import time
@@ -21,6 +22,217 @@ MAX_QUEUE_DRAIN_PER_TICK = 250
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
+COLIBRI_BAUD_RATE = 9600
+COLIBRI_SLAVE_ADDRESS = 0xFF
+COLIBRI_MM_PER_STEP = 0.005
+COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
+COLIBRI_TRAVEL_MM = 75.0
+
+
+class ColibriProtocolError(Exception):
+    pass
+
+
+class ColibriController:
+    START_BLOCK = 0x04
+    END_BLOCK = 0x05
+    SHIFT = 0x06
+
+    TG_REQ_STATUS = 0x01
+    TG_REQ_ERROR = 0x02
+    TG_REQ_POSITION = 0x03
+    TG_MOVE_REL = 0x15
+    TG_MOTOR = 0x16
+    TG_MOVE_ABS = 0x1A
+
+    TG_STATUS = 0x80
+    TG_ERROR = 0x81
+    TG_POSITION = 0x84
+    TG_MOVING = 0x85
+
+    MOTOR_ESTOP = 0
+    MOTOR_STOP = 1
+    MOTOR_REF = 2
+    MOTOR_REMOTE = 5
+    MOTOR_EXIT_REMOTE = 10
+    MOTOR_DISABLE = 11
+    MOTOR_ENABLE = 12
+
+    def __init__(self, port, baudrate=COLIBRI_BAUD_RATE, slave_address=COLIBRI_SLAVE_ADDRESS, debug_logger=None):
+        if serial is None:
+            raise RuntimeError("pyserial is not installed")
+        self.port_name = port
+        self.slave_address = slave_address
+        self.debug_logger = debug_logger
+        self.serial_port = serial.Serial(
+            port,
+            baudrate,
+            bytesize=8,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.08,
+            write_timeout=SERIAL_WRITE_TIMEOUT,
+        )
+        self.lock = threading.Lock()
+
+    def set_debug_logger(self, debug_logger):
+        self.debug_logger = debug_logger
+
+    def close(self):
+        self.serial_port.close()
+
+    def status(self):
+        response = self._request(self.TG_REQ_STATUS, expected_type=self.TG_STATUS)
+        if len(response) < 6:
+            raise ColibriProtocolError(f"Short status response: {response.hex(' ')}")
+        return self._decode_status(response[3], response[4], response[5])
+
+    def position_steps(self):
+        response = self._request(self.TG_REQ_POSITION, expected_type=self.TG_POSITION)
+        if len(response) < 7:
+            raise ColibriProtocolError(f"Short position response: {response.hex(' ')}")
+        return int.from_bytes(response[3:7], byteorder="little", signed=True)
+
+    def error(self):
+        response = self._request(self.TG_REQ_ERROR, expected_type=self.TG_ERROR)
+        if len(response) < 5:
+            raise ColibriProtocolError(f"Short error response: {response.hex(' ')}")
+        return {
+            "last_error": response[3],
+            "details": response[4],
+        }
+
+    def set_remote(self):
+        return self.motor_command(self.MOTOR_REMOTE)
+
+    def enable(self):
+        return self.motor_command(self.MOTOR_ENABLE)
+
+    def disable(self):
+        return self.motor_command(self.MOTOR_DISABLE)
+
+    def stop(self):
+        return self.motor_command(self.MOTOR_STOP)
+
+    def emergency_stop(self):
+        return self.motor_command(self.MOTOR_ESTOP)
+
+    def reference(self):
+        return self.motor_command(self.MOTOR_REF)
+
+    def motor_command(self, command):
+        return self._request(self.TG_MOTOR, command, expected_type=None)
+
+    def move_relative_steps(self, steps):
+        return self._request(self.TG_MOVE_REL, *self._int32_bytes(steps), expected_type=self.TG_MOVING)
+
+    def move_absolute_steps(self, steps):
+        return self._request(self.TG_MOVE_ABS, *self._int32_bytes(steps), expected_type=self.TG_MOVING)
+
+    def _request(self, *data, expected_type):
+        with self.lock:
+            last_response = None
+            request_frame = self._build_frame(data)
+            for attempt in range(2):
+                self.serial_port.reset_input_buffer()
+                self._trace(f"TX {request_frame.hex(' ')}")
+                self.serial_port.write(request_frame)
+                self.serial_port.flush()
+                deadline = time.time() + 0.8
+                while time.time() < deadline:
+                    response = self._read_frame(deadline)
+                    if response is None:
+                        continue
+                    self._trace(f"RX {response.hex(' ')}")
+                    self._validate_response(response)
+                    last_response = response
+                    if len(response) >= 3 and response[2] == self.TG_ERROR and expected_type != self.TG_ERROR:
+                        continue
+                    if expected_type is None or (len(response) >= 3 and response[2] == expected_type):
+                        return response
+                if attempt == 0:
+                    time.sleep(0.05)
+            if last_response is not None:
+                raise ColibriProtocolError(f"Unexpected response: {last_response.hex(' ')}")
+            raise TimeoutError("No response from Colibri")
+
+    def _build_frame(self, data):
+        payload = bytes([self.slave_address, len(data) + 1, *data])
+        checksum = sum(payload) & 0xFF
+        return bytes([self.START_BLOCK]) + self._escape(payload + bytes([checksum])) + bytes([self.END_BLOCK])
+
+    def _escape(self, data):
+        escaped = bytearray()
+        for value in data:
+            if value in (self.START_BLOCK, self.END_BLOCK, self.SHIFT):
+                escaped.extend([self.SHIFT, (value + self.SHIFT) & 0xFF])
+            else:
+                escaped.append(value)
+        return bytes(escaped)
+
+    def _read_frame(self, deadline):
+        frame = bytearray()
+        in_frame = False
+        shifted = False
+        while time.time() < deadline:
+            byte = self.serial_port.read(1)
+            if not byte:
+                continue
+            value = byte[0]
+            if value == self.START_BLOCK:
+                frame.clear()
+                in_frame = True
+                shifted = False
+                continue
+            if value == self.END_BLOCK and in_frame:
+                return bytes(frame)
+            if not in_frame:
+                continue
+            if shifted:
+                frame.append((value - self.SHIFT) & 0xFF)
+                shifted = False
+            elif value == self.SHIFT:
+                shifted = True
+            else:
+                frame.append(value)
+        return None
+
+    def _validate_response(self, response):
+        if len(response) < 4:
+            raise ColibriProtocolError(f"Frame too short: {response.hex(' ')}")
+        checksum = sum(response[:-1]) & 0xFF
+        if checksum != response[-1]:
+            raise ColibriProtocolError(
+                f"Bad checksum: expected {checksum:02x}, got {response[-1]:02x}"
+            )
+
+    def _decode_status(self, status_byte, system_status_byte, error_byte):
+        return {
+            "moving": bool(status_byte & 0x01),
+            "software_limit": bool(status_byte & 0x02),
+            "ready": bool(status_byte & 0x08),
+            "referenced": bool(status_byte & 0x10),
+            "remote": bool(status_byte & 0x20),
+            "enabled": bool(status_byte & 0x40),
+            "password": bool(status_byte & 0x80),
+            "system_status_byte": system_status_byte,
+            "error_byte": error_byte,
+            "error": bool(error_byte & 0x01),
+            "watchdog_error": bool(error_byte & 0x02),
+            "burnout_error": bool(error_byte & 0x04),
+            "eeprom_error": bool(error_byte & 0x08),
+            "motor_voltage_error": bool(error_byte & 0x10),
+            "temperature_error": bool(error_byte & 0x20),
+            "mark_error": bool(error_byte & 0x40),
+            "bootloader_error": bool(error_byte & 0x80),
+        }
+
+    def _int32_bytes(self, value):
+        return int(value).to_bytes(4, byteorder="little", signed=True)
+
+    def _trace(self, message):
+        if self.debug_logger:
+            self.debug_logger(f"COLIBRI {message}")
 
 
 class TestRunGui(tk.Tk):
@@ -38,10 +250,19 @@ class TestRunGui(tk.Tk):
         self.messages = queue.Queue()
         self.commands = queue.Queue()
         self.port_devices = {}
+        self.colibri = None
+        self.colibri_busy = False
+        self.debug_log_file = None
+        self.debug_log_path = None
+        self.debug_log_lock = threading.Lock()
 
         self.port_var = tk.StringVar()
+        self.colibri_port_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
+        self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
+        self.colibri_position_var = tk.StringVar(value="Position: --")
+        self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.target_pressure_var = tk.DoubleVar(value=0.20)
         self.starting_pressure_var = tk.DoubleVar(value=0.20)
         self.pressure_increment_var = tk.DoubleVar(value=0.05)
@@ -50,9 +271,13 @@ class TestRunGui(tk.Tk):
         self.motor_enabled_var = tk.BooleanVar(value=False)
         self.motor_distance_var = tk.DoubleVar(value=10.0)
         self.motor_speed_var = tk.DoubleVar(value=5.0)
+        self.colibri_enabled_var = tk.BooleanVar(value=False)
+        self.colibri_distance_var = tk.DoubleVar(value=1.0)
+        self.colibri_absolute_var = tk.DoubleVar(value=0.0)
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
         self.nozzle_checkbuttons = []
         self.motor_controls = []
+        self.colibri_controls = []
         self.last_motor_speed_steps_s = None
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
@@ -81,6 +306,8 @@ class TestRunGui(tk.Tk):
         self.stop_button = ttk.Button(controls, text="Stop", command=self._stop_test, state=tk.DISABLED)
         self.stop_button.pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(controls, text="Save CSV", command=self._save_csv).pack(side=tk.RIGHT)
+        self.debug_log_button = ttk.Button(controls, text="Start debug log", command=self._toggle_debug_log)
+        self.debug_log_button.pack(side=tk.RIGHT, padx=(0, 8))
 
         pressure_controls = ttk.Frame(root)
         pressure_controls.pack(fill=tk.X, pady=(10, 0))
@@ -261,7 +488,124 @@ class TestRunGui(tk.Tk):
             self.motor_stop_button,
         ]
 
+        colibri_connection_controls = ttk.Frame(root)
+        colibri_connection_controls.pack(fill=tk.X, pady=(10, 0))
+
+        ttk.Label(colibri_connection_controls, text="Colibri").pack(side=tk.LEFT)
+        self.colibri_port_combo = ttk.Combobox(
+            colibri_connection_controls,
+            textvariable=self.colibri_port_var,
+            width=36,
+            state="readonly",
+        )
+        self.colibri_port_combo.pack(side=tk.LEFT, padx=(6, 8))
+
+        self.colibri_connect_button = ttk.Button(
+            colibri_connection_controls,
+            text="Connect",
+            command=self._toggle_colibri_connection,
+        )
+        self.colibri_connect_button.pack(side=tk.LEFT)
+        self.colibri_refresh_button = ttk.Button(
+            colibri_connection_controls,
+            text="Read status",
+            command=self._colibri_refresh_status,
+            state=tk.DISABLED,
+        )
+        self.colibri_refresh_button.pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(colibri_connection_controls, textvariable=self.colibri_position_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(colibri_connection_controls, textvariable=self.colibri_status_var).pack(side=tk.LEFT, padx=(18, 0))
+
+        colibri_motion_controls = ttk.Frame(root)
+        colibri_motion_controls.pack(fill=tk.X, pady=(10, 0))
+
+        self.colibri_enable_checkbutton = ttk.Checkbutton(
+            colibri_motion_controls,
+            text="Endstage",
+            variable=self.colibri_enabled_var,
+            command=self._apply_colibri_enable,
+            state=tk.DISABLED,
+        )
+        self.colibri_enable_checkbutton.pack(side=tk.LEFT)
+
+        self.colibri_reference_button = ttk.Button(
+            colibri_motion_controls,
+            text="Reference",
+            command=self._colibri_reference,
+            state=tk.DISABLED,
+        )
+        self.colibri_reference_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(colibri_motion_controls, text="Relative").pack(side=tk.LEFT, padx=(18, 0))
+        self.colibri_distance_spinbox = ttk.Spinbox(
+            colibri_motion_controls,
+            from_=0.005,
+            to=COLIBRI_TRAVEL_MM,
+            increment=0.5,
+            textvariable=self.colibri_distance_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.colibri_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(colibri_motion_controls, text="mm").pack(side=tk.LEFT)
+
+        self.colibri_reverse_button = ttk.Button(
+            colibri_motion_controls,
+            text="Jog -",
+            command=self._colibri_jog_reverse,
+            state=tk.DISABLED,
+        )
+        self.colibri_reverse_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.colibri_forward_button = ttk.Button(
+            colibri_motion_controls,
+            text="Jog +",
+            command=self._colibri_jog_forward,
+            state=tk.DISABLED,
+        )
+        self.colibri_forward_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(colibri_motion_controls, text="Absolute").pack(side=tk.LEFT, padx=(18, 0))
+        self.colibri_absolute_spinbox = ttk.Spinbox(
+            colibri_motion_controls,
+            from_=-COLIBRI_TRAVEL_MM,
+            to=COLIBRI_TRAVEL_MM,
+            increment=0.5,
+            textvariable=self.colibri_absolute_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.colibri_absolute_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(colibri_motion_controls, text="mm").pack(side=tk.LEFT)
+        self.colibri_absolute_button = ttk.Button(
+            colibri_motion_controls,
+            text="Go",
+            command=self._colibri_move_absolute,
+            state=tk.DISABLED,
+        )
+        self.colibri_absolute_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.colibri_stop_button = ttk.Button(
+            colibri_motion_controls,
+            text="Stop Colibri",
+            command=self._colibri_stop,
+            state=tk.DISABLED,
+        )
+        self.colibri_stop_button.pack(side=tk.LEFT, padx=(18, 0))
+
+        self.colibri_controls = [
+            self.colibri_refresh_button,
+            self.colibri_enable_checkbutton,
+            self.colibri_reference_button,
+            self.colibri_distance_spinbox,
+            self.colibri_reverse_button,
+            self.colibri_forward_button,
+            self.colibri_absolute_spinbox,
+            self.colibri_absolute_button,
+            self.colibri_stop_button,
+        ]
+
         ttk.Label(root, textvariable=self.mode_var).pack(fill=tk.X, pady=(10, 0))
+        ttk.Label(root, textvariable=self.debug_log_var).pack(fill=tk.X, pady=(4, 0))
         ttk.Label(root, textvariable=self.status_var).pack(fill=tk.X, pady=(10, 8))
 
         columns = (
@@ -303,13 +647,26 @@ class TestRunGui(tk.Tk):
         }
         labels = list(self.port_devices)
         self.port_combo["values"] = labels
+        self.colibri_port_combo["values"] = labels
         if labels and self.port_var.get() not in labels:
-            self.port_var.set(labels[0])
+            self.port_var.set(self._preferred_port_label(labels, ("arduino", "ttyacm")) or labels[0])
+        if labels and self.colibri_port_var.get() not in labels:
+            self.colibri_port_var.set(
+                self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
+            )
         elif not labels:
             self.port_var.set("")
+            self.colibri_port_var.set("")
             self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
+
+    def _preferred_port_label(self, labels, keywords):
+        for keyword in keywords:
+            for label in labels:
+                if keyword in label.lower():
+                    return label
+        return None
 
     def _toggle_connection(self):
         if self.serial_port:
@@ -356,6 +713,7 @@ class TestRunGui(tk.Tk):
         self._set_motor_controls_enabled(True)
         self.mode_var.set("Mode: connected")
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
+        self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
         self._apply_stream_setting()
 
@@ -363,7 +721,68 @@ class TestRunGui(tk.Tk):
         selected = self.port_var.get()
         return self.port_devices.get(selected, selected)
 
+    def _selected_colibri_port_device(self):
+        selected = self.colibri_port_var.get()
+        return self.port_devices.get(selected, selected)
+
+    def _toggle_debug_log(self):
+        if self.debug_log_file:
+            self._stop_debug_log()
+        else:
+            self._start_debug_log()
+
+    def _start_debug_log(self):
+        default_name = f"biba_debug_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        path = filedialog.asksaveasfilename(
+            initialfile=default_name,
+            defaultextension=".log",
+            filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+
+        try:
+            log_file = open(path, "w", encoding="utf-8")
+        except OSError as exc:
+            messagebox.showerror("Debug log failed", str(exc))
+            return
+
+        with self.debug_log_lock:
+            self.debug_log_file = log_file
+            self.debug_log_path = path
+        if self.colibri:
+            self.colibri.set_debug_logger(self._write_debug_log)
+        self.debug_log_button.configure(text="Stop debug log")
+        self.debug_log_var.set(f"Debug log: {path}")
+        self._write_debug_log("LOG started")
+        self._write_debug_log(f"GUI Arduino port label={self.port_var.get()!r} device={self._selected_port_device()!r}")
+        self._write_debug_log(
+            f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
+        )
+
+    def _stop_debug_log(self):
+        self._write_debug_log("LOG stopped")
+        if self.colibri:
+            self.colibri.set_debug_logger(None)
+        with self.debug_log_lock:
+            if self.debug_log_file:
+                self.debug_log_file.close()
+            stopped_path = self.debug_log_path
+            self.debug_log_file = None
+            self.debug_log_path = None
+        self.debug_log_button.configure(text="Start debug log")
+        self.debug_log_var.set(f"Debug log: stopped ({stopped_path})" if stopped_path else "Debug log: off")
+
+    def _write_debug_log(self, message):
+        timestamp = dt.datetime.now().isoformat(timespec="milliseconds")
+        with self.debug_log_lock:
+            if not self.debug_log_file:
+                return
+            self.debug_log_file.write(f"{timestamp} {message}\n")
+            self.debug_log_file.flush()
+
     def _disconnect(self):
+        self._write_debug_log("ARDUINO disconnect requested")
         self.writer_running = False
         self.commands.put(None)
         if self.writer_thread:
@@ -394,16 +813,19 @@ class TestRunGui(tk.Tk):
         self.pending_increment_direction = 0
         self.mode_var.set("Mode: disconnected")
         self.status_var.set("Disconnected")
+        self._write_debug_log("ARDUINO disconnected")
 
     def _start_test(self):
         self.rows.clear()
         for item in self.table.get_children():
             self.table.delete(item)
         self.mode_var.set("Mode: test sequence")
+        self._write_debug_log("GUI start test")
         self._send("START")
 
     def _stop_test(self):
         self.mode_var.set("Mode: idle")
+        self._write_debug_log("GUI stop test")
         self._send("STOP")
 
     def _manual_pulse(self):
@@ -436,6 +858,7 @@ class TestRunGui(tk.Tk):
         self.pending_increment_direction = increment_direction
         self._set_pulse_buttons_enabled(False)
         self.mode_var.set("Mode: manual pulse running")
+        self._write_debug_log(f"GUI pulse mask={mask} increment_direction={increment_direction}")
         self._send(f"PULSE:{mask}")
 
     def _selected_nozzle_mask(self):
@@ -470,6 +893,7 @@ class TestRunGui(tk.Tk):
         target_pressure = min(max(target_pressure, 0.0), 5.0)
         self.target_pressure_var.set(round(target_pressure, 3))
         self.mode_var.set("Mode: manual pressure pending")
+        self._write_debug_log(f"GUI set pressure target={target_pressure:.3f}")
         self._send(f"SET_PRESSURE:{target_pressure:.3f}", flush_live_backlog=True)
         return True
 
@@ -485,6 +909,7 @@ class TestRunGui(tk.Tk):
         return value
 
     def _apply_stream_setting(self):
+        self._write_debug_log(f"GUI stream {'on' if self.stream_var.get() else 'off'}")
         self._send("STREAM_ON" if self.stream_var.get() else "STREAM_OFF")
 
     def _set_motor_controls_enabled(self, enabled):
@@ -493,6 +918,7 @@ class TestRunGui(tk.Tk):
             control.configure(state=state)
 
     def _apply_motor_enable(self):
+        self._write_debug_log(f"GUI stepper enable={self.motor_enabled_var.get()}")
         self._send(f"MOTOR_ENABLE:{1 if self.motor_enabled_var.get() else 0}")
 
     def _apply_motor_speed(self):
@@ -527,10 +953,219 @@ class TestRunGui(tk.Tk):
         steps = self._mm_to_steps(distance_mm)
         signed_steps = direction * steps
         self.mode_var.set(f"Mode: stepper jog | {direction * distance_mm:.3f} mm")
+        self._write_debug_log(
+            f"GUI stepper jog distance_mm={direction * distance_mm:.3f} steps={signed_steps}"
+        )
         self._send(f"MOTOR_MOVE:{signed_steps}")
 
     def _motor_stop(self):
+        self._write_debug_log("GUI stepper stop")
         self._send("MOTOR_STOP")
+
+    def _toggle_colibri_connection(self):
+        if self.colibri:
+            self._disconnect_colibri()
+        else:
+            self._connect_colibri()
+
+    def _connect_colibri(self):
+        if serial is None:
+            messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
+            return
+
+        port = self._selected_colibri_port_device()
+        if not port:
+            messagebox.showerror("No port selected", "Select the Colibri serial port.")
+            return
+        if self.serial_port and port == self._selected_port_device():
+            messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
+            return
+
+        try:
+            self.colibri = ColibriController(port, debug_logger=self._write_debug_log if self.debug_log_file else None)
+            snapshot = self._read_colibri_snapshot()
+        except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError, RuntimeError) as exc:
+            if self.colibri:
+                self.colibri.close()
+            self.colibri = None
+            messagebox.showerror("Colibri connection failed", str(exc))
+            return
+
+        self.colibri_connect_button.configure(text="Disconnect")
+        self.colibri_port_combo.configure(state=tk.DISABLED)
+        self._set_colibri_controls_enabled(True)
+        self._handle_colibri_snapshot(snapshot, prefix=f"Connected to {port}")
+        self._write_debug_log(f"COLIBRI connected port={port}")
+
+    def _disconnect_colibri(self):
+        if self.colibri:
+            self._write_debug_log("COLIBRI disconnect")
+            self.colibri.close()
+        self.colibri = None
+        self.colibri_busy = False
+        self.colibri_enabled_var.set(False)
+        self.colibri_connect_button.configure(text="Connect")
+        self.colibri_port_combo.configure(state="readonly")
+        self._set_colibri_controls_enabled(False)
+        self.colibri_position_var.set("Position: --")
+        self.colibri_status_var.set("Colibri: disconnected")
+
+    def _set_colibri_controls_enabled(self, enabled):
+        state = tk.NORMAL if enabled and self.colibri and not self.colibri_busy else tk.DISABLED
+        for control in self.colibri_controls:
+            control.configure(state=state)
+        if self.colibri:
+            self.colibri_stop_button.configure(state=tk.NORMAL)
+
+    def _colibri_refresh_status(self):
+        self._run_colibri_task("Read Colibri status", self._read_colibri_snapshot)
+
+    def _apply_colibri_enable(self):
+        requested_enabled = self.colibri_enabled_var.get()
+
+        def task():
+            if requested_enabled:
+                self.colibri.set_remote()
+                self.colibri.enable()
+            else:
+                self.colibri.disable()
+            time.sleep(0.05)
+            return self._read_colibri_snapshot()
+
+        self._run_colibri_task("Set Colibri endstage", task)
+
+    def _colibri_reference(self):
+        if not messagebox.askyesno(
+            "Start reference run",
+            "Start the Colibri reference run now? Make sure the axis can move freely.",
+        ):
+            return
+
+        def task():
+            self.colibri.set_remote()
+            self.colibri.enable()
+            self.colibri.reference()
+            time.sleep(0.1)
+            return self._read_colibri_snapshot()
+
+        self._run_colibri_task("Start Colibri reference run", task)
+
+    def _colibri_jog_forward(self):
+        self._colibri_jog(direction=1)
+
+    def _colibri_jog_reverse(self):
+        self._colibri_jog(direction=-1)
+
+    def _colibri_jog(self, direction):
+        distance_mm = self._validated_float(self.colibri_distance_var, "Colibri distance", 0.005, COLIBRI_TRAVEL_MM)
+        if distance_mm is None:
+            return
+        signed_steps = self._colibri_mm_to_steps(direction * distance_mm)
+
+        def task():
+            self.colibri.set_remote()
+            self.colibri.enable()
+            self.colibri.move_relative_steps(signed_steps)
+            time.sleep(0.1)
+            return self._read_colibri_snapshot()
+
+        self._run_colibri_task(f"Colibri jog {direction * distance_mm:.3f} mm", task)
+
+    def _colibri_move_absolute(self):
+        position_mm = self._validated_float(
+            self.colibri_absolute_var,
+            "Colibri absolute position",
+            -COLIBRI_TRAVEL_MM,
+            COLIBRI_TRAVEL_MM,
+        )
+        if position_mm is None:
+            return
+        target_steps = self._colibri_mm_to_steps(position_mm)
+
+        def task():
+            self.colibri.set_remote()
+            self.colibri.enable()
+            self.colibri.move_absolute_steps(target_steps)
+            time.sleep(0.1)
+            return self._read_colibri_snapshot()
+
+        self._run_colibri_task(f"Colibri absolute move {position_mm:.3f} mm", task)
+
+    def _colibri_stop(self):
+        def task():
+            self.colibri.stop()
+            time.sleep(0.05)
+            return self._read_colibri_snapshot()
+
+        self._run_colibri_task("Stop Colibri", task, allow_while_busy=True)
+
+    def _run_colibri_task(self, label, task, allow_while_busy=False):
+        if not self.colibri:
+            messagebox.showerror("Colibri disconnected", "Connect the Colibri axis first.")
+            return
+        if self.colibri_busy and not allow_while_busy:
+            messagebox.showinfo("Colibri busy", "The Colibri axis is still processing the previous command.")
+            return
+
+        self.colibri_busy = True
+        self._set_colibri_controls_enabled(True)
+        self.colibri_status_var.set(f"Colibri: {label}...")
+        self._write_debug_log(f"COLIBRI TASK start {label}")
+
+        def worker():
+            try:
+                snapshot = task()
+            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
+                self._write_debug_log(f"COLIBRI TASK error {label}: {exc}")
+                self.messages.put(("colibri_error", f"{label} failed: {exc}"))
+            else:
+                self._write_debug_log(f"COLIBRI TASK done {label}: {snapshot}")
+                self.messages.put(("colibri_snapshot", (label, snapshot)))
+            finally:
+                self.messages.put(("colibri_done", None))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _read_colibri_snapshot(self):
+        status = self.colibri.status()
+        position_steps = self.colibri.position_steps()
+        error = self.colibri.error()
+        return {
+            "status": status,
+            "position_steps": position_steps,
+            "position_mm": self._colibri_steps_to_mm(position_steps),
+            "error": error,
+        }
+
+    def _handle_colibri_snapshot(self, snapshot, prefix=None):
+        status = snapshot["status"]
+        self.colibri_enabled_var.set(status["enabled"])
+        self.colibri_position_var.set(f"Position: {snapshot['position_mm']:.3f} mm")
+        status_parts = []
+        if status["ready"]:
+            status_parts.append("ready")
+        if status["enabled"]:
+            status_parts.append("enabled")
+        if status["remote"]:
+            status_parts.append("remote")
+        if status["referenced"]:
+            status_parts.append("referenced")
+        if status["moving"]:
+            status_parts.append("moving")
+        if status["error_byte"]:
+            status_parts.append(f"error 0x{status['error_byte']:02X}")
+        if not status_parts:
+            status_parts.append("no status bits")
+        message = ", ".join(status_parts)
+        self.colibri_status_var.set(f"Colibri: {message}")
+        if prefix:
+            self.status_var.set(f"{prefix} | Colibri {message}")
+
+    def _colibri_mm_to_steps(self, position_mm):
+        return round(position_mm * COLIBRI_STEPS_PER_MM)
+
+    def _colibri_steps_to_mm(self, steps):
+        return steps * COLIBRI_MM_PER_STEP
 
     def _validated_int(self, variable, label, minimum, maximum):
         try:
@@ -593,10 +1228,13 @@ class TestRunGui(tk.Tk):
                 break
 
             try:
+                self._write_debug_log(f"ARDUINO TX {command}")
                 self.serial_port.write(f"{command}\n".encode("ascii"))
             except serial.SerialTimeoutException:
+                self._write_debug_log(f"ARDUINO TX timeout {command}")
                 self.messages.put(("status", f"Serial write timed out while sending {command}"))
             except serial.SerialException as exc:
+                self._write_debug_log(f"ARDUINO TX error {exc}")
                 self.messages.put(("status", f"Serial write failed: {exc}"))
                 break
             else:
@@ -630,9 +1268,11 @@ class TestRunGui(tk.Tk):
             try:
                 line = self.serial_port.readline().decode("utf-8", errors="replace").strip()
             except serial.SerialException as exc:
+                self._write_debug_log(f"ARDUINO RX error {exc}")
                 self.messages.put(("status", f"Serial error: {exc}"))
                 break
             if line:
+                self._write_debug_log(f"ARDUINO RX {line}")
                 self.messages.put(("line", line))
 
     def _drain_messages(self):
@@ -644,7 +1284,19 @@ class TestRunGui(tk.Tk):
                 break
             drained_count += 1
             if kind == "status":
+                self._write_debug_log(f"GUI STATUS {value}")
                 self.status_var.set(value)
+            elif kind == "colibri_snapshot":
+                label, snapshot = value
+                self._write_debug_log(f"GUI COLIBRI snapshot {label}: {snapshot}")
+                self._handle_colibri_snapshot(snapshot, prefix=label)
+            elif kind == "colibri_error":
+                self._write_debug_log(f"GUI COLIBRI error {value}")
+                self.colibri_status_var.set(f"Colibri: {value}")
+                self.status_var.set(value)
+            elif kind == "colibri_done":
+                self.colibri_busy = False
+                self._set_colibri_controls_enabled(True)
             else:
                 self._handle_line(value)
         self.after(1 if drained_count == MAX_QUEUE_DRAIN_PER_TICK else 50, self._drain_messages)
@@ -820,7 +1472,10 @@ class TestRunGui(tk.Tk):
             writer.writerows(self.rows)
 
     def destroy(self):
+        self._disconnect_colibri()
         self._disconnect()
+        if self.debug_log_file:
+            self._stop_debug_log()
         super().destroy()
 
 
