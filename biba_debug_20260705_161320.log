@@ -1,0 +1,112 @@
+2026-07-05T16:13:28.338 LOG started
+2026-07-05T16:13:28.338 GUI Arduino port label='/dev/ttyACM0 - ttyACM0' device='/dev/ttyACM0'
+2026-07-05T16:13:28.338 GUI Colibri port label='/dev/ttyUSB0 - DEDITEC USB-RS485-Stick - DEDITEC USB-RS485-Stick' device='/dev/ttyUSB0'
+2026-07-05T16:13:32.757 COLIBRI TASK start Start Colibri reference run
+2026-07-05T16:13:32.757 COLIBRI TX 04 ff 03 16 06 0b 1d 05
+2026-07-05T16:13:32.787 COLIBRI RX ff 05 80 6d 70 11 72
+2026-07-05T16:13:32.787 COLIBRI TX 04 ff 03 16 0c 24 05
+2026-07-05T16:13:32.819 COLIBRI RX ff 04 81 04 00 88
+2026-07-05T16:13:33.059 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:33.059 COLIBRI TX 04 ff 03 16 02 1a 05
+2026-07-05T16:13:33.123 COLIBRI RX ff 05 80 6c 61 11 62
+2026-07-05T16:13:33.223 COLIBRI TX 04 ff 02 01 02 05
+2026-07-05T16:13:33.251 COLIBRI RX ff 05 80 6c 61 11 62
+2026-07-05T16:13:33.251 COLIBRI TX 04 ff 02 03 06 0a 05
+2026-07-05T16:13:33.283 COLIBRI RX ff 06 84 9a 18 00 00 3b
+2026-07-05T16:13:33.283 COLIBRI TX 04 ff 02 02 03 05
+2026-07-05T16:13:33.315 COLIBRI RX ff 04 81 01 00 85
+2026-07-05T16:13:33.315 COLIBRI TASK done Start Colibri reference run: {'status': {'moving': False, 'software_limit': False, 'ready': True, 'referenced': False, 'remote': True, 'enabled': True, 'password': False, 'system_status_byte': 97, 'error_byte': 17, 'error': True, 'watchdog_error': False, 'burnout_error': False, 'eeprom_error': False, 'motor_voltage_error': True, 'temperature_error': False, 'mark_error': False, 'bootloader_error': False}, 'position_steps': 6298, 'position_mm': 31.490000000000002, 'error': {'last_error': 1, 'details': 0}}
+2026-07-05T16:13:33.348 GUI COLIBRI snapshot Start Colibri reference run: {'status': {'moving': False, 'software_limit': False, 'ready': True, 'referenced': False, 'remote': True, 'enabled': True, 'password': False, 'system_status_byte': 97, 'error_byte': 17, 'error': True, 'watchdog_error': False, 'burnout_error': False, 'eeprom_error': False, 'motor_voltage_error': True, 'temperature_error': False, 'mark_error': False, 'bootloader_error': False}, 'position_steps': 6298, 'position_mm': 31.490000000000002, 'error': {'last_error': 1, 'details': 0}}
+2026-07-05T16:13:37.460 COLIBRI TASK start Colibri jog 1.000 mm
+2026-07-05T16:13:37.460 COLIBRI TX 04 ff 03 16 06 0b 1d 05
+2026-07-05T16:13:37.486 COLIBRI RX ff 05 80 08 70 00 fc
+2026-07-05T16:13:37.486 COLIBRI TX 04 ff 03 16 0c 24 05
+2026-07-05T16:13:37.518 COLIBRI RX ff 04 81 04 00 88
+2026-07-05T16:13:37.566 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:37.566 COLIBRI TX 04 ff 06 0c 15 c8 00 00 00 e2 05
+2026-07-05T16:13:37.614 COLIBRI RX ff 05 80 0c 71 00 01
+2026-07-05T16:13:37.678 COLIBRI RX ff 06 84 43 00 00 00 cc
+2026-07-05T16:13:37.918 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:37.950 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:37.966 COLIBRI RX ff 06 84 c8 00 00 00 51
+2026-07-05T16:13:38.046 COLIBRI RX ff 05 82 02 18 00 a0
+2026-07-05T16:13:38.142 COLIBRI RX ff 05 82 01 18 00 9f
+2026-07-05T16:13:38.365 COLIBRI RX ff 04 86 04 00 8d
+2026-07-05T16:13:38.496 COLIBRI TX 04 ff 06 0c 15 c8 00 00 00 e2 05
+2026-07-05T16:13:38.573 COLIBRI RX ff 05 80 0c 71 00 01
+2026-07-05T16:13:38.669 COLIBRI RX ff 06 84 51 01 00 00 db
+2026-07-05T16:13:38.877 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:38.925 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:38.973 COLIBRI RX ff 06 84 90 01 00 00 1a
+2026-07-05T16:13:39.084 COLIBRI RX ff 05 82 01 18 00 9f
+2026-07-05T16:13:39.324 COLIBRI TASK error Colibri jog 1.000 mm: Unexpected response: ff 05 82 01 18 00 9f
+2026-07-05T16:13:39.363 GUI COLIBRI error Colibri jog 1.000 mm failed: Unexpected response: ff 05 82 01 18 00 9f
+2026-07-05T16:13:39.717 COLIBRI TASK start Colibri jog -1.000 mm
+2026-07-05T16:13:39.717 COLIBRI TX 04 ff 03 16 06 0b 1d 05
+2026-07-05T16:13:39.740 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:39.740 COLIBRI TX 04 ff 03 16 0c 24 05
+2026-07-05T16:13:39.772 COLIBRI RX ff 04 81 04 00 88
+2026-07-05T16:13:39.820 COLIBRI RX ff 06 84 90 01 00 00 1a
+2026-07-05T16:13:39.820 COLIBRI TX 04 ff 06 0c 15 38 ff ff ff 4f 05
+2026-07-05T16:13:39.868 COLIBRI RX ff 05 80 0c 71 00 01
+2026-07-05T16:13:39.964 COLIBRI RX ff 06 84 20 01 00 00 aa
+2026-07-05T16:13:40.203 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:40.219 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:40.267 COLIBRI RX ff 06 84 c8 00 00 00 51
+2026-07-05T16:13:40.299 COLIBRI RX ff 05 82 02 18 00 a0
+2026-07-05T16:13:40.395 COLIBRI RX ff 05 82 01 18 00 9f
+2026-07-05T16:13:40.619 COLIBRI RX ff 04 86 04 00 8d
+2026-07-05T16:13:40.750 COLIBRI TX 04 ff 06 0c 15 38 ff ff ff 4f 05
+2026-07-05T16:13:40.811 COLIBRI RX ff 05 80 0c 71 00 01
+2026-07-05T16:13:40.923 COLIBRI RX ff 06 84 44 00 00 00 cd
+2026-07-05T16:13:41.131 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:41.163 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:41.226 COLIBRI RX ff 06 84 00 00 00 00 89
+2026-07-05T16:13:41.322 COLIBRI RX ff 05 82 01 18 00 9f
+2026-07-05T16:13:41.562 COLIBRI TASK error Colibri jog -1.000 mm: Unexpected response: ff 05 82 01 18 00 9f
+2026-07-05T16:13:41.568 GUI COLIBRI error Colibri jog -1.000 mm failed: Unexpected response: ff 05 82 01 18 00 9f
+2026-07-05T16:13:41.924 COLIBRI TASK start Colibri absolute move 5.000 mm
+2026-07-05T16:13:41.924 COLIBRI TX 04 ff 03 16 06 0b 1d 05
+2026-07-05T16:13:41.946 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:41.946 COLIBRI TX 04 ff 03 16 0c 24 05
+2026-07-05T16:13:41.962 COLIBRI RX ff 06 84 00 ff 03 16 0c
+2026-07-05T16:13:41.962 COLIBRI TASK error Colibri absolute move 5.000 mm: Bad checksum: expected a1, got 0c
+2026-07-05T16:13:41.970 GUI COLIBRI error Colibri absolute move 5.000 mm failed: Bad checksum: expected a1, got 0c
+2026-07-05T16:13:42.970 COLIBRI TASK start Colibri absolute move 5.000 mm
+2026-07-05T16:13:42.970 COLIBRI TX 04 ff 03 16 06 0b 1d 05
+2026-07-05T16:13:43.001 COLIBRI RX ff 05 80 0c 70 00 00
+2026-07-05T16:13:43.001 COLIBRI TX 04 ff 03 16 0c 24 05
+2026-07-05T16:13:43.033 COLIBRI RX ff 04 81 04 00 88
+2026-07-05T16:13:43.272 COLIBRI RX ff 05 82 03 1c 00 a5
+2026-07-05T16:13:43.272 COLIBRI TX 04 ff 06 0c 1a e8 03 00 00 0a 05
+2026-07-05T16:13:43.320 COLIBRI RX ff 05 80 0c 71 00 01
+2026-07-05T16:13:43.416 COLIBRI RX ff 06 84 69 00 00 00 f2
+2026-07-05T16:13:43.720 COLIBRI RX ff 06 84 95 01 00 00 1f
+2026-07-05T16:13:43.960 COLIBRI RX ff 05 82 03 1d 00 a6
+2026-07-05T16:13:43.976 COLIBRI RX ff 05 80 6d 70 11 72
+2026-07-05T16:13:44.024 COLIBRI RX ff 06 84 18 02 00 00 a3
+2026-07-05T16:13:44.056 COLIBRI RX ff 05 82 02 0a 00 92
+2026-07-05T16:13:44.072 COLIBRI RX ff 06 84 08 02 00 00 93
+2026-07-05T16:13:44.202 COLIBRI TX 04 ff 06 0c 1a e8 03 00 00 0a 05
+2026-07-05T16:13:44.263 COLIBRI RX ff 05 80 6c 71 11 72
+2026-07-05T16:13:44.375 COLIBRI RX ff 06 84 89 02 00 00 14
+2026-07-05T16:13:44.583 COLIBRI RX ff 05 82 03 1d 00 a6
+2026-07-05T16:13:44.615 COLIBRI RX ff 05 80 6d 70 11 72
+2026-07-05T16:13:44.663 COLIBRI RX ff 06 84 a8 02 00 00 33
+2026-07-05T16:13:44.679 COLIBRI RX ff 05 82 02 09 00 91
+2026-07-05T16:13:44.775 COLIBRI RX ff 05 82 01 16 00 9d
+2026-07-05T16:13:45.015 COLIBRI RX ff 04 86 04 00 8d
+2026-07-05T16:13:45.095 COLIBRI TASK error Colibri absolute move 5.000 mm: Unexpected response: ff 04 86 04 00 8d
+2026-07-05T16:13:45.129 GUI COLIBRI error Colibri absolute move 5.000 mm failed: Unexpected response: ff 04 86 04 00 8d
+2026-07-05T16:13:46.078 COLIBRI TASK start Stop Colibri
+2026-07-05T16:13:46.078 COLIBRI TX 04 ff 03 16 01 19 05
+2026-07-05T16:13:46.118 COLIBRI RX ff 04 86 04 00 8d
+2026-07-05T16:13:46.168 COLIBRI TX 04 ff 02 01 02 05
+2026-07-05T16:13:46.198 COLIBRI RX ff 05 80 6d 70 11 72
+2026-07-05T16:13:46.198 COLIBRI TX 04 ff 02 03 06 0a 05
+2026-07-05T16:13:46.230 COLIBRI RX ff 06 84 a8 02 00 00 33
+2026-07-05T16:13:46.230 COLIBRI TX 04 ff 02 02 03 05
+2026-07-05T16:13:46.262 COLIBRI RX ff 04 81 01 00 85
+2026-07-05T16:13:46.262 COLIBRI TASK done Stop Colibri: {'status': {'moving': True, 'software_limit': False, 'ready': True, 'referenced': False, 'remote': True, 'enabled': True, 'password': False, 'system_status_byte': 112, 'error_byte': 17, 'error': True, 'watchdog_error': False, 'burnout_error': False, 'eeprom_error': False, 'motor_voltage_error': True, 'temperature_error': False, 'mark_error': False, 'bootloader_error': False}, 'position_steps': 680, 'position_mm': 3.4, 'error': {'last_error': 1, 'details': 0}}
+2026-07-05T16:13:46.282 GUI COLIBRI snapshot Stop Colibri: {'status': {'moving': True, 'software_limit': False, 'ready': True, 'referenced': False, 'remote': True, 'enabled': True, 'password': False, 'system_status_byte': 112, 'error_byte': 17, 'error': True, 'watchdog_error': False, 'burnout_error': False, 'eeprom_error': False, 'motor_voltage_error': True, 'temperature_error': False, 'mark_error': False, 'bootloader_error': False}, 'position_steps': 680, 'position_mm': 3.4, 'error': {'last_error': 1, 'details': 0}}
+2026-07-05T16:13:51.722 LOG stopped
