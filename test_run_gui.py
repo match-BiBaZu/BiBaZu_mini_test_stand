@@ -1,9 +1,13 @@
 import csv
 import datetime as dt
+import json
+import math
 import queue
+import re
 import threading
 import time
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 try:
@@ -19,6 +23,10 @@ SERIAL_WRITE_TIMEOUT = 1.0
 SERIAL_COMMAND_SPACING_SECONDS = 0.08
 MAX_LOG_LINES = 400
 MAX_QUEUE_DRAIN_PER_TICK = 250
+FLOW_DELAY_CAPTURE_MS = 500.0
+SAMPLE_INTERVAL_MS = 5.0
+VALVE_PULSE_DURATION_MS = 100.0
+PRESSURE_SETTLE_SKIP_SAMPLES = 2
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -28,6 +36,11 @@ COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
+FORCE_BAUD_RATE = 38400
+FORCE_SENSOR_RANGE_N = 2.0
+FORCE_BINARY_SYNC = 0x2C
+FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
+FORCE_VALUE_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 
 class ColibriProtocolError(Exception):
@@ -280,13 +293,27 @@ class TestRunGui(tk.Tk):
         super().__init__()
         self.title("Pneumatic Test Run")
         self.geometry("980x640")
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self.user_presets_path = Path(__file__).with_name("user_presets.json")
+        self.user_presets = self._load_user_presets()
         self.serial_port = None
         self.reader_thread = None
         self.writer_thread = None
         self.reader_running = False
         self.writer_running = False
+        self.force_serial_port = None
+        self.force_reader_thread = None
+        self.force_reader_running = False
+        self.force_lock = threading.Lock()
+        self.latest_force_raw_n = None
+        self.latest_force_n = None
+        self.latest_force_time = None
+        self.force_zero_offset_n = 0.0
         self.rows = []
+        self.impulse_rows = []
+        self.current_impulse = None
+        self.last_valves_open = False
         self.messages = queue.Queue()
         self.commands = queue.Queue()
         self.port_devices = {}
@@ -298,22 +325,53 @@ class TestRunGui(tk.Tk):
 
         self.port_var = tk.StringVar()
         self.colibri_port_var = tk.StringVar()
+        self.force_port_var = tk.StringVar()
+        self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
         self.colibri_position_var = tk.StringVar(value="Position: --")
+        self.force_status_var = tk.StringVar(value="Force sensor: disconnected")
+        self.force_value_var = tk.StringVar(value="Force: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
-        self.target_pressure_var = tk.DoubleVar(value=0.20)
-        self.starting_pressure_var = tk.DoubleVar(value=0.20)
+        self.german_csv_format_var = tk.BooleanVar(value=True)
+        self.target_pressure_var = tk.DoubleVar(value=0.50)
+        self.starting_pressure_var = tk.DoubleVar(value=0.50)
+        self.test_start_pressure_var = tk.DoubleVar(value=0.50)
+        self.test_end_pressure_var = tk.DoubleVar(value=0.80)
+        self.test_repeats_var = tk.IntVar(value=10)
         self.pressure_increment_var = tk.DoubleVar(value=0.05)
         self.increment_count_var = tk.IntVar(value=0)
+        self.flow_threshold_var = tk.DoubleVar(value=2.0)
+        self.pressure_offset_var = tk.DoubleVar(
+            value=self._preset_float("pressure_pwm_offset_percent", 7.0, -100.0, 100.0)
+        )
         self.stream_var = tk.BooleanVar(value=True)
         self.motor_enabled_var = tk.BooleanVar(value=False)
         self.motor_distance_var = tk.DoubleVar(value=10.0)
+        self.motor_absolute_var = tk.DoubleVar(value=0.0)
         self.motor_speed_var = tk.DoubleVar(value=5.0)
+        self.motor_position_var = tk.StringVar(value="Stepper position: --")
+        self.last_motor_position_mm = None
         self.colibri_enabled_var = tk.BooleanVar(value=False)
         self.colibri_distance_var = tk.DoubleVar(value=1.0)
         self.colibri_absolute_var = tk.DoubleVar(value=0.0)
+        self.last_colibri_position_mm = None
+        self.part_pose_var = tk.StringVar()
+        self.part_hole_var = tk.StringVar()
+        self.part_csv_status_var = tk.StringVar(value="No part CSV loaded")
+        self.use_cap_offsets_var = tk.BooleanVar(value=False)
+        self.nozzle_offset_var = tk.DoubleVar(value=self._preset_float("nozzle_offset_mm", 0.0, -2000.0, 2000.0))
+        self.test_stand_height_var = tk.DoubleVar(
+            value=self._preset_float("test_stand_height_mm", 0.0, -2000.0, 2000.0)
+        )
+        self.holder_height_var = tk.DoubleVar(
+            value=self._preset_float("holder_height_mm", 0.0, -2000.0, 2000.0)
+        )
+        self.part_y_offset_var = tk.StringVar(value="Y offset: --")
+        self.part_z_offset_var = tk.StringVar(value="Z offset: --")
+        self.part_stepper_position_var = tk.StringVar(value="Stepper target: --")
+        self.part_colibri_position_var = tk.StringVar(value="Colibri target: --")
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
         self.nozzle_checkbuttons = []
         self.motor_controls = []
@@ -321,10 +379,102 @@ class TestRunGui(tk.Tk):
         self.last_motor_speed_steps_s = None
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = ""
+        self.pending_pulse_duration_ms = None
+        self.active_test_mask = ""
+        self.part_rows = {}
 
         self._build_ui()
+        for variable in (
+            self.use_cap_offsets_var,
+            self.nozzle_offset_var,
+            self.test_stand_height_var,
+            self.holder_height_var,
+        ):
+            variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
         self.after(50, self._drain_messages)
+
+    def _load_user_presets(self):
+        try:
+            with open(self.user_presets_path, encoding="utf-8") as preset_file:
+                presets = json.load(preset_file)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return presets if isinstance(presets, dict) else {}
+
+    def _preset_float(self, key, default, minimum, maximum):
+        try:
+            value = float(self.user_presets.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return min(max(value, minimum), maximum)
+
+    def _on_close(self):
+        response = self._ask_save_user_presets()
+        if response is None:
+            return
+        if response and not self._save_user_presets():
+            return
+        self.destroy()
+
+    def _ask_save_user_presets(self):
+        result = {"value": None}
+        dialog = tk.Toplevel(self)
+        dialog.title("Save User Presets")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        ttk.Label(
+            dialog,
+            text="Save the current pressure PWM offset, nozzle offset, test stand height, and holder height as defaults?",
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(padx=18, pady=(16, 12))
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(padx=14, pady=(0, 14), anchor=tk.E)
+
+        def choose(value):
+            result["value"] = value
+            dialog.destroy()
+
+        ttk.Button(button_frame, text="Save", command=lambda: choose(True)).pack(side=tk.LEFT, padx=4)
+        ttk.Button(button_frame, text="Don't Save", command=lambda: choose(False)).pack(side=tk.LEFT, padx=4)
+        ttk.Button(button_frame, text="Cancel", command=lambda: choose(None)).pack(side=tk.LEFT, padx=4)
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: choose(None))
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.lift()
+        dialog.focus_force()
+        dialog.grab_set()
+        self.wait_window(dialog)
+        return result["value"]
+
+    def _save_user_presets(self):
+        try:
+            presets = {
+                "pressure_pwm_offset_percent": float(self.pressure_offset_var.get()),
+                "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
+                "test_stand_height_mm": float(self.test_stand_height_var.get()),
+                "holder_height_mm": float(self.holder_height_var.get()),
+            }
+        except (tk.TclError, ValueError) as exc:
+            messagebox.showerror("Preset save failed", f"One of the preset values is not numeric: {exc}")
+            return False
+
+        try:
+            with open(self.user_presets_path, "w", encoding="utf-8") as preset_file:
+                json.dump(presets, preset_file, indent=2)
+        except OSError as exc:
+            messagebox.showerror("Preset save failed", str(exc))
+            return False
+
+        return True
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=12)
@@ -343,11 +493,51 @@ class TestRunGui(tk.Tk):
 
         self.start_button = ttk.Button(controls, text="Start test", command=self._start_test, state=tk.DISABLED)
         self.start_button.pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(controls, text="From").pack(side=tk.LEFT, padx=(8, 0))
+        self.test_start_pressure_spinbox = ttk.Spinbox(
+            controls,
+            from_=0.0,
+            to=5.0,
+            increment=0.05,
+            textvariable=self.test_start_pressure_var,
+            width=6,
+            state=tk.DISABLED,
+        )
+        self.test_start_pressure_spinbox.pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Label(controls, text="to").pack(side=tk.LEFT)
+        self.test_end_pressure_spinbox = ttk.Spinbox(
+            controls,
+            from_=0.0,
+            to=5.0,
+            increment=0.05,
+            textvariable=self.test_end_pressure_var,
+            width=6,
+            state=tk.DISABLED,
+        )
+        self.test_end_pressure_spinbox.pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Label(controls, text="bar").pack(side=tk.LEFT)
+        ttk.Label(controls, text="Repeats").pack(side=tk.LEFT, padx=(8, 0))
+        self.test_repeats_spinbox = ttk.Spinbox(
+            controls,
+            from_=1,
+            to=100,
+            increment=1,
+            textvariable=self.test_repeats_var,
+            width=5,
+            state=tk.DISABLED,
+        )
+        self.test_repeats_spinbox.pack(side=tk.LEFT, padx=(4, 2))
         self.stop_button = ttk.Button(controls, text="Stop", command=self._stop_test, state=tk.DISABLED)
         self.stop_button.pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Button(controls, text="Save CSV", command=self._save_csv).pack(side=tk.RIGHT)
+        ttk.Button(controls, text="Save CSV", command=self._save_impulse_csv).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Checkbutton(
+            controls,
+            text="German CSV format",
+            variable=self.german_csv_format_var,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
         self.debug_log_button = ttk.Button(controls, text="Start debug log", command=self._toggle_debug_log)
         self.debug_log_button.pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(controls, text="Clear", command=self._clear_log).pack(side=tk.RIGHT, padx=(0, 8))
 
         pressure_controls = ttk.Frame(root)
         pressure_controls.pack(fill=tk.X, pady=(10, 0))
@@ -372,6 +562,28 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.apply_pressure_button.pack(side=tk.LEFT, padx=(10, 0))
+
+        ttk.Label(pressure_controls, text="Pressure PWM offset").pack(side=tk.LEFT, padx=(18, 0))
+        self.pressure_offset_spinbox = ttk.Spinbox(
+            pressure_controls,
+            from_=-100.0,
+            to=100.0,
+            increment=1.0,
+            textvariable=self.pressure_offset_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.pressure_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(pressure_controls, text="%").pack(side=tk.LEFT)
+
+        self.apply_pressure_offset_button = ttk.Button(
+            pressure_controls,
+            text="Apply offset",
+            command=self._apply_pressure_offset_setting,
+            state=tk.DISABLED,
+        )
+        self.apply_pressure_offset_button.pack(side=tk.LEFT, padx=(10, 0))
+
         self.stream_checkbutton = ttk.Checkbutton(
             pressure_controls,
             text="Live stream",
@@ -380,6 +592,27 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.stream_checkbutton.pack(side=tk.LEFT, padx=(18, 0))
+
+        ttk.Label(pressure_controls, text="Flow Detection Threshold").pack(side=tk.LEFT, padx=(18, 0))
+        self.flow_threshold_spinbox = ttk.Spinbox(
+            pressure_controls,
+            from_=0.0,
+            to=200.0,
+            increment=0.5,
+            textvariable=self.flow_threshold_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.flow_threshold_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(pressure_controls, text="l/min").pack(side=tk.LEFT)
+
+        self.apply_flow_threshold_button = ttk.Button(
+            pressure_controls,
+            text="Apply threshold",
+            command=self._apply_flow_threshold_setting,
+            state=tk.DISABLED,
+        )
+        self.apply_flow_threshold_button.pack(side=tk.LEFT, padx=(10, 0))
 
         pulse_controls = ttk.Frame(root)
         pulse_controls.pack(fill=tk.X, pady=(10, 0))
@@ -471,10 +704,32 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.motor_enable_checkbutton.pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(motor_controls, textvariable=self.motor_position_var).pack(side=tk.LEFT, padx=(12, 0))
 
-        ttk.Label(motor_controls, text="Distance").pack(side=tk.LEFT, padx=(18, 0))
-        self.motor_distance_spinbox = ttk.Spinbox(
+        self.motor_home_button = ttk.Button(
             motor_controls,
+            text="Home -",
+            command=self._motor_home,
+            state=tk.DISABLED,
+        )
+        self.motor_home_button.pack(side=tk.LEFT, padx=(12, 0))
+
+        self.motor_zero_button = ttk.Button(
+            motor_controls,
+            text="Set zero here",
+            command=self._motor_set_zero,
+            state=tk.DISABLED,
+        )
+        self.motor_zero_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        motor_motion_controls = ttk.Frame(root)
+        motor_motion_controls.pack(fill=tk.X, pady=(6, 0))
+
+        ttk.Label(motor_motion_controls, text="Stepper motion").pack(side=tk.LEFT)
+
+        ttk.Label(motor_motion_controls, text="Distance").pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_distance_spinbox = ttk.Spinbox(
+            motor_motion_controls,
             from_=0.01,
             to=2000.0,
             increment=1.0,
@@ -483,11 +738,11 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.motor_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(motor_controls, text="mm").pack(side=tk.LEFT)
+        ttk.Label(motor_motion_controls, text="mm").pack(side=tk.LEFT)
 
-        ttk.Label(motor_controls, text="Speed").pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(motor_motion_controls, text="Speed").pack(side=tk.LEFT, padx=(18, 0))
         self.motor_speed_spinbox = ttk.Spinbox(
-            motor_controls,
+            motor_motion_controls,
             from_=0.01,
             to=50.0,
             increment=0.5,
@@ -496,24 +751,46 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.motor_speed_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(motor_controls, text="mm/s").pack(side=tk.LEFT)
+        ttk.Label(motor_motion_controls, text="mm/s").pack(side=tk.LEFT)
 
         self.motor_reverse_button = ttk.Button(
-            motor_controls,
+            motor_motion_controls,
             text="Jog -",
             command=self._motor_jog_reverse,
             state=tk.DISABLED,
         )
         self.motor_reverse_button.pack(side=tk.LEFT, padx=(18, 0))
         self.motor_forward_button = ttk.Button(
-            motor_controls,
+            motor_motion_controls,
             text="Jog +",
             command=self._motor_jog_forward,
             state=tk.DISABLED,
         )
         self.motor_forward_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(motor_motion_controls, text="Absolute").pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_absolute_spinbox = ttk.Spinbox(
+            motor_motion_controls,
+            from_=-2000.0,
+            to=2000.0,
+            increment=1.0,
+            textvariable=self.motor_absolute_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.motor_absolute_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(motor_motion_controls, text="mm").pack(side=tk.LEFT)
+
+        self.motor_absolute_button = ttk.Button(
+            motor_motion_controls,
+            text="Go",
+            command=self._motor_move_absolute,
+            state=tk.DISABLED,
+        )
+        self.motor_absolute_button.pack(side=tk.LEFT, padx=(8, 0))
+
         self.motor_stop_button = ttk.Button(
-            motor_controls,
+            motor_motion_controls,
             text="Stop motor",
             command=self._motor_stop,
             state=tk.DISABLED,
@@ -521,10 +798,14 @@ class TestRunGui(tk.Tk):
         self.motor_stop_button.pack(side=tk.LEFT, padx=(8, 0))
         self.motor_controls = [
             self.motor_enable_checkbutton,
+            self.motor_home_button,
+            self.motor_zero_button,
             self.motor_distance_spinbox,
             self.motor_speed_spinbox,
             self.motor_reverse_button,
             self.motor_forward_button,
+            self.motor_absolute_spinbox,
+            self.motor_absolute_button,
             self.motor_stop_button,
         ]
 
@@ -653,6 +934,129 @@ class TestRunGui(tk.Tk):
             self.colibri_stop_button,
         ]
 
+        force_controls = ttk.Frame(root)
+        force_controls.pack(fill=tk.X, pady=(10, 0))
+
+        ttk.Label(force_controls, text="Force sensor").pack(side=tk.LEFT)
+        self.force_port_combo = ttk.Combobox(
+            force_controls,
+            textvariable=self.force_port_var,
+            width=36,
+            state="readonly",
+        )
+        self.force_port_combo.pack(side=tk.LEFT, padx=(6, 8))
+
+        ttk.Label(force_controls, text="Baud").pack(side=tk.LEFT)
+        self.force_baud_spinbox = ttk.Spinbox(
+            force_controls,
+            from_=1200,
+            to=921600,
+            increment=1200,
+            textvariable=self.force_baud_var,
+            width=8,
+            state=tk.NORMAL,
+        )
+        self.force_baud_spinbox.pack(side=tk.LEFT, padx=(6, 8))
+
+        self.force_connect_button = ttk.Button(
+            force_controls,
+            text="Connect",
+            command=self._toggle_force_connection,
+        )
+        self.force_connect_button.pack(side=tk.LEFT)
+
+        self.force_zero_button = ttk.Button(
+            force_controls,
+            text="Zero force",
+            command=self._zero_force_sensor,
+            state=tk.DISABLED,
+        )
+        self.force_zero_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
+
+        part_controls = ttk.Frame(root)
+        part_controls.pack(fill=tk.X, pady=(10, 0))
+
+        ttk.Label(part_controls, text="Part CSV").pack(side=tk.LEFT)
+        ttk.Button(part_controls, text="Load part CSV", command=self._load_part_csv).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(part_controls, textvariable=self.part_csv_status_var).pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(part_controls, text="Pose").pack(side=tk.LEFT, padx=(18, 0))
+        self.part_pose_combo = ttk.Combobox(
+            part_controls,
+            textvariable=self.part_pose_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.part_pose_combo.pack(side=tk.LEFT, padx=(6, 4))
+        self.part_pose_combo.bind("<<ComboboxSelected>>", self._part_pose_selected)
+
+        ttk.Label(part_controls, text="Hole").pack(side=tk.LEFT, padx=(8, 0))
+        self.part_hole_combo = ttk.Combobox(
+            part_controls,
+            textvariable=self.part_hole_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.part_hole_combo.pack(side=tk.LEFT, padx=(6, 4))
+        self.part_hole_combo.bind("<<ComboboxSelected>>", self._part_hole_selected)
+
+        ttk.Checkbutton(
+            part_controls,
+            text="Add cap in measurements",
+            variable=self.use_cap_offsets_var,
+        ).pack(side=tk.LEFT, padx=(12, 0))
+
+        part_position_controls = ttk.Frame(root)
+        part_position_controls.pack(fill=tk.X, pady=(6, 0))
+
+        ttk.Label(part_position_controls, text="Nozzle offset").pack(side=tk.LEFT)
+        self.nozzle_offset_spinbox = ttk.Spinbox(
+            part_position_controls,
+            from_=-2000.0,
+            to=2000.0,
+            increment=0.1,
+            textvariable=self.nozzle_offset_var,
+            width=8,
+        )
+        self.nozzle_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
+
+        ttk.Label(part_position_controls, text="Test stand height").pack(side=tk.LEFT, padx=(18, 0))
+        self.test_stand_height_spinbox = ttk.Spinbox(
+            part_position_controls,
+            from_=-2000.0,
+            to=2000.0,
+            increment=0.1,
+            textvariable=self.test_stand_height_var,
+            width=8,
+        )
+        self.test_stand_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
+
+        ttk.Label(part_position_controls, text="Holder height").pack(side=tk.LEFT, padx=(18, 0))
+        self.holder_height_spinbox = ttk.Spinbox(
+            part_position_controls,
+            from_=-2000.0,
+            to=2000.0,
+            increment=0.1,
+            textvariable=self.holder_height_var,
+            width=8,
+        )
+        self.holder_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
+
+        ttk.Label(part_position_controls, textvariable=self.part_y_offset_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(part_position_controls, textvariable=self.part_z_offset_var).pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Label(part_position_controls, textvariable=self.part_stepper_position_var).pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Label(part_position_controls, textvariable=self.part_colibri_position_var).pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Button(part_position_controls, text="Set targets", command=self._set_part_axis_targets).pack(
+            side=tk.LEFT,
+            padx=(12, 0),
+        )
+
         ttk.Label(root, textvariable=self.mode_var).pack(fill=tk.X, pady=(10, 0))
         ttk.Label(root, textvariable=self.debug_log_var).pack(fill=tk.X, pady=(4, 0))
         ttk.Label(root, textvariable=self.status_var).pack(fill=tk.X, pady=(10, 8))
@@ -665,20 +1069,22 @@ class TestRunGui(tk.Tk):
             "regulator_pwm",
             "valves_open",
             "flow",
+            "force",
         )
         self.table = ttk.Treeview(root, columns=columns, show="headings", height=18)
         headings = {
             "time": "Time ms",
             "target_pressure": "Target pressure",
             "pressure_before": "Pressure before valve",
-            "regulator_feedback": "Regulator feedback pressure",
+            "regulator_feedback": "Actual regulator pressure",
             "regulator_pwm": "Regulator PWM",
             "valves_open": "Valves open",
             "flow": "Flow",
+            "force": "Force N",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
-            self.table.column(col, width=125, anchor=tk.CENTER)
+            self.table.column(col, width=115, anchor=tk.CENTER)
         self.table.pack(fill=tk.BOTH, expand=True)
 
         self.log = tk.Text(root, height=7, wrap=tk.NONE)
@@ -697,15 +1103,21 @@ class TestRunGui(tk.Tk):
         labels = list(self.port_devices)
         self.port_combo["values"] = labels
         self.colibri_port_combo["values"] = labels
+        self.force_port_combo["values"] = labels
         if labels and self.port_var.get() not in labels:
             self.port_var.set(self._preferred_port_label(labels, ("arduino", "ttyacm")) or labels[0])
         if labels and self.colibri_port_var.get() not in labels:
             self.colibri_port_var.set(
                 self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
             )
+        if labels and self.force_port_var.get() not in labels:
+            self.force_port_var.set(
+                self._preferred_port_label(labels, ("gsv", "me-", "me ", "usb serial", "usb-serial")) or labels[0]
+            )
         elif not labels:
             self.port_var.set("")
             self.colibri_port_var.set("")
+            self.force_port_var.set("")
             self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
@@ -732,6 +1144,9 @@ class TestRunGui(tk.Tk):
         if not port:
             messagebox.showerror("No port selected", "Select the Arduino serial port.")
             return
+        if self.force_serial_port and port == self._selected_force_port_device():
+            messagebox.showerror("Port already in use", "Select a separate serial port for the force sensor.")
+            return
 
         try:
             self.serial_port = serial.Serial(port, BAUD_RATE, timeout=0.1, write_timeout=SERIAL_WRITE_TIMEOUT)
@@ -750,9 +1165,16 @@ class TestRunGui(tk.Tk):
         self.connect_button.configure(text="Disconnect")
         self.start_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.NORMAL)
+        self.test_start_pressure_spinbox.configure(state=tk.NORMAL)
+        self.test_end_pressure_spinbox.configure(state=tk.NORMAL)
+        self.test_repeats_spinbox.configure(state=tk.NORMAL)
         self.target_pressure_spinbox.configure(state=tk.NORMAL)
         self.apply_pressure_button.configure(state=tk.NORMAL)
+        self.pressure_offset_spinbox.configure(state=tk.NORMAL)
+        self.apply_pressure_offset_button.configure(state=tk.NORMAL)
         self.stream_checkbutton.configure(state=tk.NORMAL)
+        self.flow_threshold_spinbox.configure(state=tk.NORMAL)
+        self.apply_flow_threshold_button.configure(state=tk.NORMAL)
         for checkbutton in self.nozzle_checkbuttons:
             checkbutton.configure(state=tk.NORMAL)
         self.starting_pressure_spinbox.configure(state=tk.NORMAL)
@@ -764,7 +1186,10 @@ class TestRunGui(tk.Tk):
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
         self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
+        self._apply_pressure_offset_setting()
+        self._apply_flow_threshold_setting()
         self._apply_stream_setting()
+        self._send("MOTOR_POS")
 
     def _selected_port_device(self):
         selected = self.port_var.get()
@@ -772,6 +1197,10 @@ class TestRunGui(tk.Tk):
 
     def _selected_colibri_port_device(self):
         selected = self.colibri_port_var.get()
+        return self.port_devices.get(selected, selected)
+
+    def _selected_force_port_device(self):
+        selected = self.force_port_var.get()
         return self.port_devices.get(selected, selected)
 
     def _toggle_debug_log(self):
@@ -807,6 +1236,10 @@ class TestRunGui(tk.Tk):
         self._write_debug_log(f"GUI Arduino port label={self.port_var.get()!r} device={self._selected_port_device()!r}")
         self._write_debug_log(
             f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
+        )
+        self._write_debug_log(
+            f"GUI force port label={self.force_port_var.get()!r} device={self._selected_force_port_device()!r} "
+            f"baud={self.force_baud_var.get()!r}"
         )
 
     def _stop_debug_log(self):
@@ -846,9 +1279,16 @@ class TestRunGui(tk.Tk):
         self.connect_button.configure(text="Connect")
         self.start_button.configure(state=tk.DISABLED)
         self.stop_button.configure(state=tk.DISABLED)
+        self.test_start_pressure_spinbox.configure(state=tk.DISABLED)
+        self.test_end_pressure_spinbox.configure(state=tk.DISABLED)
+        self.test_repeats_spinbox.configure(state=tk.DISABLED)
         self.target_pressure_spinbox.configure(state=tk.DISABLED)
         self.apply_pressure_button.configure(state=tk.DISABLED)
+        self.pressure_offset_spinbox.configure(state=tk.DISABLED)
+        self.apply_pressure_offset_button.configure(state=tk.DISABLED)
         self.stream_checkbutton.configure(state=tk.DISABLED)
+        self.flow_threshold_spinbox.configure(state=tk.DISABLED)
+        self.apply_flow_threshold_button.configure(state=tk.DISABLED)
         for checkbutton in self.nozzle_checkbuttons:
             checkbutton.configure(state=tk.DISABLED)
         self.starting_pressure_spinbox.configure(state=tk.DISABLED)
@@ -858,19 +1298,46 @@ class TestRunGui(tk.Tk):
         self._set_motor_controls_enabled(False)
         self.motor_enabled_var.set(False)
         self.last_motor_speed_steps_s = None
+        self.motor_position_var.set("Stepper position: --")
+        self.last_motor_position_mm = None
         self.pulse_in_progress = False
         self.pending_increment_direction = 0
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = ""
+        self.pending_pulse_duration_ms = None
+        self.active_test_mask = ""
+        self.current_impulse = None
+        self.last_valves_open = False
         self.mode_var.set("Mode: disconnected")
         self.status_var.set("Disconnected")
         self._write_debug_log("ARDUINO disconnected")
 
     def _start_test(self):
-        self.rows.clear()
-        for item in self.table.get_children():
-            self.table.delete(item)
+        start_pressure = self._validated_pressure_step(self.test_start_pressure_var, "test start pressure")
+        end_pressure = self._validated_pressure_step(self.test_end_pressure_var, "test end pressure")
+        repeats = self._validated_repeats()
+        if start_pressure is None or end_pressure is None or repeats is None:
+            return
+        if end_pressure < start_pressure:
+            messagebox.showerror("Invalid test range", "Test end pressure must be greater than or equal to start pressure.")
+            return
+        mask = self._selected_nozzle_mask()
+        if mask == 0:
+            messagebox.showerror("No nozzle selected", "Select at least one nozzle for the test.")
+            return
+
+        if not self._apply_pressure_offset_setting():
+            return
+        if not self._apply_flow_threshold_setting():
+            return
+
+        self._clear_run_display()
+        self.active_test_mask = str(mask)
         self.mode_var.set("Mode: test sequence")
-        self._write_debug_log("GUI start test")
-        self._send("START")
+        self._write_debug_log(
+            f"GUI start test range={start_pressure:.2f}-{end_pressure:.2f} repeats={repeats} mask={mask}"
+        )
+        self._send(f"START:{start_pressure:.2f}:{end_pressure:.2f}:{repeats}:{mask}")
 
     def _stop_test(self):
         self.mode_var.set("Mode: idle")
@@ -881,15 +1348,11 @@ class TestRunGui(tk.Tk):
         self._start_pulse(increment_direction=0)
 
     def _increment_pulse(self):
-        if self._validated_pressure(self.starting_pressure_var, "starting pressure") is None:
-            return
         if self._validated_pressure(self.pressure_increment_var, "pressure increment") is None:
             return
         self._start_pulse(increment_direction=1)
 
     def _decrement_pulse(self):
-        if self._validated_pressure(self.starting_pressure_var, "starting pressure") is None:
-            return
         if self._validated_pressure(self.pressure_increment_var, "pressure increment") is None:
             return
         self._start_pulse(increment_direction=-1)
@@ -902,13 +1365,48 @@ class TestRunGui(tk.Tk):
 
         if not self._apply_pressure_settings():
             return
+        if not self._apply_pressure_offset_setting():
+            return
+        if not self._apply_flow_threshold_setting():
+            return
 
         self.pulse_in_progress = True
         self.pending_increment_direction = increment_direction
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = str(mask)
         self._set_pulse_buttons_enabled(False)
         self.mode_var.set("Mode: manual pulse running")
         self._write_debug_log(f"GUI pulse mask={mask} increment_direction={increment_direction}")
         self._send(f"PULSE:{mask}")
+
+    def _show_flip_angle_prompt(self, callback):
+        dialog = tk.Toplevel(self)
+        dialog.title("Flip angle")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        ttk.Label(dialog, text="Flip angle for this impulse").pack(padx=18, pady=(14, 8))
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(padx=14, pady=(0, 14))
+
+        def choose(value):
+            callback(value)
+            dialog.destroy()
+
+        for angle in (90, 180, 0):
+            ttk.Button(button_frame, text=str(angle), width=10, command=lambda value=angle: choose(value)).pack(
+                side=tk.LEFT,
+                padx=4,
+            )
+        ttk.Button(button_frame, text="Undefined", width=10, command=lambda: choose(-1)).pack(side=tk.LEFT, padx=4)
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: choose(-1))
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.lift()
+        dialog.focus_force()
 
     def _selected_nozzle_mask(self):
         mask = 0
@@ -946,6 +1444,32 @@ class TestRunGui(tk.Tk):
         self._send(f"SET_PRESSURE:{target_pressure:.3f}", flush_live_backlog=True)
         return True
 
+    def _apply_pressure_offset_setting(self):
+        try:
+            pressure_offset = float(self.pressure_offset_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid pressure offset", "Enter a numeric pressure PWM offset percentage.")
+            return False
+
+        pressure_offset = min(max(pressure_offset, -100.0), 100.0)
+        self.pressure_offset_var.set(round(pressure_offset, 3))
+        self._write_debug_log(f"GUI set pressure pwm offset={pressure_offset:.3f}%")
+        self._send(f"SET_PRESSURE_OFFSET:{pressure_offset:.3f}")
+        return True
+
+    def _apply_flow_threshold_setting(self):
+        try:
+            flow_threshold = float(self.flow_threshold_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid Flow Detection Threshold", "Enter a numeric Flow Detection Threshold.")
+            return False
+
+        flow_threshold = min(max(flow_threshold, 0.0), 200.0)
+        self.flow_threshold_var.set(round(flow_threshold, 3))
+        self._write_debug_log(f"GUI set Flow Detection Threshold={flow_threshold:.3f} l/min")
+        self._send(f"SET_FLOW_THRESHOLD:{flow_threshold:.3f}")
+        return True
+
     def _validated_pressure(self, variable, label):
         try:
             value = float(variable.get())
@@ -956,6 +1480,31 @@ class TestRunGui(tk.Tk):
         value = min(max(value, 0.0), 5.0)
         variable.set(round(value, 3))
         return value
+
+    def _validated_pressure_step(self, variable, label):
+        try:
+            value = float(variable.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid pressure setting", f"Enter a numeric {label}.")
+            return None
+
+        value = min(max(value, 0.0), 5.0)
+        step_count = math.ceil((value - 0.000001) / 0.05)
+        stepped_value = step_count * 0.05
+        stepped_value = min(max(stepped_value, 0.0), 5.0)
+        variable.set(round(stepped_value, 2))
+        return stepped_value
+
+    def _validated_repeats(self):
+        try:
+            repeats = int(float(self.test_repeats_var.get()))
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid repeats", "Enter a numeric repeat count.")
+            return None
+
+        repeats = min(max(repeats, 1), 100)
+        self.test_repeats_var.set(repeats)
+        return repeats
 
     def _apply_stream_setting(self):
         self._write_debug_log(f"GUI stream {'on' if self.stream_var.get() else 'off'}")
@@ -989,6 +1538,38 @@ class TestRunGui(tk.Tk):
     def _motor_jog_reverse(self):
         self._motor_jog(direction=-1)
 
+    def _motor_home(self):
+        if not self.motor_enabled_var.get():
+            messagebox.showerror("Motor disabled", "Enable the stepper output before homing.")
+            return
+
+        speed_steps_s = self._apply_motor_speed()
+        if speed_steps_s is None:
+            return
+
+        self.mode_var.set("Mode: stepper homing")
+        self._write_debug_log("GUI stepper home")
+        self._send("MOTOR_HOME")
+
+    def _motor_set_zero(self):
+        self._write_debug_log("GUI stepper set zero")
+        self._send("MOTOR_ZERO")
+
+    def _motor_move_absolute(self):
+        if not self.motor_enabled_var.get():
+            messagebox.showerror("Motor disabled", "Enable the stepper output before moving.")
+            return
+
+        target_mm = self._validated_float(self.motor_absolute_var, "motor absolute position", -2000.0, 2000.0)
+        speed_steps_s = self._apply_motor_speed()
+        if target_mm is None or speed_steps_s is None:
+            return
+
+        target_steps = self._mm_to_steps(target_mm)
+        self.mode_var.set(f"Mode: stepper absolute | {target_mm:.3f} mm")
+        self._write_debug_log(f"GUI stepper absolute target_mm={target_mm:.3f} steps={target_steps}")
+        self._send(f"MOTOR_ABS:{target_steps}")
+
     def _motor_jog(self, direction):
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before jogging.")
@@ -1011,6 +1592,211 @@ class TestRunGui(tk.Tk):
         self._write_debug_log("GUI stepper stop")
         self._send("MOTOR_STOP")
 
+    def _toggle_force_connection(self):
+        if self.force_serial_port:
+            self._disconnect_force_sensor()
+        else:
+            self._connect_force_sensor()
+
+    def _connect_force_sensor(self):
+        if serial is None:
+            messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
+            return
+
+        port = self._selected_force_port_device()
+        if not port:
+            messagebox.showerror("No port selected", "Select the force sensor serial port.")
+            return
+        if self.serial_port and port == self._selected_port_device():
+            messagebox.showerror("Port already in use", "Select a separate serial port for the Arduino.")
+            return
+        if self.colibri and port == self._selected_colibri_port_device():
+            messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
+            return
+
+        try:
+            baud_rate = int(self.force_baud_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid baud rate", "Enter a numeric baud rate for the force sensor.")
+            return
+
+        try:
+            self.force_serial_port = serial.Serial(
+                port,
+                baud_rate,
+                bytesize=8,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.05,
+                write_timeout=SERIAL_WRITE_TIMEOUT,
+            )
+            self.force_serial_port.reset_input_buffer()
+        except serial.SerialException as exc:
+            self.force_serial_port = None
+            messagebox.showerror("Force sensor connection failed", str(exc))
+            return
+
+        self.force_reader_running = True
+        self.force_reader_thread = threading.Thread(target=self._read_force_serial, daemon=True)
+        self.force_reader_thread.start()
+        self.force_connect_button.configure(text="Disconnect")
+        self.force_port_combo.configure(state=tk.DISABLED)
+        self.force_baud_spinbox.configure(state=tk.DISABLED)
+        self.force_zero_button.configure(state=tk.NORMAL)
+        self.force_status_var.set(f"Force sensor: connected to {port} at {baud_rate} baud")
+        self.status_var.set(f"Connected force sensor on {port}")
+        self._write_debug_log(f"FORCE connected port={port} baud={baud_rate}")
+
+    def _disconnect_force_sensor(self):
+        self._write_debug_log("FORCE disconnect requested")
+        self.force_reader_running = False
+        if self.force_reader_thread:
+            self.force_reader_thread.join(timeout=0.5)
+        if self.force_serial_port:
+            self.force_serial_port.close()
+        self.force_serial_port = None
+        self.force_reader_thread = None
+        with self.force_lock:
+            self.latest_force_raw_n = None
+            self.latest_force_n = None
+            self.latest_force_time = None
+            self.force_zero_offset_n = 0.0
+        self.force_connect_button.configure(text="Connect")
+        self.force_port_combo.configure(state="readonly")
+        self.force_baud_spinbox.configure(state=tk.NORMAL)
+        self.force_zero_button.configure(state=tk.DISABLED)
+        self.force_value_var.set("Force: --")
+        self.force_status_var.set("Force sensor: disconnected")
+        self._write_debug_log("FORCE disconnected")
+
+    def _zero_force_sensor(self):
+        with self.force_lock:
+            if self.latest_force_raw_n is None:
+                messagebox.showinfo("No force value", "No force value has been received yet.")
+                return
+            self.force_zero_offset_n = self.latest_force_raw_n
+            self.latest_force_n = 0.0
+            force_time = self.latest_force_time
+
+        self.force_value_var.set("Force: 0.0000 N")
+        self.force_status_var.set("Force sensor: software zeroed")
+        self.status_var.set("Force sensor software zero set")
+        self._write_debug_log(f"FORCE software zero offset={self.force_zero_offset_n:.6f} time={force_time}")
+
+    def _read_force_serial(self):
+        buffer = bytearray()
+        last_ui_update = 0.0
+        while self.force_reader_running and self.force_serial_port:
+            try:
+                data = self.force_serial_port.read(64)
+            except serial.SerialException as exc:
+                self._write_debug_log(f"FORCE RX error {exc}")
+                self.messages.put(("force_status", f"Force sensor serial error: {exc}"))
+                break
+
+            if not data:
+                continue
+
+            buffer.extend(data)
+            values = self._extract_force_values(buffer)
+            for raw_force_n in values:
+                force_n = self._store_force_value(raw_force_n)
+                now = time.time()
+                if now - last_ui_update >= 0.05:
+                    self.messages.put(("force_value", force_n))
+                    last_ui_update = now
+
+        self.force_reader_running = False
+
+    def _store_force_value(self, raw_force_n):
+        with self.force_lock:
+            force_n = raw_force_n - self.force_zero_offset_n
+            self.latest_force_raw_n = raw_force_n
+            self.latest_force_n = force_n
+            self.latest_force_time = time.time()
+            return force_n
+
+    def _latest_force_text(self):
+        with self.force_lock:
+            force_n = self.latest_force_n
+        return "" if force_n is None else f"{force_n:.4f}"
+
+    def _extract_force_values(self, buffer):
+        values = []
+        while buffer:
+            if buffer[0] == FORCE_BINARY_SYNC:
+                if len(buffer) < 5:
+                    break
+                frame = bytes(buffer[:5])
+                del buffer[:5]
+                value = self._parse_force_binary_frame(frame)
+                if value is not None:
+                    values.append(value)
+                continue
+
+            newline_index = self._first_newline_index(buffer)
+            if newline_index >= 0:
+                line_bytes = bytes(buffer[:newline_index])
+                del buffer[:newline_index + 1]
+                while buffer and buffer[0] in (10, 13):
+                    del buffer[0]
+                value = self._parse_force_ascii_line(line_bytes)
+                if value is not None:
+                    values.append(value)
+                continue
+
+            if self._buffer_looks_like_ascii_prefix(buffer) and self._buffer_is_printable_ascii_prefix(buffer):
+                if len(buffer) <= 128:
+                    break
+                buffer.clear()
+                break
+
+            sync_index = buffer.find(bytes([FORCE_BINARY_SYNC]), 1)
+            if sync_index >= 0:
+                del buffer[:sync_index]
+            else:
+                del buffer[0]
+
+        return values
+
+    def _first_newline_index(self, buffer):
+        indexes = [index for index in (buffer.find(b"\n"), buffer.find(b"\r")) if index >= 0]
+        return min(indexes) if indexes else -1
+
+    def _buffer_looks_like_ascii_prefix(self, buffer):
+        return bool(buffer and chr(buffer[0]) in "+-0123456789 .\t")
+
+    def _buffer_is_printable_ascii_prefix(self, buffer):
+        sample = buffer[:min(len(buffer), 32)]
+        return all(32 <= value <= 126 or value in (9, 10, 13) for value in sample)
+
+    def _parse_force_ascii_line(self, line_bytes):
+        text = line_bytes.decode("ascii", errors="ignore").strip()
+        if not text:
+            return None
+        match = FORCE_VALUE_RE.search(text)
+        if not match:
+            return None
+
+        value = float(match.group(0).replace(",", "."))
+        unit = text[match.end():].strip().lower()
+        if unit.startswith("kn"):
+            return value * 1000.0
+        if unit.startswith("mn"):
+            return value * 0.001
+        if unit.startswith("kg"):
+            return value * 9.80665
+        if unit.startswith("g"):
+            return value * 0.00980665
+        return value
+
+    def _parse_force_binary_frame(self, frame):
+        if len(frame) != 5 or frame[0] != FORCE_BINARY_SYNC:
+            return None
+        raw_value = (frame[2] << 16) | (frame[3] << 8) | frame[4]
+        signed_fraction = (raw_value - 0x800000) / 0x7FFFFF
+        return signed_fraction * FORCE_SENSOR_RANGE_N * FORCE_BINARY_FULL_SCALE_FACTOR
+
     def _toggle_colibri_connection(self):
         if self.colibri:
             self._disconnect_colibri()
@@ -1028,6 +1814,9 @@ class TestRunGui(tk.Tk):
             return
         if self.serial_port and port == self._selected_port_device():
             messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
+            return
+        if self.force_serial_port and port == self._selected_force_port_device():
+            messagebox.showerror("Port already in use", "Select a separate serial port for the force sensor.")
             return
 
         try:
@@ -1057,6 +1846,7 @@ class TestRunGui(tk.Tk):
         self.colibri_port_combo.configure(state="readonly")
         self._set_colibri_controls_enabled(False)
         self.colibri_position_var.set("Position: --")
+        self.last_colibri_position_mm = None
         self.colibri_status_var.set("Colibri: disconnected")
 
     def _set_colibri_controls_enabled(self, enabled):
@@ -1288,6 +2078,7 @@ class TestRunGui(tk.Tk):
     def _handle_colibri_snapshot(self, snapshot, prefix=None):
         status = snapshot["status"]
         self.colibri_enabled_var.set(status["enabled"])
+        self.last_colibri_position_mm = snapshot["position_mm"]
         self.colibri_position_var.set(f"Position: {snapshot['position_mm']:.3f} mm")
         status_parts = []
         if status["ready"]:
@@ -1337,6 +2128,168 @@ class TestRunGui(tk.Tk):
         variable.set(round(value, 3))
         return value
 
+    def _load_part_csv(self):
+        if self.german_csv_format_var.get():
+            messagebox.showerror(
+                "English CSV required",
+                "Part CSV files are English format. Uncheck German CSV format before loading a part CSV.",
+            )
+            return
+
+        path = filedialog.askopenfilename(
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+
+        required_fields = {
+            "Pose",
+            "Hole",
+            "Y-offset",
+            "Z-offset",
+            "Y-CapOffset",
+            "Z-CapOffset",
+        }
+        loaded_rows = {}
+        try:
+            with open(path, newline="", encoding="utf-8-sig") as csv_file:
+                reader = csv.DictReader(csv_file)
+                if not reader.fieldnames or not required_fields.issubset(reader.fieldnames):
+                    missing = sorted(required_fields - set(reader.fieldnames or []))
+                    raise ValueError(f"Missing columns: {', '.join(missing)}")
+
+                for row in reader:
+                    pose = row["Pose"].strip()
+                    hole = row["Hole"].strip()
+                    if not pose or not hole:
+                        continue
+                    loaded_rows[(pose, hole)] = {
+                        "y": float(row["Y-offset"]),
+                        "z": float(row["Z-offset"]),
+                        "y_cap": float(row["Y-CapOffset"]),
+                        "z_cap": float(row["Z-CapOffset"]),
+                    }
+        except (OSError, ValueError, KeyError) as exc:
+            messagebox.showerror("Part CSV failed", str(exc))
+            return
+
+        if not loaded_rows:
+            messagebox.showerror("Part CSV failed", "No pose/hole rows were found.")
+            return
+
+        self.part_rows = loaded_rows
+        self.part_csv_status_var.set(f"Loaded {Path(path).name} ({len(loaded_rows)} rows)")
+        poses = self._sorted_part_values({pose for pose, _hole in loaded_rows})
+        self.part_pose_combo.configure(state="readonly", values=poses)
+        self.part_pose_var.set(poses[0])
+        self._refresh_part_holes()
+        self.status_var.set(f"Loaded part CSV: {Path(path).name}")
+
+    def _sorted_part_values(self, values):
+        return sorted(values, key=lambda value: (float(value), value))
+
+    def _part_pose_selected(self, _event=None):
+        self._refresh_part_holes()
+
+    def _part_hole_selected(self, _event=None):
+        self._update_part_position_preview()
+
+    def _part_input_changed(self, *_args):
+        if hasattr(self, "part_y_offset_var"):
+            self._update_part_position_preview()
+
+    def _refresh_part_holes(self):
+        pose = self.part_pose_var.get()
+        holes = self._sorted_part_values({hole for row_pose, hole in self.part_rows if row_pose == pose})
+        self.part_hole_combo.configure(state="readonly" if holes else tk.DISABLED, values=holes)
+        if holes and self.part_hole_var.get() not in holes:
+            self.part_hole_var.set(holes[0])
+        elif not holes:
+            self.part_hole_var.set("")
+        self._update_part_position_preview()
+
+    def _selected_part_offsets(self):
+        row = self.part_rows.get((self.part_pose_var.get(), self.part_hole_var.get()))
+        if row is None:
+            return None
+        if self.use_cap_offsets_var.get():
+            return row["y_cap"], row["z_cap"]
+        return row["y"], row["z"]
+
+    def _part_float_value(self, variable):
+        try:
+            return float(variable.get())
+        except (tk.TclError, ValueError):
+            return None
+
+    def _part_position_values(self):
+        offsets = self._selected_part_offsets()
+        nozzle_offset = self._part_float_value(self.nozzle_offset_var)
+        test_stand_height = self._part_float_value(self.test_stand_height_var)
+        holder_height = self._part_float_value(self.holder_height_var)
+        if offsets is None or nozzle_offset is None or test_stand_height is None or holder_height is None:
+            return None
+
+        y_offset, z_offset = offsets
+        stepper_position = nozzle_offset + y_offset
+        colibri_position = test_stand_height - holder_height + z_offset
+        return y_offset, z_offset, stepper_position, colibri_position
+
+    def _current_pose_hole_for_csv(self):
+        pose = self.part_pose_var.get().strip()
+        hole = self.part_hole_var.get().strip()
+        if self.part_rows and (pose, hole) in self.part_rows:
+            return pose, hole
+        return -1, -1
+
+    def _current_readback_offsets_for_csv(self):
+        stepper_y_offset = -1
+        colibri_z_offset = -1
+
+        nozzle_offset = self._part_float_value(self.nozzle_offset_var)
+        if self.motor_enabled_var.get() and self.last_motor_position_mm is not None and nozzle_offset is not None:
+            stepper_y_offset = self.last_motor_position_mm - nozzle_offset
+
+        test_stand_height = self._part_float_value(self.test_stand_height_var)
+        holder_height = self._part_float_value(self.holder_height_var)
+        if (
+            self.colibri_enabled_var.get()
+            and self.last_colibri_position_mm is not None
+            and test_stand_height is not None
+            and holder_height is not None
+        ):
+            colibri_z_offset = self.last_colibri_position_mm - test_stand_height + holder_height
+
+        return stepper_y_offset, colibri_z_offset
+
+    def _update_part_position_preview(self):
+        values = self._part_position_values()
+        if values is None:
+            self.part_y_offset_var.set("Y offset: --")
+            self.part_z_offset_var.set("Z offset: --")
+            self.part_stepper_position_var.set("Stepper target: --")
+            self.part_colibri_position_var.set("Colibri target: --")
+            return
+
+        y_offset, z_offset, stepper_position, colibri_position = values
+        self.part_y_offset_var.set(f"Y offset: {y_offset:.3f} mm")
+        self.part_z_offset_var.set(f"Z offset: {z_offset:.3f} mm")
+        self.part_stepper_position_var.set(f"Stepper target: {stepper_position:.3f} mm")
+        self.part_colibri_position_var.set(f"Colibri target: {colibri_position:.3f} mm")
+
+    def _set_part_axis_targets(self):
+        values = self._part_position_values()
+        if values is None:
+            messagebox.showerror("No part target", "Load a part CSV and select a pose/hole first.")
+            return
+
+        _y_offset, _z_offset, stepper_position, colibri_position = values
+        self.motor_absolute_var.set(round(stepper_position, 3))
+        self.colibri_absolute_var.set(round(colibri_position, 3))
+        self.status_var.set(
+            f"Part targets set: stepper {stepper_position:.3f} mm, Colibri {colibri_position:.3f} mm"
+        )
+
     def _mm_to_steps(self, distance_mm):
         return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
 
@@ -1378,6 +2331,7 @@ class TestRunGui(tk.Tk):
             try:
                 self._write_debug_log(f"ARDUINO TX {command}")
                 self.serial_port.write(f"{command}\n".encode("ascii"))
+                self.serial_port.flush()
             except serial.SerialTimeoutException:
                 self._write_debug_log(f"ARDUINO TX timeout {command}")
                 self.messages.put(("status", f"Serial write timed out while sending {command}"))
@@ -1445,8 +2399,15 @@ class TestRunGui(tk.Tk):
             elif kind == "colibri_done":
                 self.colibri_busy = False
                 self._set_colibri_controls_enabled(True)
+            elif kind == "force_value":
+                self.force_value_var.set(f"Force: {value:.4f} N")
+            elif kind == "force_status":
+                self.force_status_var.set(value)
+                self.status_var.set(value)
             else:
                 self._handle_line(value)
+        if drained_count:
+            self._scroll_log_to_end()
         self.after(1 if drained_count == MAX_QUEUE_DRAIN_PER_TICK else 50, self._drain_messages)
 
     def _handle_line(self, line):
@@ -1459,6 +2420,7 @@ class TestRunGui(tk.Tk):
 
         if parts[0] == "STOPPED":
             self.mode_var.set("Mode: idle")
+            self.active_test_mask = ""
             return
 
         if parts[0] == "PULSE":
@@ -1467,6 +2429,14 @@ class TestRunGui(tk.Tk):
 
         if parts[0] == "MOTOR":
             self._handle_motor_line(parts)
+            return
+
+        if parts[0] == "FLOW_THRESHOLD":
+            self._handle_flow_threshold_line(parts)
+            return
+
+        if parts[0] == "PRESSURE_OFFSET":
+            self._handle_pressure_offset_line(parts)
             return
 
         if not parts or not parts[0].isdigit():
@@ -1485,18 +2455,259 @@ class TestRunGui(tk.Tk):
         elif len(parts) != 7:
             return
 
+        parts.append(self._latest_force_text())
+        self._update_impulse_capture(parts)
         self.rows.append(parts)
         self.table.insert("", tk.END, values=parts)
         children = self.table.get_children()
         if len(children) > 250:
             self.table.delete(children[0])
+        self._scroll_table_to_end()
+
+    def _reset_impulse_capture(self, clear_saved=False):
+        self.current_impulse = None
+        self.last_valves_open = False
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = ""
+        self.pending_pulse_duration_ms = None
+        if clear_saved:
+            self.impulse_rows.clear()
+            self.active_test_mask = ""
+
+    def _update_impulse_capture(self, parts):
+        sample = self._parse_live_sample(parts)
+        if sample is None:
+            return
+
+        valves_open = sample["valves_open"]
+        if valves_open and not self.last_valves_open:
+            if self.current_impulse:
+                previous_close_ms = self.current_impulse.get("valve_close_time_ms")
+                capture_end_ms = sample["time_ms"]
+                previous_flow_end_ms = self._flow_capture_end_time_ms(self.current_impulse)
+                if previous_flow_end_ms is not None:
+                    capture_end_ms = min(capture_end_ms, previous_flow_end_ms)
+                self._finalize_impulse(capture_end_ms)
+            self._begin_impulse(sample)
+
+        if self.current_impulse:
+            if valves_open:
+                self._add_pressure_sample(sample)
+                self._add_flow_sample(sample)
+            else:
+                close_time_ms = self.current_impulse.get("valve_close_time_ms")
+                if self.last_valves_open:
+                    self.current_impulse["valve_close_time_ms"] = sample["time_ms"]
+                    self._add_flow_sample(sample)
+                elif close_time_ms is not None:
+                    capture_end_ms = self._flow_capture_end_time_ms(self.current_impulse)
+                    if sample["time_ms"] <= capture_end_ms:
+                        self._add_flow_sample(sample)
+                    else:
+                        self._finalize_impulse(capture_end_ms)
+
+        self.last_valves_open = valves_open
+
+    def _parse_live_sample(self, parts):
+        try:
+            return {
+                "time_ms": float(parts[0]),
+                "target_pressure": self._optional_float(parts[1]),
+                "pressure_before": self._optional_float(parts[2]),
+                "regulator_feedback": self._optional_float(parts[3]),
+                "regulator_pwm": self._optional_float(parts[4]),
+                "valves_open": parts[5] not in ("0", "FALSE", "False", "false", ""),
+                "flow": self._optional_float(parts[6]),
+                "force": self._optional_float(parts[7]) if len(parts) > 7 else None,
+            }
+        except ValueError:
+            return None
+
+    def _optional_float(self, value):
+        if value == "":
+            return None
+        return float(value)
+
+    def _flow_capture_end_time_ms(self, impulse):
+        arduino_duration_ms = impulse.get("arduino_valve_open_duration_ms")
+        if arduino_duration_ms is not None:
+            return impulse["start_time_ms"] + arduino_duration_ms + FLOW_DELAY_CAPTURE_MS
+
+        close_time_ms = impulse.get("valve_close_time_ms")
+        if close_time_ms is None:
+            return None
+        return close_time_ms + FLOW_DELAY_CAPTURE_MS
+
+    def _begin_impulse(self, sample):
+        valve_mask = self.pending_pulse_mask
+        if not valve_mask and self.mode_var.get().startswith("Mode: test sequence"):
+            valve_mask = self.active_test_mask
+        pose_number, hole_number = self._current_pose_hole_for_csv()
+        read_stepper_y_offset, read_colibri_z_offset = self._current_readback_offsets_for_csv()
+
+        self.current_impulse = {
+            "impulse_index": len(self.impulse_rows) + 1,
+            "flip_angle": self.pending_flip_angle,
+            "pose_number": pose_number,
+            "hole_number": hole_number,
+            "read_stepper_y_offset": read_stepper_y_offset,
+            "read_colibri_z_offset": read_colibri_z_offset,
+            "valve_mask": valve_mask,
+            "arduino_valve_open_duration_ms": self.pending_pulse_duration_ms,
+            "start_time_ms": sample["time_ms"],
+            "valve_close_time_ms": None,
+            "capture_end_time_ms": sample["time_ms"],
+            "target_pressure": sample["target_pressure"],
+            "valve_open_sample_count": 0,
+            "pressure_skipped_count": 0,
+            "pressure_sum": 0.0,
+            "pressure_count": 0,
+            "regulator_pressure_sum": 0.0,
+            "regulator_pressure_count": 0,
+            "force_sum": 0.0,
+            "force_count": 0,
+            "max_flow": None,
+            "flow_sample_count": 0,
+            "last_flow_time_ms": None,
+            "last_flow_l_min": None,
+            "volume_l": 0.0,
+        }
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = ""
+        self.pending_pulse_duration_ms = None
+
+    def _add_pressure_sample(self, sample):
+        self.current_impulse["valve_open_sample_count"] += 1
+        if self.current_impulse["valve_open_sample_count"] <= PRESSURE_SETTLE_SKIP_SAMPLES:
+            self.current_impulse["pressure_skipped_count"] += 1
+            return
+
+        pressure = sample["pressure_before"]
+        if pressure is not None:
+            self.current_impulse["pressure_sum"] += pressure
+            self.current_impulse["pressure_count"] += 1
+
+        regulator_pressure = sample["regulator_feedback"]
+        if regulator_pressure is not None:
+            self.current_impulse["regulator_pressure_sum"] += regulator_pressure
+            self.current_impulse["regulator_pressure_count"] += 1
+
+        force = sample["force"]
+        if force is not None:
+            self.current_impulse["force_sum"] += force
+            self.current_impulse["force_count"] += 1
+
+    def _add_flow_sample(self, sample):
+        flow = sample["flow"]
+        time_ms = sample["time_ms"]
+        if flow is None:
+            return
+
+        max_flow = self.current_impulse["max_flow"]
+        self.current_impulse["max_flow"] = flow if max_flow is None else max(max_flow, flow)
+        self.current_impulse["flow_sample_count"] += 1
+        self.current_impulse["volume_l"] += flow * (SAMPLE_INTERVAL_MS / 60000.0)
+        self.current_impulse["last_flow_time_ms"] = time_ms
+        self.current_impulse["last_flow_l_min"] = flow
+        self.current_impulse["capture_end_time_ms"] = time_ms
+
+    def _finalize_impulse(self, capture_end_time_ms=None):
+        if not self.current_impulse:
+            return
+
+        impulse = self.current_impulse
+        if capture_end_time_ms is not None:
+            impulse["capture_end_time_ms"] = capture_end_time_ms
+
+        pressure_count = impulse["pressure_count"]
+        avg_pressure = impulse["pressure_sum"] / pressure_count if pressure_count else ""
+        regulator_pressure_count = impulse["regulator_pressure_count"]
+        avg_regulator_pressure = (
+            impulse["regulator_pressure_sum"] / regulator_pressure_count
+            if regulator_pressure_count
+            else ""
+        )
+        force_count = impulse["force_count"]
+        avg_force = impulse["force_sum"] / force_count if force_count else ""
+        valve_close_time_ms = impulse["valve_close_time_ms"]
+        if valve_close_time_ms is None:
+            valve_close_time_ms = impulse["capture_end_time_ms"]
+        valve_open_duration_ms = impulse["arduino_valve_open_duration_ms"]
+        if valve_open_duration_ms is None:
+            valve_open_duration_ms = VALVE_PULSE_DURATION_MS
+
+        row = [
+            impulse["impulse_index"],
+            impulse["flip_angle"],
+            impulse["pose_number"],
+            impulse["hole_number"],
+            self._format_readback_offset(impulse["read_stepper_y_offset"]),
+            self._format_readback_offset(impulse["read_colibri_z_offset"]),
+            self._format_csv_number(impulse["start_time_ms"]),
+            self._format_csv_number(valve_close_time_ms),
+            self._format_csv_number(impulse["capture_end_time_ms"]),
+            self._format_csv_number(valve_open_duration_ms),
+            self._format_csv_number(impulse["target_pressure"]),
+            self._format_csv_number(avg_regulator_pressure),
+            self._format_csv_number(avg_pressure),
+            self._format_csv_number(avg_force, digits=4),
+            self._format_csv_number(impulse["max_flow"]),
+            self._format_csv_number(impulse["volume_l"], digits=6),
+            *self._nozzle_mask_flags(impulse["valve_mask"]),
+            impulse["valve_open_sample_count"],
+            pressure_count,
+            impulse["flow_sample_count"],
+        ]
+        self.impulse_rows.append(row)
+        self.current_impulse = None
+
+    def _nozzle_mask_flags(self, mask):
+        try:
+            mask_value = int(float(mask))
+        except (TypeError, ValueError):
+            return ["", "", "", ""]
+
+        return [1 if mask_value & (1 << index) else 0 for index in range(4)]
+
+    def _format_csv_number(self, value, digits=3):
+        if value is None or value == "":
+            return ""
+        return f"{float(value):.{digits}f}"
+
+    def _format_readback_offset(self, value):
+        if value == -1:
+            return -1
+        return self._format_csv_number(value)
 
     def _append_log_line(self, line):
         self.log.insert(tk.END, line + "\n")
         line_count = int(self.log.index("end-1c").split(".")[0])
         if line_count > MAX_LOG_LINES:
             self.log.delete("1.0", f"{line_count - MAX_LOG_LINES + 1}.0")
-        self.log.see(tk.END)
+        self._scroll_log_to_end()
+
+    def _clear_log(self):
+        self._clear_run_display()
+
+    def _clear_run_display(self):
+        self.rows.clear()
+        self._reset_impulse_capture(clear_saved=True)
+        for item in self.table.get_children():
+            self.table.delete(item)
+        self.log.delete("1.0", tk.END)
+        self._clear_pending_live_messages()
+
+    def _scroll_log_to_end(self):
+        self.log.mark_set(tk.INSERT, tk.END)
+        self.log.see(tk.INSERT)
+        self.log.yview_moveto(1.0)
+
+    def _scroll_table_to_end(self):
+        children = self.table.get_children()
+        if not children:
+            return
+        self.table.see(children[-1])
+        self.table.yview_moveto(1.0)
 
     def _is_live_data_line(self, line):
         parts = line.split(";")
@@ -1513,19 +2724,39 @@ class TestRunGui(tk.Tk):
             self.mode_var.set(f"Mode: manual pressure | target {setpoint} bar | PWM {pwm}")
             self.status_var.set(f"Arduino applied manual pressure: {setpoint} bar, PWM {pwm}")
 
+    def _handle_flow_threshold_line(self, parts):
+        if len(parts) >= 3 and parts[1] == "SET":
+            self.status_var.set(f"Flow Detection Threshold set to {parts[2]} l/min")
+
+    def _handle_pressure_offset_line(self, parts):
+        if len(parts) >= 3 and parts[1] == "SET":
+            self.status_var.set(f"Pressure PWM offset set to {parts[2]}%")
+
     def _handle_pulse_line(self, parts):
         if len(parts) >= 3 and parts[1] == "ERROR":
             self.pulse_in_progress = False
             self.pending_increment_direction = 0
+            self.pending_flip_angle = -1
+            self.pending_pulse_mask = ""
             self._set_pulse_buttons_enabled(True)
             self.status_var.set(";".join(parts))
             return
 
         if len(parts) >= 3 and parts[1] == "START":
+            self.pending_pulse_mask = parts[2]
+            if self.current_impulse and not self.current_impulse.get("valve_mask"):
+                self.current_impulse["valve_mask"] = parts[2]
             self.mode_var.set(f"Mode: manual pulse running | mask {parts[2]}")
             return
 
+        if len(parts) >= 3 and parts[1] == "FLOW_DONE":
+            self._handle_flow_done_line(parts)
+            return
+
         if len(parts) >= 3 and parts[1] == "DONE":
+            pulse_duration_ms = self._pulse_duration_ms(parts)
+            self._set_completed_pulse_duration(pulse_duration_ms)
+
             if not self.pulse_in_progress:
                 return
 
@@ -1539,6 +2770,91 @@ class TestRunGui(tk.Tk):
                 self._advance_increment_target(completed_increment_direction)
             else:
                 self.mode_var.set("Mode: manual pressure")
+
+            self.after(0, lambda valve_mask=parts[2]: self._show_completed_pulse_flip_angle_prompt(valve_mask))
+
+    def _handle_flow_done_line(self, parts):
+        flow_sample_count = self._pulse_field_float(parts, "SAMPLES")
+        max_flow = self._pulse_field_float(parts, "MAX_FLOW")
+        volume_l = self._pulse_field_float(parts, "VOLUME_L")
+
+        if self.current_impulse:
+            if flow_sample_count is not None:
+                self.current_impulse["flow_sample_count"] = int(round(flow_sample_count))
+            if max_flow is not None:
+                self.current_impulse["max_flow"] = max_flow
+            if volume_l is not None:
+                self.current_impulse["volume_l"] = volume_l
+            self._finalize_impulse(self.current_impulse["capture_end_time_ms"])
+            return
+
+        if self.impulse_rows:
+            if max_flow is not None:
+                self.impulse_rows[-1][14] = self._format_csv_number(max_flow)
+            if volume_l is not None:
+                self.impulse_rows[-1][15] = self._format_csv_number(volume_l, digits=6)
+            if flow_sample_count is not None:
+                self.impulse_rows[-1][22] = int(round(flow_sample_count))
+
+    def _pulse_field_float(self, parts, field_name):
+        if field_name not in parts:
+            return None
+        try:
+            return float(parts[parts.index(field_name) + 1])
+        except (ValueError, IndexError):
+            return None
+
+    def _pulse_duration_ms(self, parts):
+        if "DURATION_US" in parts:
+            try:
+                duration_index = parts.index("DURATION_US") + 1
+                return float(parts[duration_index]) / 1000.0
+            except (ValueError, IndexError):
+                return None
+
+        if "DURATION_MS" in parts:
+            try:
+                duration_index = parts.index("DURATION_MS") + 1
+                return float(parts[duration_index])
+            except (ValueError, IndexError):
+                return None
+
+        return None
+
+    def _set_completed_pulse_duration(self, duration_ms):
+        if duration_ms is None:
+            return
+
+        if self.current_impulse:
+            self.current_impulse["arduino_valve_open_duration_ms"] = duration_ms
+            return
+
+        if self.impulse_rows:
+            self.impulse_rows[-1][9] = self._format_csv_number(duration_ms)
+            return
+
+        self.pending_pulse_duration_ms = duration_ms
+
+    def _show_completed_pulse_flip_angle_prompt(self, valve_mask):
+        self._show_flip_angle_prompt(
+            lambda flip_angle: self._set_completed_pulse_flip_angle(flip_angle, valve_mask)
+        )
+
+    def _set_completed_pulse_flip_angle(self, flip_angle, valve_mask):
+        if self.current_impulse:
+            self.current_impulse["flip_angle"] = flip_angle
+            if not self.current_impulse.get("valve_mask"):
+                self.current_impulse["valve_mask"] = valve_mask
+            return
+
+        if self.impulse_rows:
+            self.impulse_rows[-1][1] = flip_angle
+            if self.impulse_rows[-1][16] == "":
+                self.impulse_rows[-1][16:20] = self._nozzle_mask_flags(valve_mask)
+            return
+
+        self.pending_flip_angle = flip_angle
+        self.pending_pulse_mask = valve_mask
 
     def _handle_motor_line(self, parts):
         if len(parts) >= 3 and parts[1] == "ENABLED":
@@ -1555,6 +2871,10 @@ class TestRunGui(tk.Tk):
             self.last_motor_speed_steps_s = speed_steps_s
             speed_mm_s = self._steps_per_second_to_mm_per_second(speed_steps_s)
             self.status_var.set(f"Stepper speed applied: {speed_mm_s:.3f} mm/s")
+            return
+
+        if "POS" in parts:
+            self._handle_motor_position_line(parts)
             return
 
         if len(parts) >= 5 and parts[1] == "MOVE":
@@ -1582,21 +2902,55 @@ class TestRunGui(tk.Tk):
         if len(parts) >= 3 and parts[1] == "ERROR":
             self.status_var.set(";".join(parts))
 
+    def _handle_motor_position_line(self, parts):
+        try:
+            pos_index = parts.index("POS")
+            mm_index = parts.index("MM")
+            ref_index = parts.index("REF")
+            position_steps = int(float(parts[pos_index + 1]))
+            position_mm = float(parts[mm_index + 1])
+            referenced = parts[ref_index + 1] not in ("0", "FALSE")
+        except (ValueError, IndexError):
+            self.status_var.set(";".join(parts))
+            return
+
+        self.last_motor_position_mm = position_mm
+        self.motor_position_var.set(
+            f"Stepper position: {position_mm:.3f} mm ({position_steps} steps) {'ref' if referenced else 'unref'}"
+        )
+
+        event = parts[1] if len(parts) > 1 else "POSITION"
+        if event == "ZERO":
+            self.mode_var.set("Mode: stepper zero set")
+            self.status_var.set("Stepper zero reference set")
+        elif event == "HOME_DONE":
+            self.mode_var.set("Mode: stepper homed")
+            self.status_var.set("Stepper homed at limit switch")
+        elif event in ("LIMIT", "LIMIT_STOP"):
+            self.mode_var.set("Mode: stepper limit switch")
+            self.status_var.set("Stepper limit switch active; zero reference set")
+        elif event == "DONE":
+            self.mode_var.set("Mode: stepper done")
+            self.status_var.set(f"Stepper move complete at {position_mm:.3f} mm")
+        elif event == "POSITION":
+            self.status_var.set(f"Stepper position: {position_mm:.3f} mm")
+
     def _advance_increment_target(self, direction):
-        starting_pressure = self._validated_pressure(self.starting_pressure_var, "starting pressure")
+        current_pressure = self._validated_pressure(self.target_pressure_var, "target pressure")
         pressure_increment = self._validated_pressure(self.pressure_increment_var, "pressure increment")
-        if starting_pressure is None or pressure_increment is None:
+        if current_pressure is None or pressure_increment is None:
             return
 
         next_count = self.increment_count_var.get() + direction
-        next_target = min(max(starting_pressure + next_count * pressure_increment, 0.0), 5.0)
+        next_target = min(max(current_pressure + direction * pressure_increment, 0.0), 5.0)
         self.increment_count_var.set(next_count)
         self.target_pressure_var.set(round(next_target, 3))
         self._apply_pressure_settings()
 
-    def _save_csv(self):
-        if not self.rows:
-            messagebox.showinfo("Nothing to save", "No test samples have been received yet.")
+    def _save_impulse_csv(self):
+        self._finalize_stale_impulse_before_save()
+        if not self.impulse_rows:
+            messagebox.showinfo("Nothing to save", "No impulses have been captured yet.")
             return
 
         path = filedialog.asksaveasfilename(
@@ -1606,20 +2960,95 @@ class TestRunGui(tk.Tk):
         if not path:
             return
 
+        edited_path = Path(path)
+        raw_path = self._raw_csv_path(edited_path)
+        try:
+            self._write_impulse_csv(edited_path)
+            self._write_raw_csv(raw_path)
+        except OSError as exc:
+            messagebox.showerror("Save failed", str(exc))
+            return
+
+        self.status_var.set(f"Saved CSV and raw CSV: {edited_path.name}, {raw_path.name}")
+
+    def _raw_csv_path(self, edited_path):
+        if edited_path.suffix:
+            return edited_path.with_name(f"{edited_path.stem}_raw{edited_path.suffix}")
+        return edited_path.with_name(f"{edited_path.name}_raw.csv")
+
+    def _write_impulse_csv(self, path):
         with open(path, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.writer(csv_file, delimiter=";")
+            writer = csv.writer(csv_file, delimiter=self._csv_delimiter())
+            writer.writerow([
+                "impulse index",
+                "flip angle",
+                "pose number",
+                "hole number",
+                "read stepper y offset",
+                "read colibri z offset",
+                "start time ms",
+                "valve close time ms",
+                "capture end time ms",
+                "arduino valve open duration ms",
+                "target regulator pressure",
+                "average actual regulator pressure",
+                "average pressure before valve",
+                "average force n",
+                "maximum flow",
+                "volume l",
+                "nozzle 1 used",
+                "nozzle 2 used",
+                "nozzle 3 used",
+                "nozzle 4 used",
+                "valve open sample count",
+                "pressure sample count",
+                "flow sample count",
+            ])
+            writer.writerows(self._csv_output_row(row) for row in self.impulse_rows)
+
+    def _finalize_stale_impulse_before_save(self):
+        if not self.current_impulse:
+            return
+
+        capture_end_time_ms = self._flow_capture_end_time_ms(self.current_impulse)
+        if capture_end_time_ms is not None:
+            self._finalize_impulse(capture_end_time_ms)
+
+    def _write_raw_csv(self, path):
+        with open(path, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file, delimiter=self._csv_delimiter())
             writer.writerow([
                 "time",
                 "target regulator pressure",
                 "pressure before valve",
-                "regulator feedback pressure",
+                "actual regulator pressure",
                 "regulator pwm",
                 "valves open",
                 "flow",
+                "force n",
             ])
-            writer.writerows(self.rows)
+            writer.writerows(self._csv_output_row(row) for row in self.rows)
+
+    def _csv_delimiter(self):
+        return ";" if self.german_csv_format_var.get() else ","
+
+    def _csv_output_row(self, row):
+        return [self._csv_output_cell(value) for value in row]
+
+    def _csv_output_cell(self, value):
+        if value is None:
+            return ""
+        text = str(value)
+        if not self.german_csv_format_var.get():
+            return text
+        try:
+            float(text)
+        except ValueError:
+            return text
+        return text.replace(".", ",")
 
     def destroy(self):
+        self._disconnect_force_sensor()
         self._disconnect_colibri()
         self._disconnect()
         if self.debug_log_file:
