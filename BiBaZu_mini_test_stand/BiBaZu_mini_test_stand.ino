@@ -44,7 +44,6 @@ const float stepperMmPerStep = 0.009985846;
 
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
 const float regulatorMaxPressure = 6.0;  // Calibrated 10 V converter output corresponds to 6 bar.
-float regulatorPressureOffsetPercent = 7.0;
 const float testPressureStepBar = 0.05;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
@@ -274,8 +273,6 @@ void processSerialCommand(String command) {
     streamContinuously = true;
   } else if (command == "STREAM_OFF") {
     streamContinuously = false;
-  } else if (command.startsWith("SET_PRESSURE_OFFSET")) {
-    setPressureOffset(command);
   } else if (command.startsWith("SET_PRESSURE")) {
     setTargetPressure(command);
   } else if (command.startsWith("SET_FLOW_THRESHOLD")) {
@@ -428,14 +425,6 @@ void setFlowCaptureThreshold(String command) {
 
   Serial.print("FLOW_THRESHOLD;SET;");
   Serial.println(flowCaptureThresholdNlMin, 3);
-}
-
-void setPressureOffset(String command) {
-  float requestedOffset = commandValue(command);
-  regulatorPressureOffsetPercent = constrain(requestedOffset, -100.0, 100.0);
-
-  Serial.print("PRESSURE_OFFSET;SET;");
-  Serial.println(regulatorPressureOffsetPercent, 3);
 }
 
 void startManualPulse(String command) {
@@ -708,7 +697,9 @@ void readSensors() {
   voltageFlow = 5.0 * (rawFlow / 1023.0);
 
   pressureBeforeValve = (voltagePressureBeforeValve - 1.0) * 2.5;
-  regulatorPressure = (voltageRegulatorFeedback - 1.0) * 5.0 / 4.0;
+  // The VEAB outputs 0-10 V for 0-6 bar. A 1:1 divider reduces this to
+  // 0-5 V at A2, so the ADC voltage maps directly to 0-6 bar.
+  regulatorPressure = voltageRegulatorFeedback * regulatorMaxPressure / 5.0;
   float flowFraction = (voltageFlow - flowSensorMinVoltage) / (flowSensorMaxVoltage - flowSensorMinVoltage);
   flowFraction = constrain(flowFraction, 0.0, 1.0);
   flow = flowSensorMinNlMin + flowFraction * (flowSensorMaxNlMin - flowSensorMinNlMin);
@@ -741,14 +732,7 @@ void updateTest() {
 }
 
 void updateRegulatorControl() {
-  float controlPressure = targetRegulatorPressure;
-
-  if (targetRegulatorPressure > 0.0) {
-    controlPressure = targetRegulatorPressure * (1.0 + regulatorPressureOffsetPercent / 100.0);
-  }
-
-  controlPressure = constrain(controlPressure, 0.0, regulatorMaxPressure);
-  regulatorSetting = constrain(round(feedforwardForPressure(controlPressure)), 0, 255);
+  regulatorSetting = constrain(round(feedforwardForPressure(targetRegulatorPressure)), 0, 255);
 }
 
 float feedforwardForPressure(float targetPressure) {
