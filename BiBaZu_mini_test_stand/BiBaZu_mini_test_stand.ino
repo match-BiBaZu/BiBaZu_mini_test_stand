@@ -1,7 +1,20 @@
 const int flowSensor_InPin = A1;
 const int pressureBeforeValve_InPin = A0;
 const int regulatorFeedback_InPin = A2;  // VEAB black output wire
-const int regulatorOutPin = 2;           // VEAB input wire, PWM output
+const int regulatorOutPin = 3;           // PWM-to-0-10 V converter input (Mega 2560 OC3C)
+const unsigned int regulatorPwmTop = 999;  // 16 MHz / (8 * (999 + 1)) = 2 kHz.
+
+// Measured converter characteristic after calibrating 100% PWM to 10.00 V.
+// The converter jumps from 0 V to about 1.04 V at its smallest PWM input.
+const float converterCalibrationDutyPercent[] = {
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+};
+const float converterCalibrationVoltage[] = {
+  0.000, 1.040, 1.190, 1.304, 1.407, 1.508, 1.609, 1.710, 1.804, 1.911,
+  2.020, 3.030, 4.030, 5.030, 6.030, 7.020, 7.990, 9.000, 9.860, 10.000
+};
+const int converterCalibrationPointCount =
+  sizeof(converterCalibrationVoltage) / sizeof(converterCalibrationVoltage[0]);
 
 const int valvePins[] = {4, 5, 6, 7};
 const int valveCount = sizeof(valvePins) / sizeof(valvePins[0]);
@@ -30,12 +43,12 @@ const float stepperMmPerStep = 0.009985846;
 
 
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
-const float regulatorMaxPressure = 5.0;  // 255 PWM corresponds to 5 bar regulator setpoint.
+const float regulatorMaxPressure = 6.0;  // Calibrated 10 V converter output corresponds to 6 bar.
 float regulatorPressureOffsetPercent = 7.0;
 const float testPressureStepBar = 0.05;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
-const int maxPressureStep = 100;  // 5.0 bar / 0.05 bar.
+const int maxPressureStep = 120;  // 6.0 bar / 0.05 bar.
 
 // Flow sensor analog scaling for the white analog output configured to 1-5 V.
 // The installed unidirectional sensor is configured as 0 ... 200 l/min.
@@ -113,11 +126,15 @@ const int serialCommandMaxLength = 80;
 String serialCommandBuffer = "";
 
 void processSerialCommand(String command);
+void setupRegulatorPwm();
+void writeRegulatorPwm(int value);
+float calibratedDutyForVoltage(float desiredVoltage);
+void writeRegulatorDutyPercent(float dutyPercent);
 
 void setup() {
   Serial.begin(230400);
 
-  pinMode(regulatorOutPin, OUTPUT);
+  setupRegulatorPwm();
   for (int i = 0; i < valveCount; i++) {
     pinMode(valvePins[i], OUTPUT);
     digitalWrite(valvePins[i], valveClosedSignal);
@@ -127,12 +144,77 @@ void setup() {
   pinMode(stepperEnablePin, OUTPUT);
   pinMode(stepperLimitPin, INPUT_PULLUP);
 
-  analogWrite(regulatorOutPin, 0);
+  writeRegulatorPwm(0);
   digitalWrite(stepperStepPin, stepperStepIdleSignal);
   digitalWrite(stepperDirPin, stepperPositiveDirSignal);
   digitalWrite(stepperEnablePin, stepperDisableSignal);
   Serial.println("READY");
   Serial.println("Send START from the GUI to begin the test.");
+}
+
+void setupRegulatorPwm() {
+#if defined(__AVR_ATmega2560__)
+  pinMode(regulatorOutPin, OUTPUT);
+  digitalWrite(regulatorOutPin, LOW);
+
+  // D3 is OC3C on the Mega 2560. Fast PWM mode 14 with a /8 prescaler
+  // produces the 2 kHz signal required by the PWM-to-0-10 V converter.
+  // Timer 3 also serves D2 and D5, but this sketch uses neither as PWM.
+  TCCR3A = _BV(WGM31);
+  TCCR3B = _BV(WGM33) | _BV(WGM32) | _BV(CS31);
+  TCNT3 = 0;
+  ICR3 = regulatorPwmTop;
+  OCR3C = 0;
+#else
+#error "The regulator PWM setup is configured for an Arduino Mega 2560."
+#endif
+}
+
+void writeRegulatorPwm(int value) {
+  value = constrain(value, 0, 255);
+  float desiredVoltage = value * 10.0 / 255.0;
+  writeRegulatorDutyPercent(calibratedDutyForVoltage(desiredVoltage));
+}
+
+float calibratedDutyForVoltage(float desiredVoltage) {
+  desiredVoltage = constrain(desiredVoltage, 0.0, 10.0);
+  if (desiredVoltage <= 0.0) {
+    return 0.0;
+  }
+
+  // No stable converter output exists between 0 and 1.04 V. Select the
+  // closer of the two reachable endpoints instead of extrapolating.
+  if (desiredVoltage < converterCalibrationVoltage[1] / 2.0) {
+    return 0.0;
+  }
+  if (desiredVoltage <= converterCalibrationVoltage[1]) {
+    return converterCalibrationDutyPercent[1];
+  }
+
+  for (int i = 2; i < converterCalibrationPointCount; i++) {
+    if (desiredVoltage <= converterCalibrationVoltage[i]) {
+      float voltageFraction =
+        (desiredVoltage - converterCalibrationVoltage[i - 1]) /
+        (converterCalibrationVoltage[i] - converterCalibrationVoltage[i - 1]);
+      return converterCalibrationDutyPercent[i - 1] + voltageFraction *
+        (converterCalibrationDutyPercent[i] - converterCalibrationDutyPercent[i - 1]);
+    }
+  }
+  return 100.0;
+}
+
+void writeRegulatorDutyPercent(float dutyPercent) {
+  dutyPercent = constrain(dutyPercent, 0.0, 100.0);
+  if (dutyPercent <= 0.0) {
+    // A static LOW guarantees a true 0 V command at the converter output.
+    TCCR3A &= ~(_BV(COM3C1) | _BV(COM3C0));
+    digitalWrite(regulatorOutPin, LOW);
+    return;
+  }
+
+  int highCounts = constrain(round(dutyPercent * 10.0), 1, regulatorPwmTop + 1);
+  OCR3C = highCounts - 1;
+  TCCR3A = (TCCR3A & ~_BV(COM3C0)) | _BV(COM3C1);
 }
 
 void loop() {
@@ -146,7 +228,7 @@ void loop() {
 
     updateTest();
     updateRegulatorControl();
-    analogWrite(regulatorOutPin, regulatorSetting);
+    writeRegulatorPwm(regulatorSetting);
     updateValvePulse();
     readSensors();
     writeSerialData();
@@ -294,7 +376,7 @@ void stopTest() {
   streamCounter = 0;
   targetRegulatorPressure = 0.0;
   regulatorSetting = 0;
-  analogWrite(regulatorOutPin, regulatorSetting);
+  writeRegulatorPwm(regulatorSetting);
   Serial.println("STOPPED");
 }
 
@@ -311,7 +393,7 @@ void finishTest() {
   streamCounter = 0;
   targetRegulatorPressure = testEndPressureStep * testPressureStepBar;
   updateRegulatorControl();
-  analogWrite(regulatorOutPin, regulatorSetting);
+  writeRegulatorPwm(regulatorSetting);
   Serial.println("STOPPED");
 }
 
@@ -330,7 +412,7 @@ void setTargetPressure(String command) {
   closeValves();
   targetRegulatorPressure = constrain(requestedPressure, 0.0, regulatorMaxPressure);
   updateRegulatorControl();
-  analogWrite(regulatorOutPin, regulatorSetting);
+  writeRegulatorPwm(regulatorSetting);
 
   Serial.print("MODE;MANUAL;SETPOINT;");
   Serial.print(targetRegulatorPressure);

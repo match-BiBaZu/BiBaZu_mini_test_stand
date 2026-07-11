@@ -27,6 +27,7 @@ FLOW_DELAY_CAPTURE_MS = 500.0
 SAMPLE_INTERVAL_MS = 5.0
 VALVE_PULSE_DURATION_MS = 100.0
 PRESSURE_SETTLE_SKIP_SAMPLES = 2
+REGULATOR_MAX_PRESSURE_BAR = 6.0
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -497,7 +498,7 @@ class TestRunGui(tk.Tk):
         self.test_start_pressure_spinbox = ttk.Spinbox(
             controls,
             from_=0.0,
-            to=5.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
             increment=0.05,
             textvariable=self.test_start_pressure_var,
             width=6,
@@ -508,7 +509,7 @@ class TestRunGui(tk.Tk):
         self.test_end_pressure_spinbox = ttk.Spinbox(
             controls,
             from_=0.0,
-            to=5.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
             increment=0.05,
             textvariable=self.test_end_pressure_var,
             width=6,
@@ -546,7 +547,7 @@ class TestRunGui(tk.Tk):
         self.target_pressure_spinbox = ttk.Spinbox(
             pressure_controls,
             from_=0.0,
-            to=5.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
             increment=0.05,
             textvariable=self.target_pressure_var,
             width=8,
@@ -659,7 +660,7 @@ class TestRunGui(tk.Tk):
         self.starting_pressure_spinbox = ttk.Spinbox(
             increment_controls,
             from_=0.0,
-            to=5.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
             increment=0.05,
             textvariable=self.starting_pressure_var,
             width=8,
@@ -672,7 +673,7 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_spinbox = ttk.Spinbox(
             increment_controls,
             from_=0.0,
-            to=5.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
             increment=0.05,
             textvariable=self.pressure_increment_var,
             width=8,
@@ -1437,7 +1438,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Invalid pressure setting", "Enter a numeric target pressure.")
             return False
 
-        target_pressure = min(max(target_pressure, 0.0), 5.0)
+        target_pressure = min(max(target_pressure, 0.0), REGULATOR_MAX_PRESSURE_BAR)
         self.target_pressure_var.set(round(target_pressure, 3))
         self.mode_var.set("Mode: manual pressure pending")
         self._write_debug_log(f"GUI set pressure target={target_pressure:.3f}")
@@ -1477,7 +1478,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Invalid pressure setting", f"Enter a numeric {label}.")
             return None
 
-        value = min(max(value, 0.0), 5.0)
+        value = min(max(value, 0.0), REGULATOR_MAX_PRESSURE_BAR)
         variable.set(round(value, 3))
         return value
 
@@ -1488,10 +1489,10 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Invalid pressure setting", f"Enter a numeric {label}.")
             return None
 
-        value = min(max(value, 0.0), 5.0)
+        value = min(max(value, 0.0), REGULATOR_MAX_PRESSURE_BAR)
         step_count = math.ceil((value - 0.000001) / 0.05)
         stepped_value = step_count * 0.05
-        stepped_value = min(max(stepped_value, 0.0), 5.0)
+        stepped_value = min(max(stepped_value, 0.0), REGULATOR_MAX_PRESSURE_BAR)
         variable.set(round(stepped_value, 2))
         return stepped_value
 
@@ -2942,7 +2943,10 @@ class TestRunGui(tk.Tk):
             return
 
         next_count = self.increment_count_var.get() + direction
-        next_target = min(max(current_pressure + direction * pressure_increment, 0.0), 5.0)
+        next_target = min(
+            max(current_pressure + direction * pressure_increment, 0.0),
+            REGULATOR_MAX_PRESSURE_BAR,
+        )
         self.increment_count_var.set(next_count)
         self.target_pressure_var.set(round(next_target, 3))
         self._apply_pressure_settings()
