@@ -344,9 +344,6 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_var = tk.DoubleVar(value=0.05)
         self.increment_count_var = tk.IntVar(value=0)
         self.flow_threshold_var = tk.DoubleVar(value=2.0)
-        self.pressure_offset_var = tk.DoubleVar(
-            value=self._preset_float("pressure_pwm_offset_percent", 7.0, -100.0, 100.0)
-        )
         self.stream_var = tk.BooleanVar(value=True)
         self.motor_enabled_var = tk.BooleanVar(value=False)
         self.motor_distance_var = tk.DoubleVar(value=10.0)
@@ -429,7 +426,7 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current pressure PWM offset, nozzle offset, test stand height, and holder height as defaults?",
+            text="Save the current nozzle offset, test stand height, and holder height as defaults?",
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -459,7 +456,6 @@ class TestRunGui(tk.Tk):
     def _save_user_presets(self):
         try:
             presets = {
-                "pressure_pwm_offset_percent": float(self.pressure_offset_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "test_stand_height_mm": float(self.test_stand_height_var.get()),
                 "holder_height_mm": float(self.holder_height_var.get()),
@@ -563,27 +559,6 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.apply_pressure_button.pack(side=tk.LEFT, padx=(10, 0))
-
-        ttk.Label(pressure_controls, text="Pressure PWM offset").pack(side=tk.LEFT, padx=(18, 0))
-        self.pressure_offset_spinbox = ttk.Spinbox(
-            pressure_controls,
-            from_=-100.0,
-            to=100.0,
-            increment=1.0,
-            textvariable=self.pressure_offset_var,
-            width=8,
-            state=tk.DISABLED,
-        )
-        self.pressure_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(pressure_controls, text="%").pack(side=tk.LEFT)
-
-        self.apply_pressure_offset_button = ttk.Button(
-            pressure_controls,
-            text="Apply offset",
-            command=self._apply_pressure_offset_setting,
-            state=tk.DISABLED,
-        )
-        self.apply_pressure_offset_button.pack(side=tk.LEFT, padx=(10, 0))
 
         self.stream_checkbutton = ttk.Checkbutton(
             pressure_controls,
@@ -1171,8 +1146,6 @@ class TestRunGui(tk.Tk):
         self.test_repeats_spinbox.configure(state=tk.NORMAL)
         self.target_pressure_spinbox.configure(state=tk.NORMAL)
         self.apply_pressure_button.configure(state=tk.NORMAL)
-        self.pressure_offset_spinbox.configure(state=tk.NORMAL)
-        self.apply_pressure_offset_button.configure(state=tk.NORMAL)
         self.stream_checkbutton.configure(state=tk.NORMAL)
         self.flow_threshold_spinbox.configure(state=tk.NORMAL)
         self.apply_flow_threshold_button.configure(state=tk.NORMAL)
@@ -1187,7 +1160,6 @@ class TestRunGui(tk.Tk):
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
         self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
-        self._apply_pressure_offset_setting()
         self._apply_flow_threshold_setting()
         self._apply_stream_setting()
         self._send("MOTOR_POS")
@@ -1285,8 +1257,6 @@ class TestRunGui(tk.Tk):
         self.test_repeats_spinbox.configure(state=tk.DISABLED)
         self.target_pressure_spinbox.configure(state=tk.DISABLED)
         self.apply_pressure_button.configure(state=tk.DISABLED)
-        self.pressure_offset_spinbox.configure(state=tk.DISABLED)
-        self.apply_pressure_offset_button.configure(state=tk.DISABLED)
         self.stream_checkbutton.configure(state=tk.DISABLED)
         self.flow_threshold_spinbox.configure(state=tk.DISABLED)
         self.apply_flow_threshold_button.configure(state=tk.DISABLED)
@@ -1327,8 +1297,6 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("No nozzle selected", "Select at least one nozzle for the test.")
             return
 
-        if not self._apply_pressure_offset_setting():
-            return
         if not self._apply_flow_threshold_setting():
             return
 
@@ -1365,8 +1333,6 @@ class TestRunGui(tk.Tk):
             return
 
         if not self._apply_pressure_settings():
-            return
-        if not self._apply_pressure_offset_setting():
             return
         if not self._apply_flow_threshold_setting():
             return
@@ -1443,19 +1409,6 @@ class TestRunGui(tk.Tk):
         self.mode_var.set("Mode: manual pressure pending")
         self._write_debug_log(f"GUI set pressure target={target_pressure:.3f}")
         self._send(f"SET_PRESSURE:{target_pressure:.3f}", flush_live_backlog=True)
-        return True
-
-    def _apply_pressure_offset_setting(self):
-        try:
-            pressure_offset = float(self.pressure_offset_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Invalid pressure offset", "Enter a numeric pressure PWM offset percentage.")
-            return False
-
-        pressure_offset = min(max(pressure_offset, -100.0), 100.0)
-        self.pressure_offset_var.set(round(pressure_offset, 3))
-        self._write_debug_log(f"GUI set pressure pwm offset={pressure_offset:.3f}%")
-        self._send(f"SET_PRESSURE_OFFSET:{pressure_offset:.3f}")
         return True
 
     def _apply_flow_threshold_setting(self):
@@ -2436,10 +2389,6 @@ class TestRunGui(tk.Tk):
             self._handle_flow_threshold_line(parts)
             return
 
-        if parts[0] == "PRESSURE_OFFSET":
-            self._handle_pressure_offset_line(parts)
-            return
-
         if not parts or not parts[0].isdigit():
             return
 
@@ -2728,10 +2677,6 @@ class TestRunGui(tk.Tk):
     def _handle_flow_threshold_line(self, parts):
         if len(parts) >= 3 and parts[1] == "SET":
             self.status_var.set(f"Flow Detection Threshold set to {parts[2]} l/min")
-
-    def _handle_pressure_offset_line(self, parts):
-        if len(parts) >= 3 and parts[1] == "SET":
-            self.status_var.set(f"Pressure PWM offset set to {parts[2]}%")
 
     def _handle_pulse_line(self, parts):
         if len(parts) >= 3 and parts[1] == "ERROR":
