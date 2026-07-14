@@ -1384,9 +1384,9 @@ class TestRunGui(tk.Tk):
             choose(value)
             return "break"  # Prevents the event from passing to the main window
 
-        dialog.bind("1", lambda e: handle_subwindow_key(e, 0))
-        dialog.bind("2", lambda e: handle_subwindow_key(e, 90))
-        dialog.bind("3", lambda e: handle_subwindow_key(e, 180))
+        dialog.bind("3", lambda e: handle_subwindow_key(e, 0))
+        dialog.bind("1", lambda e: handle_subwindow_key(e, 90))
+        dialog.bind("2", lambda e: handle_subwindow_key(e, 180))
         dialog.bind("4", lambda e: handle_subwindow_key(e, -1))
         # -----------------------------
 
