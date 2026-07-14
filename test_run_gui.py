@@ -1066,6 +1066,18 @@ class TestRunGui(tk.Tk):
         self.log = tk.Text(root, height=7, wrap=tk.NONE)
         self.log.pack(fill=tk.X, pady=(8, 0))
 
+        # --- Key binding ---
+        def _trigger_pulse_btn(event, button):
+            # Ignore the key press if the user is typing in a text/input field
+            if event.widget.winfo_class() in ('Entry', 'TEntry', 'TCombobox', 'TSpinbox', 'Text'):
+                return
+            button.invoke()
+
+        self.bind("1", lambda e: _trigger_pulse_btn(e, self.manual_pulse_button))
+        self.bind("2", lambda e: _trigger_pulse_btn(e, self.increment_pulse_button))
+        self.bind("3", lambda e: _trigger_pulse_btn(e, self.decrement_pulse_button))
+        # -----------------------------
+
     def _refresh_ports(self):
         if list_ports is None:
             self.status_var.set("Install pyserial first: python -m pip install pyserial")
@@ -1366,6 +1378,17 @@ class TestRunGui(tk.Tk):
                 padx=4,
             )
         ttk.Button(button_frame, text="Undefined", width=10, command=lambda: choose(-1)).pack(side=tk.LEFT, padx=4)
+
+        # --- Key binding ---
+        def handle_subwindow_key(event, value):
+            choose(value)
+            return "break"  # Prevents the event from passing to the main window
+
+        dialog.bind("1", lambda e: handle_subwindow_key(e, 0))
+        dialog.bind("2", lambda e: handle_subwindow_key(e, 90))
+        dialog.bind("3", lambda e: handle_subwindow_key(e, 180))
+        dialog.bind("4", lambda e: handle_subwindow_key(e, -1))
+        # -----------------------------
 
         dialog.protocol("WM_DELETE_WINDOW", lambda: choose(-1))
         dialog.update_idletasks()
