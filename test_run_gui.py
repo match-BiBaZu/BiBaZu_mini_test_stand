@@ -7,8 +7,9 @@ import re
 import threading
 import time
 import tkinter as tk
+from collections import deque
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 try:
     import serial
@@ -16,6 +17,11 @@ try:
 except ImportError:
     serial = None
     list_ports = None
+
+try:
+    import pysoem
+except ImportError:
+    pysoem = None
 
 
 BAUD_RATE = 230400
@@ -38,9 +44,9 @@ COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 FORCE_BAUD_RATE = 38400
-FORCE_SENSOR_RANGE_N = 2.0
 FORCE_BINARY_SYNC = 0x2C
-FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
+FORCE_CALIBRATION_AVERAGE_SECONDS = 5.0
+FORCE_RATE_WINDOW_SECONDS = 2.0
 FORCE_VALUE_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 
@@ -310,7 +316,12 @@ class TestRunGui(tk.Tk):
         self.latest_force_raw_n = None
         self.latest_force_n = None
         self.latest_force_time = None
-        self.force_zero_offset_n = 0.0
+        self.force_calibration_slope = self._preset_float("force_calibration_slope", 1.0, -1.0e12, 1.0e12)
+        self.force_calibration_intercept = self._preset_float(
+            "force_calibration_intercept", 0.0, -1.0e12, 1.0e12
+        )
+        self.force_calibration_samples = deque(maxlen=10000)
+        self.force_rate_times = deque(maxlen=2000)
         self.rows = []
         self.impulse_rows = []
         self.current_impulse = None
@@ -318,6 +329,10 @@ class TestRunGui(tk.Tk):
         self.messages = queue.Queue()
         self.commands = queue.Queue()
         self.port_devices = {}
+        self.ethercat_adapters = {}
+        self.ethercat_master = None
+        self.ethercat_busy = False
+        self.closing = False
         self.colibri = None
         self.colibri_busy = False
         self.debug_log_file = None
@@ -327,13 +342,16 @@ class TestRunGui(tk.Tk):
         self.port_var = tk.StringVar()
         self.colibri_port_var = tk.StringVar()
         self.force_port_var = tk.StringVar()
+        self.ethercat_adapter_var = tk.StringVar()
+        self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
         self.colibri_position_var = tk.StringVar(value="Position: --")
-        self.force_status_var = tk.StringVar(value="Force sensor: disconnected")
-        self.force_value_var = tk.StringVar(value="Force: --")
+        self.force_status_var = tk.StringVar(value=self._force_calibration_status("Force sensor: disconnected"))
+        self.force_value_var = tk.StringVar(value="Force reading: --")
+        self.force_rate_var = tk.StringVar(value="Force rate: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.german_csv_format_var = tk.BooleanVar(value=True)
         self.target_pressure_var = tk.DoubleVar(value=0.50)
@@ -392,6 +410,7 @@ class TestRunGui(tk.Tk):
         ):
             variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
+        self._refresh_ethercat_adapters()
         self.after(50, self._drain_messages)
 
     def _load_user_presets(self):
@@ -426,7 +445,7 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current nozzle offset, test stand height, and holder height as defaults?",
+            text="Save the current force calibration, nozzle offset, test stand height, and holder height as defaults?",
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -456,6 +475,8 @@ class TestRunGui(tk.Tk):
     def _save_user_presets(self):
         try:
             presets = {
+                "force_calibration_slope": float(self.force_calibration_slope),
+                "force_calibration_intercept": float(self.force_calibration_intercept),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "test_stand_height_mm": float(self.test_stand_height_var.get()),
                 "holder_height_mm": float(self.holder_height_var.get()),
@@ -535,6 +556,30 @@ class TestRunGui(tk.Tk):
         self.debug_log_button = ttk.Button(controls, text="Start debug log", command=self._toggle_debug_log)
         self.debug_log_button.pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(controls, text="Clear", command=self._clear_log).pack(side=tk.RIGHT, padx=(0, 8))
+
+        ethercat_controls = ttk.Frame(root)
+        ethercat_controls.pack(fill=tk.X, pady=(10, 0))
+        ttk.Label(ethercat_controls, text="EtherCAT (EK1100)").pack(side=tk.LEFT)
+        self.ethercat_adapter_combo = ttk.Combobox(
+            ethercat_controls,
+            textvariable=self.ethercat_adapter_var,
+            width=52,
+            state="readonly",
+        )
+        self.ethercat_adapter_combo.pack(side=tk.LEFT, padx=(6, 8))
+        self.ethercat_refresh_button = ttk.Button(
+            ethercat_controls,
+            text="Refresh adapters",
+            command=self._refresh_ethercat_adapters,
+        )
+        self.ethercat_refresh_button.pack(side=tk.LEFT)
+        self.ethercat_connect_button = ttk.Button(
+            ethercat_controls,
+            text="Scan and connect",
+            command=self._toggle_ethercat_connection,
+        )
+        self.ethercat_connect_button.pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(ethercat_controls, textvariable=self.ethercat_status_var).pack(side=tk.LEFT, padx=(12, 0))
 
         pressure_controls = ttk.Frame(root)
         pressure_controls.pack(fill=tk.X, pady=(10, 0))
@@ -941,16 +986,17 @@ class TestRunGui(tk.Tk):
         )
         self.force_connect_button.pack(side=tk.LEFT)
 
-        self.force_zero_button = ttk.Button(
+        self.force_calibrate_button = ttk.Button(
             force_controls,
-            text="Zero force",
-            command=self._zero_force_sensor,
+            text="2-point calibration",
+            command=self._calibrate_force_sensor,
             state=tk.DISABLED,
         )
-        self.force_zero_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.force_calibrate_button.pack(side=tk.LEFT, padx=(8, 0))
 
         ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_rate_var).pack(side=tk.LEFT, padx=(18, 0))
 
         part_controls = ttk.Frame(root)
         part_controls.pack(fill=tk.X, pady=(10, 0))
@@ -1046,6 +1092,7 @@ class TestRunGui(tk.Tk):
             "valves_open",
             "flow",
             "force",
+            "raw_force",
         )
         self.table = ttk.Treeview(root, columns=columns, show="headings", height=18)
         headings = {
@@ -1056,15 +1103,162 @@ class TestRunGui(tk.Tk):
             "regulator_pwm": "Regulator PWM",
             "valves_open": "Valves open",
             "flow": "Flow",
-            "force": "Force N",
+            "force": "Force reading",
+            "raw_force": "Raw force reading",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
-            self.table.column(col, width=115, anchor=tk.CENTER)
+            self.table.column(col, width=110, anchor=tk.CENTER)
         self.table.pack(fill=tk.BOTH, expand=True)
 
         self.log = tk.Text(root, height=7, wrap=tk.NONE)
         self.log.pack(fill=tk.X, pady=(8, 0))
+
+    def _refresh_ethercat_adapters(self):
+        if pysoem is None:
+            self.ethercat_status_var.set("EtherCAT: install pysoem and Npcap first")
+            self.ethercat_adapter_combo["values"] = ()
+            return
+        if self.ethercat_master or self.ethercat_busy:
+            return
+
+        try:
+            adapters = pysoem.find_adapters()
+        except Exception as exc:
+            self.ethercat_adapters = {}
+            self.ethercat_adapter_combo["values"] = ()
+            self.ethercat_status_var.set(f"EtherCAT adapter scan failed: {exc}")
+            return
+
+        self.ethercat_adapters = {}
+        for adapter in adapters:
+            name = self._ethercat_adapter_text(getattr(adapter, "name", ""))
+            description = self._ethercat_adapter_text(
+                getattr(adapter, "desc", "") or "Network adapter"
+            )
+            if not name:
+                continue
+            label = f"{description} — {name}"
+            self.ethercat_adapters[label] = name
+
+        labels = list(self.ethercat_adapters)
+        self.ethercat_adapter_combo["values"] = labels
+        if labels and self.ethercat_adapter_var.get() not in labels:
+            self.ethercat_adapter_var.set(labels[0])
+        if labels:
+            self.ethercat_status_var.set(f"EtherCAT: {len(labels)} adapter(s) available")
+        else:
+            self.ethercat_adapter_var.set("")
+            self.ethercat_status_var.set("EtherCAT: no Npcap-compatible adapter found")
+
+    @staticmethod
+    def _ethercat_adapter_text(value):
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return str(value)
+
+    def _toggle_ethercat_connection(self):
+        if self.ethercat_master:
+            self._disconnect_ethercat()
+        else:
+            self._connect_ethercat()
+
+    def _connect_ethercat(self):
+        if pysoem is None:
+            messagebox.showerror(
+                "Missing EtherCAT dependency",
+                "Install PySOEM and Npcap first. During Npcap setup, enable\n"
+                "'Install Npcap in WinPcap API-compatible Mode'.",
+            )
+            return
+        adapter_name = self.ethercat_adapters.get(self.ethercat_adapter_var.get())
+        if not adapter_name:
+            messagebox.showerror("No adapter selected", "Select the Ethernet adapter connected to the EK1100.")
+            return
+
+        self.ethercat_busy = True
+        self.ethercat_status_var.set("EtherCAT: scanning bus...")
+        self.ethercat_connect_button.configure(state=tk.DISABLED)
+        self.ethercat_refresh_button.configure(state=tk.DISABLED)
+        self.ethercat_adapter_combo.configure(state=tk.DISABLED)
+        threading.Thread(
+            target=self._scan_ethercat_bus,
+            args=(adapter_name,),
+            daemon=True,
+        ).start()
+
+    def _scan_ethercat_bus(self, adapter_name):
+        master = pysoem.Master()
+        try:
+            master.open(adapter_name)
+            device_count = master.config_init()
+            if device_count <= 0:
+                master.close()
+                self.messages.put(("ethercat_error", "No EtherCAT devices found on the selected adapter."))
+                return
+
+            devices = []
+            for position, slave in enumerate(master.slaves, start=1):
+                devices.append({
+                    "position": position,
+                    "name": str(getattr(slave, "name", "") or "Unknown EtherCAT device"),
+                    "vendor_id": int(getattr(slave, "man", 0)),
+                    "product_code": int(getattr(slave, "id", 0)),
+                    "revision": int(getattr(slave, "rev", 0)),
+                })
+            if self.closing:
+                master.close()
+                return
+            self.messages.put(("ethercat_connected", (master, adapter_name, devices)))
+        except Exception as exc:
+            try:
+                master.close()
+            except Exception:
+                pass
+            self.messages.put(("ethercat_error", str(exc)))
+
+    def _handle_ethercat_connected(self, value):
+        master, adapter_name, devices = value
+        if self.closing:
+            master.close()
+            return
+        self.ethercat_master = master
+        self.ethercat_busy = False
+        self.ethercat_connect_button.configure(text="Disconnect", state=tk.NORMAL)
+        self.ethercat_status_var.set(f"EtherCAT: connected, {len(devices)} device(s) in PRE-OP")
+        self.status_var.set(f"EtherCAT bus found on {adapter_name}: {len(devices)} device(s)")
+        self._write_debug_log(f"ETHERCAT connected adapter={adapter_name!r} devices={len(devices)}")
+        for device in devices:
+            line = (
+                f"EtherCAT [{device['position']}] {device['name']} | "
+                f"vendor 0x{device['vendor_id']:08X}, product 0x{device['product_code']:08X}, "
+                f"revision 0x{device['revision']:08X}"
+            )
+            self._append_log_line(line)
+            self._write_debug_log(line)
+
+    def _handle_ethercat_error(self, error):
+        self.ethercat_busy = False
+        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_refresh_button.configure(state=tk.NORMAL)
+        self.ethercat_adapter_combo.configure(state="readonly")
+        self.ethercat_status_var.set(f"EtherCAT: {error}")
+        self.status_var.set(f"EtherCAT connection failed: {error}")
+        self._write_debug_log(f"ETHERCAT error {error}")
+
+    def _disconnect_ethercat(self):
+        if self.ethercat_master:
+            try:
+                self.ethercat_master.close()
+            except Exception as exc:
+                self._write_debug_log(f"ETHERCAT close error {exc}")
+        self.ethercat_master = None
+        self.ethercat_busy = False
+        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_refresh_button.configure(state=tk.NORMAL)
+        self.ethercat_adapter_combo.configure(state="readonly")
+        self.ethercat_status_var.set("EtherCAT: disconnected")
+        self._write_debug_log("ETHERCAT disconnected")
 
     def _refresh_ports(self):
         if list_ports is None:
@@ -1212,7 +1406,9 @@ class TestRunGui(tk.Tk):
         )
         self._write_debug_log(
             f"GUI force port label={self.force_port_var.get()!r} device={self._selected_force_port_device()!r} "
-            f"baud={self.force_baud_var.get()!r}"
+            f"baud={self.force_baud_var.get()!r} "
+            f"cal_slope={self.force_calibration_slope:.12g} "
+            f"cal_intercept={self.force_calibration_intercept:.12g}"
         )
 
     def _stop_debug_log(self):
@@ -1596,8 +1792,8 @@ class TestRunGui(tk.Tk):
         self.force_connect_button.configure(text="Disconnect")
         self.force_port_combo.configure(state=tk.DISABLED)
         self.force_baud_spinbox.configure(state=tk.DISABLED)
-        self.force_zero_button.configure(state=tk.NORMAL)
-        self.force_status_var.set(f"Force sensor: connected to {port} at {baud_rate} baud")
+        self.force_calibrate_button.configure(state=tk.NORMAL)
+        self.force_status_var.set(self._force_calibration_status(f"Force sensor: connected to {port} at {baud_rate} baud"))
         self.status_var.set(f"Connected force sensor on {port}")
         self._write_debug_log(f"FORCE connected port={port} baud={baud_rate}")
 
@@ -1614,28 +1810,133 @@ class TestRunGui(tk.Tk):
             self.latest_force_raw_n = None
             self.latest_force_n = None
             self.latest_force_time = None
-            self.force_zero_offset_n = 0.0
+            self.force_calibration_samples.clear()
+            self.force_rate_times.clear()
         self.force_connect_button.configure(text="Connect")
         self.force_port_combo.configure(state="readonly")
         self.force_baud_spinbox.configure(state=tk.NORMAL)
-        self.force_zero_button.configure(state=tk.DISABLED)
-        self.force_value_var.set("Force: --")
-        self.force_status_var.set("Force sensor: disconnected")
+        self.force_calibrate_button.configure(state=tk.DISABLED)
+        self.force_value_var.set("Force reading: --")
+        self.force_rate_var.set("Force rate: --")
+        self.force_status_var.set(self._force_calibration_status("Force sensor: disconnected"))
         self._write_debug_log("FORCE disconnected")
 
-    def _zero_force_sensor(self):
-        with self.force_lock:
-            if self.latest_force_raw_n is None:
-                messagebox.showinfo("No force value", "No force value has been received yet.")
-                return
-            self.force_zero_offset_n = self.latest_force_raw_n
-            self.latest_force_n = 0.0
-            force_time = self.latest_force_time
+    def _calibrate_force_sensor(self):
+        if not self.force_serial_port:
+            messagebox.showerror("Force sensor disconnected", "Connect the force sensor before calibrating.")
+            return
 
-        self.force_value_var.set("Force: 0.0000 N")
-        self.force_status_var.set("Force sensor: software zeroed")
-        self.status_var.set("Force sensor software zero set")
-        self._write_debug_log(f"FORCE software zero offset={self.force_zero_offset_n:.6f} time={force_time}")
+        if not messagebox.askokcancel(
+            "Force calibration",
+            "Set the sensor to the first calibration point, normally unloaded / 0 measurement. "
+            "Wait until the amplifier reading is stable, then press OK. "
+            "The GUI will average raw readings for 5 seconds.",
+        ):
+            return
+
+        first_known = simpledialog.askfloat(
+            "First calibration point",
+            "Enter the actual force value for the first point:",
+            initialvalue=0.0,
+            parent=self,
+        )
+        if first_known is None:
+            return
+        first_raw = self._measure_force_raw_average("Measuring first calibration point")
+        if first_raw is None:
+            return
+
+        if not messagebox.askokcancel(
+            "Force calibration",
+            "Apply a second calibration force as close as possible to the full scale of the sensor. "
+            "Wait until the amplifier reading is stable, then press OK. "
+            "The GUI will average raw readings for 5 seconds.",
+        ):
+            return
+
+        second_known = simpledialog.askfloat(
+            "Second calibration point",
+            "Enter the actual force value for the second point:",
+            initialvalue=2.0,
+            parent=self,
+        )
+        if second_known is None:
+            return
+        second_raw = self._measure_force_raw_average("Measuring second calibration point")
+        if second_raw is None:
+            return
+
+        raw_span = second_raw - first_raw
+        if abs(raw_span) < 1.0e-12:
+            messagebox.showerror(
+                "Calibration failed",
+                "The two raw force readings are identical. Apply a larger second calibration force.",
+            )
+            return
+
+        slope = (second_known - first_known) / raw_span
+        intercept = first_known - slope * first_raw
+        with self.force_lock:
+            self.force_calibration_slope = slope
+            self.force_calibration_intercept = intercept
+            if self.latest_force_raw_n is not None:
+                self.latest_force_n = self._apply_force_calibration(self.latest_force_raw_n)
+
+        self.force_value_var.set(self._format_force_value(self.latest_force_n))
+        self.force_status_var.set(self._force_calibration_status("Force sensor: calibrated"))
+        self.status_var.set("Force 2-point calibration applied")
+        self._write_debug_log(
+            "FORCE calibration "
+            f"raw1={first_raw:.6f} known1={first_known:.6f} "
+            f"raw2={second_raw:.6f} known2={second_known:.6f} "
+            f"slope={slope:.12g} intercept={intercept:.12g}"
+        )
+
+    def _measure_force_raw_average(self, label):
+        with self.force_lock:
+            self.force_calibration_samples.clear()
+
+        start_time = time.time()
+        end_time = start_time + FORCE_CALIBRATION_AVERAGE_SECONDS
+        self.force_status_var.set(f"{label}: 0.0 / {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} s")
+        self.status_var.set(f"{label} for {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} seconds...")
+
+        while time.time() < end_time:
+            elapsed = min(time.time() - start_time, FORCE_CALIBRATION_AVERAGE_SECONDS)
+            self.force_status_var.set(
+                f"{label}: {elapsed:.1f} / {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} s"
+            )
+            self.update_idletasks()
+            time.sleep(0.05)
+
+        with self.force_lock:
+            samples = [raw_value for timestamp, raw_value in self.force_calibration_samples if timestamp >= start_time]
+
+        if not samples:
+            messagebox.showerror("No force samples", f"No force samples were received during {label.lower()}.")
+            self.force_status_var.set(self._force_calibration_status("Force sensor: calibration failed"))
+            return None
+
+        average_raw = sum(samples) / len(samples)
+        self.force_status_var.set(
+            f"{label}: averaged {len(samples)} samples, raw avg {average_raw:.4f}"
+        )
+        self.status_var.set(f"{label}: averaged {len(samples)} force samples")
+        return average_raw
+
+    def _apply_force_calibration(self, raw_force):
+        return self.force_calibration_slope * raw_force + self.force_calibration_intercept
+
+    def _force_calibration_status(self, prefix):
+        if abs(self.force_calibration_slope - 1.0) < 1.0e-12 and abs(self.force_calibration_intercept) < 1.0e-12:
+            return prefix
+        return (
+            f"{prefix} | cal m={self.force_calibration_slope:.6g}, "
+            f"b={self.force_calibration_intercept:.6g}"
+        )
+
+    def _format_force_value(self, force_value):
+        return "Force reading: --" if force_value is None else f"Force reading: {force_value:.4f}"
 
     def _read_force_serial(self):
         buffer = bytearray()
@@ -1654,26 +1955,43 @@ class TestRunGui(tk.Tk):
             buffer.extend(data)
             values = self._extract_force_values(buffer)
             for raw_force_n in values:
-                force_n = self._store_force_value(raw_force_n)
+                force_n, rate_hz = self._store_force_value(raw_force_n)
                 now = time.time()
                 if now - last_ui_update >= 0.05:
-                    self.messages.put(("force_value", force_n))
+                    self.messages.put(("force_value", (force_n, rate_hz)))
                     last_ui_update = now
 
         self.force_reader_running = False
 
     def _store_force_value(self, raw_force_n):
+        now = time.time()
         with self.force_lock:
-            force_n = raw_force_n - self.force_zero_offset_n
+            force_n = self._apply_force_calibration(raw_force_n)
             self.latest_force_raw_n = raw_force_n
             self.latest_force_n = force_n
-            self.latest_force_time = time.time()
-            return force_n
+            self.latest_force_time = now
+            self.force_calibration_samples.append((now, raw_force_n))
+            self.force_rate_times.append(now)
+            while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
+                self.force_rate_times.popleft()
+            return force_n, self._force_rate_hz_locked()
 
-    def _latest_force_text(self):
+    def _force_rate_hz_locked(self):
+        if len(self.force_rate_times) < 2:
+            return None
+        elapsed = self.force_rate_times[-1] - self.force_rate_times[0]
+        if elapsed <= 0:
+            return None
+        return (len(self.force_rate_times) - 1) / elapsed
+
+    def _force_value_for_live_row(self):
         with self.force_lock:
-            force_n = self.latest_force_n
-        return "" if force_n is None else f"{force_n:.4f}"
+            calibrated_force = self.latest_force_n
+            raw_force = self.latest_force_raw_n
+        return (
+            "" if calibrated_force is None else f"{calibrated_force:.4f}",
+            "" if raw_force is None else f"{raw_force:.4f}",
+        )
 
     def _extract_force_values(self, buffer):
         values = []
@@ -1732,24 +2050,13 @@ class TestRunGui(tk.Tk):
         if not match:
             return None
 
-        value = float(match.group(0).replace(",", "."))
-        unit = text[match.end():].strip().lower()
-        if unit.startswith("kn"):
-            return value * 1000.0
-        if unit.startswith("mn"):
-            return value * 0.001
-        if unit.startswith("kg"):
-            return value * 9.80665
-        if unit.startswith("g"):
-            return value * 0.00980665
-        return value
+        return float(match.group(0).replace(",", "."))
 
     def _parse_force_binary_frame(self, frame):
         if len(frame) != 5 or frame[0] != FORCE_BINARY_SYNC:
             return None
         raw_value = (frame[2] << 16) | (frame[3] << 8) | frame[4]
-        signed_fraction = (raw_value - 0x800000) / 0x7FFFFF
-        return signed_fraction * FORCE_SENSOR_RANGE_N * FORCE_BINARY_FULL_SCALE_FACTOR
+        return raw_value - 0x800000
 
     def _toggle_colibri_connection(self):
         if self.colibri:
@@ -2342,6 +2649,10 @@ class TestRunGui(tk.Tk):
             if kind == "status":
                 self._write_debug_log(f"GUI STATUS {value}")
                 self.status_var.set(value)
+            elif kind == "ethercat_connected":
+                self._handle_ethercat_connected(value)
+            elif kind == "ethercat_error":
+                self._handle_ethercat_error(value)
             elif kind == "colibri_snapshot":
                 label, snapshot = value
                 self._write_debug_log(f"GUI COLIBRI snapshot {label}: {snapshot}")
@@ -2354,7 +2665,13 @@ class TestRunGui(tk.Tk):
                 self.colibri_busy = False
                 self._set_colibri_controls_enabled(True)
             elif kind == "force_value":
-                self.force_value_var.set(f"Force: {value:.4f} N")
+                if isinstance(value, tuple):
+                    force_n, rate_hz = value
+                else:
+                    force_n, rate_hz = value, None
+                self.force_value_var.set(self._format_force_value(force_n))
+                if rate_hz is not None:
+                    self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
             elif kind == "force_status":
                 self.force_status_var.set(value)
                 self.status_var.set(value)
@@ -2405,7 +2722,7 @@ class TestRunGui(tk.Tk):
         elif len(parts) != 7:
             return
 
-        parts.append(self._latest_force_text())
+        parts.extend(self._force_value_for_live_row())
         self._update_impulse_capture(parts)
         self.rows.append(parts)
         self.table.insert("", tk.END, values=parts)
@@ -2469,6 +2786,7 @@ class TestRunGui(tk.Tk):
                 "valves_open": parts[5] not in ("0", "FALSE", "False", "false", ""),
                 "flow": self._optional_float(parts[6]),
                 "force": self._optional_float(parts[7]) if len(parts) > 7 else None,
+                "raw_force": self._optional_float(parts[8]) if len(parts) > 8 else None,
             }
         except ValueError:
             return None
@@ -2942,7 +3260,7 @@ class TestRunGui(tk.Tk):
                 "target regulator pressure",
                 "average actual regulator pressure",
                 "average pressure before valve",
-                "average force n",
+                "average calibrated force reading",
                 "maximum flow",
                 "volume l",
                 "nozzle 1 used",
@@ -2974,7 +3292,8 @@ class TestRunGui(tk.Tk):
                 "regulator pwm",
                 "valves open",
                 "flow",
-                "force n",
+                "force reading",
+                "raw force reading",
             ])
             writer.writerows(self._csv_output_row(row) for row in self.rows)
 
@@ -2997,6 +3316,8 @@ class TestRunGui(tk.Tk):
         return text.replace(".", ",")
 
     def destroy(self):
+        self.closing = True
+        self._disconnect_ethercat()
         self._disconnect_force_sensor()
         self._disconnect_colibri()
         self._disconnect()

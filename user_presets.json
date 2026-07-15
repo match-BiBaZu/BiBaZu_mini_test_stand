@@ -1,4 +1,6 @@
 {
+  "force_calibration_slope": 1.7972174420490566e-06,
+  "force_calibration_intercept": 0.0,
   "nozzle_offset_mm": 125.41,
   "test_stand_height_mm": 150.0,
   "holder_height_mm": 43.53

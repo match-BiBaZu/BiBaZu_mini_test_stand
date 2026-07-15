@@ -19,7 +19,8 @@ The software and firmware currently expect the following components. Where the e
 
 | Component | Role | Connection and installed settings |
 | --- | --- | --- |
-| Host PC | Runs the GUI and saves logs/CSV files | Three independent serial connections are supported |
+| Host PC | Runs the GUI and saves logs/CSV files | Three independent serial connections and an EtherCAT scan are supported |
+| Beckhoff EK1100 | EtherCAT coupler for Beckhoff EtherCAT terminals | Direct 100BASE-TX connection to a dedicated PC Ethernet adapter; no IP address |
 | Arduino Mega 2560 | Real-time pneumatic control, sensor acquisition, valve control, and stepper control | USB serial, `230400` baud |
 | Pneumatic pressure regulator | Sets the test pressure | VEAB feedback connection is noted in the firmware; command is provided through a calibrated PWM-to-0-10 V converter; range `0-6 bar` |
 | PWM-to-0-10 V converter | Converts the Arduino command into the regulator input voltage | Arduino D3, 2 kHz PWM; measured calibration curve is stored in the firmware |
@@ -90,12 +91,27 @@ sudo usermod -a -G dialout "$USER"
 
 ## Installation and startup
 
-Python 3 with Tkinter and `pyserial` is required.
+Python 3 with Tkinter, `pyserial`, and `pysoem` is required.
 
 ```bash
 python -m pip install -r requirements.txt
 python test_run_gui.py
 ```
+
+### EK1100 discovery on Windows
+
+The EK1100 does not use TCP/IP and therefore cannot be discovered with `ping` or an IP port scan. It must be connected directly from its upper RJ45 socket to the selected PC Ethernet adapter. Do not place a normal Ethernet switch or router between the PC and the EK1100.
+
+In addition to the Python dependencies, Windows needs [Npcap](https://npcap.com/). During Npcap setup, enable **Install Npcap in WinPcap API-compatible Mode**. Start the GUI with administrator privileges because PySOEM needs raw access to the network adapter.
+
+In the GUI, use the **EtherCAT (EK1100)** row:
+
+1. Click **Refresh adapters** and select the wired Ethernet adapter connected to the EK1100.
+2. Make sure the EK1100 has 24 V power and the cable is plugged into its upper EtherCAT input socket.
+3. Click **Scan and connect**. The discovered coupler and attached terminals are listed in the log with their vendor and product codes.
+4. Click **Disconnect** before another EtherCAT master, such as TwinCAT, takes ownership of the same adapter.
+
+This first integration step only discovers the EtherCAT chain and keeps it in PRE-OP. It does not yet replace the Arduino I/O or exchange cyclic process data.
 
 Upload `BiBaZu_mini_test_stand/BiBaZu_mini_test_stand.ino` to an Arduino Mega 2560. The firmware deliberately fails compilation for a different Arduino target because its 2 kHz regulator output uses Mega 2560 Timer 3 and pin D3/OC3C.
 

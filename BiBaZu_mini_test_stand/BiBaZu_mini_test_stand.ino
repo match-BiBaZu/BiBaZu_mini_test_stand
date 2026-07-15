@@ -48,6 +48,8 @@ const float testPressureStepBar = 0.05;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
 const int maxPressureStep = 120;  // 6.0 bar / 0.05 bar.
+const int testRepeatWaitTicks = 199;          // 199 + 1 ticks at 5 ms = 1.0 s.
+const int testPressureStepWaitTicks = 199;    // Wait before first pulse after a pressure increase.
 
 // Flow sensor analog scaling for the white analog output configured to 1-5 V.
 // The installed unidirectional sensor is configured as 0 ... 200 l/min.
@@ -67,7 +69,7 @@ int valvePulseCounter = 0;
 int sampleCounter = 0;
 int streamCounter = 0;
 int loopCounter = 0;
-int waitTime = 1999;
+int waitTime = testPressureStepWaitTicks;
 int activeValveMask = allValveMask;
 int stepperSpeed = 400;
 int stepperMoveDirection = 1;
@@ -711,7 +713,7 @@ void updateTest() {
   }
 
   targetRegulatorPressure = pressureIndex * testPressureStepBar;
-  waitTime = pulseCounter > 0 ? 999 : 1999;
+  waitTime = pulseCounter > 0 ? testRepeatWaitTicks : testPressureStepWaitTicks;
 
   if (loopCounter > waitTime) {
     if (pulseCounter < testPulsesPerPressure) {
