@@ -48,8 +48,8 @@ const float testPressureStepBar = 0.10;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
 const int maxPressureStep = 60;  // 6.0 bar / 0.10 bar.
-const int testRepeatWaitTicks = 199;          // 199 + 1 ticks at 5 ms = 1.0 s.
-const int testPressureStepWaitTicks = 199;    // Wait before first pulse after a pressure increase.
+const int testRepeatWaitTicks = 999;          // 999 + 1 ticks at 5 ms = 5.0 s.
+const int testPressureStepWaitTicks = 1999;   // 1999 + 1 ticks at 5 ms = 10.0 s after a pressure increase.
 
 // Flow sensor analog scaling for the white analog output configured to 1-5 V.
 // The installed unidirectional sensor is configured as 0 ... 200 l/min.
