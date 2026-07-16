@@ -9,7 +9,7 @@ import time
 import tkinter as tk
 from collections import deque
 from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
 try:
     import serial
@@ -44,10 +44,18 @@ COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 FORCE_BAUD_RATE = 38400
-FORCE_BINARY_SYNC = 0x2C
-FORCE_CALIBRATION_AVERAGE_SECONDS = 5.0
+FORCE_READ_TIMEOUT_SECONDS = 0.005
 FORCE_RATE_WINDOW_SECONDS = 2.0
-FORCE_VALUE_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
+FORCE_BINARY_SYNC = 0x2C
+FORCE_BINARY_FRAME_LENGTH = 5
+FORCE_BINARY_STATUS_MASK = 0x18
+FORCE_BINARY_BIPOLAR_ZERO = 0x800000
+FORCE_BINARY_POSITIVE_SPAN = 0x7FFFFF
+FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
+FORCE_DEFAULT_SCALING = 14.3758
+FORCE_DEFAULT_AVERAGE_SECONDS = 0.0
+GSV_CMD_GET_VALUE = 0x3B
+FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
 
 
 class ColibriProtocolError(Exception):
@@ -312,15 +320,16 @@ class TestRunGui(tk.Tk):
         self.force_serial_port = None
         self.force_reader_thread = None
         self.force_reader_running = False
+        self.force_serial_lock = threading.Lock()
         self.force_lock = threading.Lock()
         self.latest_force_raw_n = None
         self.latest_force_n = None
         self.latest_force_time = None
-        self.force_calibration_slope = self._preset_float("force_calibration_slope", 1.0, -1.0e12, 1.0e12)
-        self.force_calibration_intercept = self._preset_float(
-            "force_calibration_intercept", 0.0, -1.0e12, 1.0e12
+        self.force_scaling = self._preset_float("force_scaling", FORCE_DEFAULT_SCALING, -1.0e12, 1.0e12)
+        self.force_average_seconds = self._preset_float(
+            "force_average_seconds", FORCE_DEFAULT_AVERAGE_SECONDS, 0.0, 60.0
         )
-        self.force_calibration_samples = deque(maxlen=10000)
+        self.force_average_samples = deque(maxlen=10000)
         self.force_rate_times = deque(maxlen=2000)
         self.rows = []
         self.impulse_rows = []
@@ -345,11 +354,13 @@ class TestRunGui(tk.Tk):
         self.ethercat_adapter_var = tk.StringVar()
         self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
+        self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
+        self.force_average_var = tk.DoubleVar(value=self.force_average_seconds)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
         self.colibri_position_var = tk.StringVar(value="Position: --")
-        self.force_status_var = tk.StringVar(value=self._force_calibration_status("Force sensor: disconnected"))
+        self.force_status_var = tk.StringVar(value=self._force_status("Force sensor: disconnected"))
         self.force_value_var = tk.StringVar(value="Force reading: --")
         self.force_rate_var = tk.StringVar(value="Force rate: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
@@ -445,7 +456,7 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current force calibration, nozzle offset, test stand height, and holder height as defaults?",
+            text="Save the current force scaling, nozzle offset, test stand height, and holder height as defaults?",
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -475,8 +486,8 @@ class TestRunGui(tk.Tk):
     def _save_user_presets(self):
         try:
             presets = {
-                "force_calibration_slope": float(self.force_calibration_slope),
-                "force_calibration_intercept": float(self.force_calibration_intercept),
+                "force_scaling": float(self.force_scale_var.get()),
+                "force_average_seconds": float(self.force_average_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "test_stand_height_mm": float(self.test_stand_height_var.get()),
                 "holder_height_mm": float(self.holder_height_var.get()),
@@ -986,13 +997,40 @@ class TestRunGui(tk.Tk):
         )
         self.force_connect_button.pack(side=tk.LEFT)
 
-        self.force_calibrate_button = ttk.Button(
+        ttk.Label(force_controls, text="Force scaling").pack(side=tk.LEFT, padx=(8, 0))
+        self.force_scale_spinbox = ttk.Spinbox(
             force_controls,
-            text="2-point calibration",
-            command=self._calibrate_force_sensor,
-            state=tk.DISABLED,
+            from_=-1000000.0,
+            to=1000000.0,
+            increment=0.0001,
+            textvariable=self.force_scale_var,
+            width=10,
         )
-        self.force_calibrate_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.force_scale_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        self.force_scale_button = ttk.Button(
+            force_controls,
+            text="Apply scaling",
+            command=self._apply_force_scaling,
+        )
+        self.force_scale_button.pack(side=tk.LEFT)
+
+        ttk.Label(force_controls, text="Force average").pack(side=tk.LEFT, padx=(8, 0))
+        self.force_average_spinbox = ttk.Spinbox(
+            force_controls,
+            from_=0.0,
+            to=60.0,
+            increment=0.05,
+            textvariable=self.force_average_var,
+            width=7,
+        )
+        self.force_average_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(force_controls, text="s").pack(side=tk.LEFT)
+        self.force_average_button = ttk.Button(
+            force_controls,
+            text="Apply average",
+            command=self._apply_force_average,
+        )
+        self.force_average_button.pack(side=tk.LEFT, padx=(6, 0))
 
         ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
@@ -1415,9 +1453,7 @@ class TestRunGui(tk.Tk):
         )
         self._write_debug_log(
             f"GUI force port label={self.force_port_var.get()!r} device={self._selected_force_port_device()!r} "
-            f"baud={self.force_baud_var.get()!r} "
-            f"cal_slope={self.force_calibration_slope:.12g} "
-            f"cal_intercept={self.force_calibration_intercept:.12g}"
+            f"baud={self.force_baud_var.get()!r} mode=binary scale={self.force_scaling:.12g}"
         )
 
     def _stop_debug_log(self):
@@ -1797,7 +1833,7 @@ class TestRunGui(tk.Tk):
                 bytesize=8,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
-                timeout=0.05,
+                timeout=FORCE_READ_TIMEOUT_SECONDS,
                 write_timeout=SERIAL_WRITE_TIMEOUT,
             )
             self.force_serial_port.reset_input_buffer()
@@ -1812,8 +1848,7 @@ class TestRunGui(tk.Tk):
         self.force_connect_button.configure(text="Disconnect")
         self.force_port_combo.configure(state=tk.DISABLED)
         self.force_baud_spinbox.configure(state=tk.DISABLED)
-        self.force_calibrate_button.configure(state=tk.NORMAL)
-        self.force_status_var.set(self._force_calibration_status(f"Force sensor: connected to {port} at {baud_rate} baud"))
+        self.force_status_var.set(self._force_status(f"Force sensor: connected to {port} at {baud_rate} baud"))
         self.status_var.set(f"Connected force sensor on {port}")
         self._write_debug_log(f"FORCE connected port={port} baud={baud_rate}")
 
@@ -1830,141 +1865,95 @@ class TestRunGui(tk.Tk):
             self.latest_force_raw_n = None
             self.latest_force_n = None
             self.latest_force_time = None
-            self.force_calibration_samples.clear()
+            self.force_average_samples.clear()
             self.force_rate_times.clear()
         self.force_connect_button.configure(text="Connect")
         self.force_port_combo.configure(state="readonly")
         self.force_baud_spinbox.configure(state=tk.NORMAL)
-        self.force_calibrate_button.configure(state=tk.DISABLED)
         self.force_value_var.set("Force reading: --")
         self.force_rate_var.set("Force rate: --")
-        self.force_status_var.set(self._force_calibration_status("Force sensor: disconnected"))
+        self.force_status_var.set(self._force_status("Force sensor: disconnected"))
         self._write_debug_log("FORCE disconnected")
 
-    def _calibrate_force_sensor(self):
-        if not self.force_serial_port:
-            messagebox.showerror("Force sensor disconnected", "Connect the force sensor before calibrating.")
-            return
-
-        if not messagebox.askokcancel(
-            "Force calibration",
-            "Set the sensor to the first calibration point, normally unloaded / 0 measurement. "
-            "Wait until the amplifier reading is stable, then press OK. "
-            "The GUI will average raw readings for 5 seconds.",
-        ):
-            return
-
-        first_known = simpledialog.askfloat(
-            "First calibration point",
-            "Enter the actual force value for the first point:",
-            initialvalue=0.0,
-            parent=self,
-        )
-        if first_known is None:
-            return
-        first_raw = self._measure_force_raw_average("Measuring first calibration point")
-        if first_raw is None:
-            return
-
-        if not messagebox.askokcancel(
-            "Force calibration",
-            "Apply a second calibration force as close as possible to the full scale of the sensor. "
-            "Wait until the amplifier reading is stable, then press OK. "
-            "The GUI will average raw readings for 5 seconds.",
-        ):
-            return
-
-        second_known = simpledialog.askfloat(
-            "Second calibration point",
-            "Enter the actual force value for the second point:",
-            initialvalue=2.0,
-            parent=self,
-        )
-        if second_known is None:
-            return
-        second_raw = self._measure_force_raw_average("Measuring second calibration point")
-        if second_raw is None:
-            return
-
-        raw_span = second_raw - first_raw
-        if abs(raw_span) < 1.0e-12:
-            messagebox.showerror(
-                "Calibration failed",
-                "The two raw force readings are identical. Apply a larger second calibration force.",
-            )
-            return
-
-        slope = (second_known - first_known) / raw_span
-        intercept = first_known - slope * first_raw
-        with self.force_lock:
-            self.force_calibration_slope = slope
-            self.force_calibration_intercept = intercept
-            if self.latest_force_raw_n is not None:
-                self.latest_force_n = self._apply_force_calibration(self.latest_force_raw_n)
-
-        self.force_value_var.set(self._format_force_value(self.latest_force_n))
-        self.force_status_var.set(self._force_calibration_status("Force sensor: calibrated"))
-        self.status_var.set("Force 2-point calibration applied")
-        self._write_debug_log(
-            "FORCE calibration "
-            f"raw1={first_raw:.6f} known1={first_known:.6f} "
-            f"raw2={second_raw:.6f} known2={second_known:.6f} "
-            f"slope={slope:.12g} intercept={intercept:.12g}"
-        )
-
-    def _measure_force_raw_average(self, label):
-        with self.force_lock:
-            self.force_calibration_samples.clear()
-
-        start_time = time.time()
-        end_time = start_time + FORCE_CALIBRATION_AVERAGE_SECONDS
-        self.force_status_var.set(f"{label}: 0.0 / {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} s")
-        self.status_var.set(f"{label} for {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} seconds...")
-
-        while time.time() < end_time:
-            elapsed = min(time.time() - start_time, FORCE_CALIBRATION_AVERAGE_SECONDS)
-            self.force_status_var.set(
-                f"{label}: {elapsed:.1f} / {FORCE_CALIBRATION_AVERAGE_SECONDS:.1f} s"
-            )
-            self.update_idletasks()
-            time.sleep(0.05)
-
-        with self.force_lock:
-            samples = [raw_value for timestamp, raw_value in self.force_calibration_samples if timestamp >= start_time]
-
-        if not samples:
-            messagebox.showerror("No force samples", f"No force samples were received during {label.lower()}.")
-            self.force_status_var.set(self._force_calibration_status("Force sensor: calibration failed"))
-            return None
-
-        average_raw = sum(samples) / len(samples)
-        self.force_status_var.set(
-            f"{label}: averaged {len(samples)} samples, raw avg {average_raw:.4f}"
-        )
-        self.status_var.set(f"{label}: averaged {len(samples)} force samples")
-        return average_raw
-
-    def _apply_force_calibration(self, raw_force):
-        return self.force_calibration_slope * raw_force + self.force_calibration_intercept
-
-    def _force_calibration_status(self, prefix):
-        if abs(self.force_calibration_slope - 1.0) < 1.0e-12 and abs(self.force_calibration_intercept) < 1.0e-12:
-            return prefix
+    def _force_status(self, prefix):
         return (
-            f"{prefix} | cal m={self.force_calibration_slope:.6g}, "
-            f"b={self.force_calibration_intercept:.6g}"
+            f"{prefix} | binary 5-byte mode, scale {self.force_scaling:.6g} x{FORCE_BINARY_FULL_SCALE_FACTOR:.3g}, "
+            f"avg {self.force_average_seconds:.3g} s"
         )
 
     def _format_force_value(self, force_value):
         return "Force reading: --" if force_value is None else f"Force reading: {force_value:.4f}"
 
+    def _apply_force_scaling(self):
+        try:
+            force_scaling = float(self.force_scale_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid force scaling", "Enter a numeric force scaling value.")
+            return
+
+        if force_scaling == 0.0:
+            messagebox.showerror("Invalid force scaling", "Force scaling must not be zero.")
+            return
+
+        with self.force_lock:
+            self.force_scaling = force_scaling
+            self.force_average_samples.clear()
+            if self.latest_force_raw_n is not None:
+                signed_fraction = (self.latest_force_raw_n - FORCE_BINARY_BIPOLAR_ZERO) / FORCE_BINARY_POSITIVE_SPAN
+                self.latest_force_n = signed_fraction * self.force_scaling * FORCE_BINARY_FULL_SCALE_FACTOR
+                latest_force = self.latest_force_n
+            else:
+                latest_force = None
+
+        self.force_value_var.set(self._format_force_value(latest_force))
+        self.force_status_var.set(self._force_status("Force sensor: scaling applied"))
+        self.status_var.set(f"Force scaling set to {force_scaling:.6g}")
+        self._write_debug_log(f"FORCE scaling={force_scaling:.12g}")
+
+    def _apply_force_average(self):
+        try:
+            average_seconds = float(self.force_average_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid force average", "Enter a numeric force average window in seconds.")
+            return
+
+        if average_seconds < 0.0:
+            messagebox.showerror("Invalid force average", "Force average window must be zero or greater.")
+            return
+
+        with self.force_lock:
+            self.force_average_seconds = average_seconds
+            self.force_average_samples.clear()
+            latest_force = self.latest_force_n
+
+        self.force_value_var.set(self._format_force_value(latest_force))
+        self.force_status_var.set(self._force_status("Force sensor: average applied"))
+        self.status_var.set(f"Force average window set to {average_seconds:.3g} s")
+        self._write_debug_log(f"FORCE average_seconds={average_seconds:.12g}")
+
+    def _write_force_command_locked(self, command, *payload):
+        port = self.force_serial_port
+        if not port:
+            raise RuntimeError("force sensor is disconnected")
+        port.write(bytes((command, *payload)))
+        port.flush()
+
     def _read_force_serial(self):
         buffer = bytearray()
         last_ui_update = 0.0
+        last_logger_poll = 0.0
         while self.force_reader_running and self.force_serial_port:
             try:
-                data = self.force_serial_port.read(64)
-            except serial.SerialException as exc:
+                with self.force_serial_lock:
+                    if not self.force_serial_port:
+                        break
+                    data = self.force_serial_port.read(64)
+                    if not data:
+                        now = time.time()
+                        if now - last_logger_poll >= FORCE_LOGGER_POLL_INTERVAL_SECONDS:
+                            self._write_force_command_locked(GSV_CMD_GET_VALUE)
+                            last_logger_poll = now
+            except (OSError, serial.SerialException, RuntimeError) as exc:
                 self._write_debug_log(f"FORCE RX error {exc}")
                 self.messages.put(("force_status", f"Force sensor serial error: {exc}"))
                 break
@@ -1974,8 +1963,8 @@ class TestRunGui(tk.Tk):
 
             buffer.extend(data)
             values = self._extract_force_values(buffer)
-            for raw_force_n in values:
-                force_n, rate_hz = self._store_force_value(raw_force_n)
+            for force_reading, raw_reading in values:
+                force_n, rate_hz = self._store_force_value(force_reading, raw_reading)
                 now = time.time()
                 if now - last_ui_update >= 0.05:
                     self.messages.put(("force_value", (force_n, rate_hz)))
@@ -1983,18 +1972,30 @@ class TestRunGui(tk.Tk):
 
         self.force_reader_running = False
 
-    def _store_force_value(self, raw_force_n):
+    def _store_force_value(self, force_reading, raw_reading=None):
         now = time.time()
         with self.force_lock:
-            force_n = self._apply_force_calibration(raw_force_n)
-            self.latest_force_raw_n = raw_force_n
+            force_n = self._filtered_force_value_locked(now, force_reading)
+            self.latest_force_raw_n = force_reading if raw_reading is None else raw_reading
             self.latest_force_n = force_n
             self.latest_force_time = now
-            self.force_calibration_samples.append((now, raw_force_n))
             self.force_rate_times.append(now)
             while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
                 self.force_rate_times.popleft()
             return force_n, self._force_rate_hz_locked()
+
+    def _filtered_force_value_locked(self, now, force_reading):
+        self.force_average_samples.append((now, force_reading))
+        if self.force_average_seconds <= 0.0:
+            return force_reading
+
+        cutoff = now - self.force_average_seconds
+        while self.force_average_samples and self.force_average_samples[0][0] < cutoff:
+            self.force_average_samples.popleft()
+        if not self.force_average_samples:
+            return force_reading
+
+        return sum(value for _, value in self.force_average_samples) / len(self.force_average_samples)
 
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
@@ -2015,68 +2016,38 @@ class TestRunGui(tk.Tk):
 
     def _extract_force_values(self, buffer):
         values = []
+        sync_byte = bytes([FORCE_BINARY_SYNC])
         while buffer:
-            if buffer[0] == FORCE_BINARY_SYNC:
-                if len(buffer) < 5:
-                    break
-                frame = bytes(buffer[:5])
-                del buffer[:5]
-                value = self._parse_force_binary_frame(frame)
-                if value is not None:
-                    values.append(value)
-                continue
-
-            newline_index = self._first_newline_index(buffer)
-            if newline_index >= 0:
-                line_bytes = bytes(buffer[:newline_index])
-                del buffer[:newline_index + 1]
-                while buffer and buffer[0] in (10, 13):
-                    del buffer[0]
-                value = self._parse_force_ascii_line(line_bytes)
-                if value is not None:
-                    values.append(value)
-                continue
-
-            if self._buffer_looks_like_ascii_prefix(buffer) and self._buffer_is_printable_ascii_prefix(buffer):
-                if len(buffer) <= 128:
-                    break
-                buffer.clear()
+            sync_index = buffer.find(sync_byte)
+            if sync_index < 0:
+                del buffer[:-FORCE_BINARY_FRAME_LENGTH + 1]
+                break
+            if sync_index > 0:
+                del buffer[:sync_index]
+            if len(buffer) < FORCE_BINARY_FRAME_LENGTH:
                 break
 
-            sync_index = buffer.find(bytes([FORCE_BINARY_SYNC]), 1)
-            if sync_index >= 0:
-                del buffer[:sync_index]
-            else:
+            frame = bytes(buffer[:FORCE_BINARY_FRAME_LENGTH])
+            if not self._is_force_binary_frame(frame):
                 del buffer[0]
+                continue
+
+            del buffer[:FORCE_BINARY_FRAME_LENGTH]
+            values.append(self._parse_force_binary_frame(frame))
 
         return values
 
-    def _first_newline_index(self, buffer):
-        indexes = [index for index in (buffer.find(b"\n"), buffer.find(b"\r")) if index >= 0]
-        return min(indexes) if indexes else -1
-
-    def _buffer_looks_like_ascii_prefix(self, buffer):
-        return bool(buffer and chr(buffer[0]) in "+-0123456789 .\t")
-
-    def _buffer_is_printable_ascii_prefix(self, buffer):
-        sample = buffer[:min(len(buffer), 32)]
-        return all(32 <= value <= 126 or value in (9, 10, 13) for value in sample)
-
-    def _parse_force_ascii_line(self, line_bytes):
-        text = line_bytes.decode("ascii", errors="ignore").strip()
-        if not text:
-            return None
-        match = FORCE_VALUE_RE.search(text)
-        if not match:
-            return None
-
-        return float(match.group(0).replace(",", "."))
+    def _is_force_binary_frame(self, frame):
+        if len(frame) != FORCE_BINARY_FRAME_LENGTH or frame[0] != FORCE_BINARY_SYNC:
+            return False
+        return (frame[1] & ~FORCE_BINARY_STATUS_MASK) == 0
 
     def _parse_force_binary_frame(self, frame):
-        if len(frame) != 5 or frame[0] != FORCE_BINARY_SYNC:
-            return None
         raw_value = (frame[2] << 16) | (frame[3] << 8) | frame[4]
-        return raw_value - 0x800000
+        signed_fraction = (raw_value - FORCE_BINARY_BIPOLAR_ZERO) / FORCE_BINARY_POSITIVE_SPAN
+        with self.force_lock:
+            force_value = signed_fraction * self.force_scaling * FORCE_BINARY_FULL_SCALE_FACTOR
+        return float(force_value), float(raw_value)
 
     def _toggle_colibri_connection(self):
         if self.colibri:
@@ -3280,7 +3251,7 @@ class TestRunGui(tk.Tk):
                 "target regulator pressure",
                 "average actual regulator pressure",
                 "average pressure before valve",
-                "average calibrated force reading",
+                "average force reading",
                 "maximum flow",
                 "volume l",
                 "nozzle 1 used",
