@@ -34,6 +34,7 @@ SAMPLE_INTERVAL_MS = 5.0
 VALVE_PULSE_DURATION_MS = 100.0
 PRESSURE_SETTLE_SKIP_SAMPLES = 2
 REGULATOR_MAX_PRESSURE_BAR = 6.0
+TEST_PRESSURE_STEP_BAR = 0.1
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -527,7 +528,7 @@ class TestRunGui(tk.Tk):
             controls,
             from_=0.0,
             to=REGULATOR_MAX_PRESSURE_BAR,
-            increment=0.05,
+            increment=TEST_PRESSURE_STEP_BAR,
             textvariable=self.test_start_pressure_var,
             width=6,
             state=tk.DISABLED,
@@ -538,7 +539,7 @@ class TestRunGui(tk.Tk):
             controls,
             from_=0.0,
             to=REGULATOR_MAX_PRESSURE_BAR,
-            increment=0.05,
+            increment=TEST_PRESSURE_STEP_BAR,
             textvariable=self.test_end_pressure_var,
             width=6,
             state=tk.DISABLED,
@@ -1695,8 +1696,8 @@ class TestRunGui(tk.Tk):
             return None
 
         value = min(max(value, 0.0), REGULATOR_MAX_PRESSURE_BAR)
-        step_count = math.ceil((value - 0.000001) / 0.05)
-        stepped_value = step_count * 0.05
+        step_count = math.ceil((value - 0.000001) / TEST_PRESSURE_STEP_BAR)
+        stepped_value = step_count * TEST_PRESSURE_STEP_BAR
         stepped_value = min(max(stepped_value, 0.0), REGULATOR_MAX_PRESSURE_BAR)
         variable.set(round(stepped_value, 2))
         return stepped_value

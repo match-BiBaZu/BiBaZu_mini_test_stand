@@ -44,10 +44,10 @@ const float stepperMmPerStep = 0.009985846;
 
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
 const float regulatorMaxPressure = 6.0;  // Calibrated 10 V converter output corresponds to 6 bar.
-const float testPressureStepBar = 0.05;
+const float testPressureStepBar = 0.10;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
-const int maxPressureStep = 120;  // 6.0 bar / 0.05 bar.
+const int maxPressureStep = 60;  // 6.0 bar / 0.10 bar.
 const int testRepeatWaitTicks = 199;          // 199 + 1 ticks at 5 ms = 1.0 s.
 const int testPressureStepWaitTicks = 199;    // Wait before first pulse after a pressure increase.
 
