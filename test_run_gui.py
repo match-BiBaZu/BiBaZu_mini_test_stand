@@ -55,6 +55,7 @@ FORCE_BINARY_POSITIVE_SPAN = 0x7FFFFF
 FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
 FORCE_DEFAULT_SCALING = 14.3758
 FORCE_DEFAULT_AVERAGE_SECONDS = 0.0
+FORCE_DEFAULT_IMPULSE_THRESHOLD = 0.1
 GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
 
@@ -330,6 +331,9 @@ class TestRunGui(tk.Tk):
         self.force_average_seconds = self._preset_float(
             "force_average_seconds", FORCE_DEFAULT_AVERAGE_SECONDS, 0.0, 60.0
         )
+        self.force_impulse_threshold = self._preset_float(
+            "force_impulse_threshold", FORCE_DEFAULT_IMPULSE_THRESHOLD, 0.0, 1.0e12
+        )
         self.force_average_samples = deque(maxlen=10000)
         self.force_rate_times = deque(maxlen=2000)
         self.rows = []
@@ -357,6 +361,7 @@ class TestRunGui(tk.Tk):
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
         self.force_average_var = tk.DoubleVar(value=self.force_average_seconds)
+        self.force_impulse_threshold_var = tk.DoubleVar(value=self.force_impulse_threshold)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
@@ -457,7 +462,7 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current force scaling, nozzle offset, test stand height, and holder height as defaults?",
+            text="Save the current force settings, nozzle offset, test stand height, and holder height as defaults?",
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -489,6 +494,7 @@ class TestRunGui(tk.Tk):
             presets = {
                 "force_scaling": float(self.force_scale_var.get()),
                 "force_average_seconds": float(self.force_average_var.get()),
+                "force_impulse_threshold": float(self.force_impulse_threshold_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "test_stand_height_mm": float(self.test_stand_height_var.get()),
                 "holder_height_mm": float(self.holder_height_var.get()),
@@ -1032,6 +1038,23 @@ class TestRunGui(tk.Tk):
             command=self._apply_force_average,
         )
         self.force_average_button.pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT, padx=(8, 0))
+        self.force_impulse_threshold_spinbox = ttk.Spinbox(
+            force_controls,
+            from_=0.0,
+            to=1000000.0,
+            increment=0.01,
+            textvariable=self.force_impulse_threshold_var,
+            width=8,
+        )
+        self.force_impulse_threshold_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        self.force_impulse_threshold_button = ttk.Button(
+            force_controls,
+            text="Apply threshold",
+            command=self._apply_force_impulse_threshold,
+        )
+        self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
         ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
@@ -1879,7 +1902,7 @@ class TestRunGui(tk.Tk):
     def _force_status(self, prefix):
         return (
             f"{prefix} | binary 5-byte mode, scale {self.force_scaling:.6g} x{FORCE_BINARY_FULL_SCALE_FACTOR:.3g}, "
-            f"avg {self.force_average_seconds:.3g} s"
+            f"avg {self.force_average_seconds:.3g} s, impulse threshold {self.force_impulse_threshold:.4g}"
         )
 
     def _format_force_value(self, force_value):
@@ -1931,6 +1954,24 @@ class TestRunGui(tk.Tk):
         self.force_status_var.set(self._force_status("Force sensor: average applied"))
         self.status_var.set(f"Force average window set to {average_seconds:.3g} s")
         self._write_debug_log(f"FORCE average_seconds={average_seconds:.12g}")
+
+    def _apply_force_impulse_threshold(self):
+        try:
+            threshold = float(self.force_impulse_threshold_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid force threshold", "Enter a numeric force impulse threshold.")
+            return
+
+        if threshold < 0.0:
+            messagebox.showerror("Invalid force threshold", "Force impulse threshold must be zero or greater.")
+            return
+
+        with self.force_lock:
+            self.force_impulse_threshold = threshold
+
+        self.force_status_var.set(self._force_status("Force sensor: impulse threshold applied"))
+        self.status_var.set(f"Force impulse threshold set to {threshold:.4g}")
+        self._write_debug_log(f"FORCE impulse_threshold={threshold:.12g}")
 
     def _write_force_command_locked(self, command, *payload):
         port = self.force_serial_port
@@ -2838,22 +2879,22 @@ class TestRunGui(tk.Tk):
 
     def _add_pressure_sample(self, sample):
         self.current_impulse["valve_open_sample_count"] += 1
-        if self.current_impulse["valve_open_sample_count"] <= PRESSURE_SETTLE_SKIP_SAMPLES:
+        skip_pressure_sample = self.current_impulse["valve_open_sample_count"] <= PRESSURE_SETTLE_SKIP_SAMPLES
+        if skip_pressure_sample:
             self.current_impulse["pressure_skipped_count"] += 1
-            return
+        else:
+            pressure = sample["pressure_before"]
+            if pressure is not None:
+                self.current_impulse["pressure_sum"] += pressure
+                self.current_impulse["pressure_count"] += 1
 
-        pressure = sample["pressure_before"]
-        if pressure is not None:
-            self.current_impulse["pressure_sum"] += pressure
-            self.current_impulse["pressure_count"] += 1
-
-        regulator_pressure = sample["regulator_feedback"]
-        if regulator_pressure is not None:
-            self.current_impulse["regulator_pressure_sum"] += regulator_pressure
-            self.current_impulse["regulator_pressure_count"] += 1
+            regulator_pressure = sample["regulator_feedback"]
+            if regulator_pressure is not None:
+                self.current_impulse["regulator_pressure_sum"] += regulator_pressure
+                self.current_impulse["regulator_pressure_count"] += 1
 
         force = sample["force"]
-        if force is not None:
+        if force is not None and abs(force) >= self.force_impulse_threshold:
             self.current_impulse["force_sum"] += force
             self.current_impulse["force_count"] += 1
 
