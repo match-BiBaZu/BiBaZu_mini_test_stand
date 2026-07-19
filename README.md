@@ -237,6 +237,14 @@ These values describe the current fixture geometry, not universal test-stand con
 
 With **German CSV format** enabled, output uses semicolons and decimal commas. With it disabled, output uses commas and decimal points.
 
+**Save folder** selects the base folder for automatic test-sequence archiving. Starting a sequence creates:
+
+- `overview_<sequence-id>.csv` in the selected folder, with one row per impulse and all calculated force/pressure metrics.
+- `metadata_<sequence-id>.csv` in the selected folder, with date/time, requested pressure range, repeats, nozzle selection, connection endpoints, fixture parameters, and completion status.
+- `impulse_data_<sequence-id>/`, containing a time-series CSV and a summary CSV for every impulse.
+
+The sequence ID and impulse ID are repeated in filenames and CSV contents. The overview also records the relative paths of both files belonging to each impulse.
+
 ## Debug logging
 
 Use **Start debug log** before reproducing a problem. The log records:

@@ -458,6 +458,10 @@ class TestRunGui(tk.Tk):
         self.current_line_received_utc_ns = None
         self.active_test_mask = ""
         self.part_rows = {}
+        self.part_csv_path = None
+        saved_sequence_root = str(self.user_presets.get("sequence_save_root", "")).strip()
+        self.sequence_save_root = Path(saved_sequence_root) if saved_sequence_root else None
+        self.active_sequence_archive = None
         self.increment_dialog = None
         self.increment_dialog_controls = []
         self.increment_dialog_pulse_buttons = []
@@ -555,6 +559,7 @@ class TestRunGui(tk.Tk):
                 "quantumx_port": int(self.quantumx_port_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
+                "sequence_save_root": "" if self.sequence_save_root is None else str(self.sequence_save_root),
             }
         except (tk.TclError, ValueError) as exc:
             messagebox.showerror("Preset save failed", f"One of the preset values is not numeric: {exc}")
@@ -666,6 +671,12 @@ class TestRunGui(tk.Tk):
         )
         self.test_impulse_button.pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(controls, text="Save CSV", command=self._save_impulse_csv).pack(side=tk.RIGHT, padx=(0, 8))
+        self.save_folder_button = ttk.Button(
+            controls,
+            text="Save folder" if self.sequence_save_root is None else "Save folder ✓",
+            command=self._choose_sequence_save_folder,
+        )
+        self.save_folder_button.pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Checkbutton(
             controls,
             text="German CSV format",
@@ -1760,6 +1771,10 @@ class TestRunGui(tk.Tk):
 
     def _disconnect(self):
         self._write_debug_log("ARDUINO disconnect requested")
+        if self.active_sequence_archive is not None:
+            if self.current_impulse is not None:
+                self._finalize_impulse(self.current_impulse.get("capture_end_time_ms"))
+            self._finish_sequence_archive("disconnected")
         self.writer_running = False
         self.commands.put(None)
         if self.writer_thread:
@@ -1807,6 +1822,61 @@ class TestRunGui(tk.Tk):
         self._update_connection_summary()
         self._write_debug_log("ARDUINO disconnected")
 
+    def _choose_sequence_save_folder(self):
+        initial_dir = None
+        if self.sequence_save_root is not None and self.sequence_save_root.exists():
+            initial_dir = str(self.sequence_save_root)
+        path = filedialog.askdirectory(
+            title="Select or create sequence save folder",
+            initialdir=initial_dir,
+            mustexist=True,
+        )
+        if not path:
+            return False
+        self.sequence_save_root = Path(path)
+        self.save_folder_button.configure(text="Save folder ✓")
+        self.status_var.set(f"Sequence save folder: {self.sequence_save_root}")
+        return True
+
+    def _prepare_sequence_archive(self, start_pressure, end_pressure, repeats, nozzle_mask):
+        if self.sequence_save_root is None and not self._choose_sequence_save_folder():
+            self.status_var.set("Test start cancelled: no sequence save folder selected.")
+            return False
+
+        now_local = dt.datetime.now().astimezone()
+        session_id = now_local.strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        root = self.sequence_save_root
+        impulse_dir = root / f"impulse_data_{session_id}"
+        archive = {
+            "session_id": session_id,
+            "root": root,
+            "impulse_dir": impulse_dir,
+            "overview_path": root / f"overview_{session_id}.csv",
+            "metadata_path": root / f"metadata_{session_id}.csv",
+            "started_local": now_local,
+            "started_utc": now_local.astimezone(dt.timezone.utc),
+            "ended_local": None,
+            "status": "running",
+            "start_pressure_bar": start_pressure,
+            "end_pressure_bar": end_pressure,
+            "pressure_step_bar": TEST_PRESSURE_STEP_BAR,
+            "repeats": repeats,
+            "nozzle_mask": nozzle_mask,
+            "german_csv": bool(self.german_csv_format_var.get()),
+            "overview_records": [],
+        }
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            impulse_dir.mkdir(parents=False, exist_ok=False)
+            self.active_sequence_archive = archive
+            self._write_sequence_metadata()
+            self._write_sequence_overview(rows=[])
+        except OSError as exc:
+            self.active_sequence_archive = None
+            messagebox.showerror("Sequence folder failed", f"Could not create the sequence files:\n{exc}")
+            return False
+        return True
+
     def _start_test(self):
         start_pressure = self._validated_pressure_step(self.test_start_pressure_var, "test start pressure")
         end_pressure = self._validated_pressure_step(self.test_end_pressure_var, "test end pressure")
@@ -1824,11 +1894,17 @@ class TestRunGui(tk.Tk):
         if not self._apply_flow_threshold_setting():
             return
 
+        if self.active_sequence_archive is not None:
+            self._finish_sequence_archive("replaced_by_new_sequence")
+        if not self._prepare_sequence_archive(start_pressure, end_pressure, repeats, mask):
+            return
+
         self._clear_run_display()
         self.active_test_mask = str(mask)
         self.mode_var.set("Mode: test sequence")
         self._write_debug_log(
-            f"GUI start test range={start_pressure:.2f}-{end_pressure:.2f} repeats={repeats} mask={mask}"
+            f"GUI start test range={start_pressure:.2f}-{end_pressure:.2f} repeats={repeats} "
+            f"mask={mask} archive={self.active_sequence_archive['root']}"
         )
         self._send(f"START:{start_pressure:.2f}:{end_pressure:.2f}:{repeats}:{mask}")
 
@@ -1836,6 +1912,29 @@ class TestRunGui(tk.Tk):
         self.mode_var.set("Mode: idle")
         self._write_debug_log("GUI stop test")
         self._send("STOP")
+
+    def _finalize_sequence_after_stop(self):
+        if self.current_impulse is not None:
+            capture_end_time_ms = self.current_impulse.get("capture_end_time_ms")
+            self._finalize_impulse(capture_end_time_ms)
+        archive = self.active_sequence_archive
+        if archive is None:
+            return
+        pressure_levels = int(
+            round((archive["end_pressure_bar"] - archive["start_pressure_bar"]) / archive["pressure_step_bar"])
+        ) + 1
+        expected_count = pressure_levels * archive["repeats"]
+        status = (
+            "completed"
+            if len(archive["overview_records"]) >= expected_count
+            else "stopped_before_completion"
+        )
+        saved_count = len(archive["overview_records"])
+        save_root = archive["root"]
+        self._finish_sequence_archive(status)
+        self.status_var.set(
+            f"Sequence {status.replace('_', ' ')}: {saved_count}/{expected_count} impulses saved in {save_root}"
+        )
 
     def _manual_pulse(self):
         self._start_pulse(increment_direction=0)
@@ -3451,6 +3550,7 @@ class TestRunGui(tk.Tk):
             return
 
         self.part_rows = loaded_rows
+        self.part_csv_path = Path(path)
         self.part_csv_status_var.set(f"Loaded {Path(path).name} ({len(loaded_rows)} rows)")
         poses = self._sorted_part_values({pose for pose, _hole in loaded_rows})
         self.part_pose_combo.configure(state="readonly", values=poses)
@@ -3769,6 +3869,8 @@ class TestRunGui(tk.Tk):
         if parts[0] == "STOPPED":
             self.mode_var.set("Mode: idle")
             self.active_test_mask = ""
+            if self.active_sequence_archive is not None:
+                self.after(250, self._finalize_sequence_after_stop)
             return
 
         if parts[0] == "PULSE":
@@ -3814,6 +3916,8 @@ class TestRunGui(tk.Tk):
         self.pending_flip_angle = -1
         self.pending_pulse_mask = ""
         self.pending_pulse_duration_ms = None
+        self.pending_pulse_start_monotonic = None
+        self.pending_pulse_start_utc_ns = None
         if clear_saved:
             self.impulse_rows.clear()
             self.active_test_mask = ""
@@ -3837,8 +3941,8 @@ class TestRunGui(tk.Tk):
             self._begin_impulse(sample)
 
         if self.current_impulse:
+            self._add_pressure_sample(sample, include_statistics=valves_open)
             if valves_open:
-                self._add_pressure_sample(sample)
                 self._add_flow_sample(sample)
             else:
                 close_time_ms = self.current_impulse.get("valve_close_time_ms")
@@ -3949,8 +4053,6 @@ class TestRunGui(tk.Tk):
         self.pending_pulse_duration_ms = None
         self.pending_pulse_start_monotonic = None
         self.pending_pulse_start_utc_ns = None
-        self.pending_pulse_start_monotonic = None
-        self.pending_pulse_start_utc_ns = None
 
     def _force_sample_trace_row(self, sample, received_monotonic=None):
         return (
@@ -3970,7 +4072,7 @@ class TestRunGui(tk.Tk):
             return
         self.current_impulse["force_trace"].append(self._force_sample_trace_row(sample))
 
-    def _add_pressure_sample(self, sample):
+    def _add_pressure_sample(self, sample, include_statistics=True):
         self.current_impulse["pressure_trace"].append(
             (
                 self.current_line_received_monotonic or time.monotonic(),
@@ -3979,6 +4081,8 @@ class TestRunGui(tk.Tk):
                 sample["pressure_before"],
             )
         )
+        if not include_statistics:
+            return
         self.current_impulse["valve_open_sample_count"] += 1
         skip_pressure_sample = self.current_impulse["valve_open_sample_count"] <= PRESSURE_SETTLE_SKIP_SAMPLES
         if skip_pressure_sample:
@@ -4095,6 +4199,7 @@ class TestRunGui(tk.Tk):
             metric("f2_fraction", digits=3, scale=100.0),
         ]
         self.impulse_rows.append(row)
+        self._archive_finalized_impulse(impulse, row, metrics)
         self.current_impulse = None
 
     def _nozzle_mask_flags(self, mask):
@@ -4433,7 +4538,11 @@ class TestRunGui(tk.Tk):
     def _write_impulse_csv(self, path):
         with open(path, "w", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file, delimiter=self._csv_delimiter())
-            writer.writerow([
+            writer.writerow(self._impulse_csv_headers())
+            writer.writerows(self._csv_output_row(row) for row in self.impulse_rows)
+
+    def _impulse_csv_headers(self):
+        return [
                 "impulse index",
                 "flip angle",
                 "pose number",
@@ -4473,8 +4582,282 @@ class TestRunGui(tk.Tk):
                 "peak force per actual pressure n per bar",
                 "force 1 share percent",
                 "force 2 share percent",
-            ])
-            writer.writerows(self._csv_output_row(row) for row in self.impulse_rows)
+            ]
+
+    def _archive_output_row(self, row, archive=None):
+        archive = self.active_sequence_archive if archive is None else archive
+        german_csv = bool(archive and archive.get("german_csv"))
+        output = []
+        for value in row:
+            if value is None:
+                output.append("")
+                continue
+            text = str(value)
+            if german_csv:
+                try:
+                    float(text)
+                except ValueError:
+                    pass
+                else:
+                    text = text.replace(".", ",")
+            output.append(text)
+        return output
+
+    def _write_sequence_overview(self, rows=None):
+        archive = self.active_sequence_archive
+        if archive is None:
+            return
+        records = archive["overview_records"] if rows is None else rows
+        headers = [
+            "sequence id",
+            "impulse id",
+            "recorded at local",
+            "timeseries file",
+            "summary file",
+            *self._impulse_csv_headers(),
+        ]
+        delimiter = ";" if archive["german_csv"] else ","
+        with open(archive["overview_path"], "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter)
+            writer.writerow(headers)
+            writer.writerows(self._archive_output_row(row, archive) for row in records)
+
+    def _sequence_metadata_rows(self, archive):
+        pressure_levels = int(
+            round((archive["end_pressure_bar"] - archive["start_pressure_bar"]) / archive["pressure_step_bar"])
+        ) + 1
+        selected_nozzles = ",".join(
+            str(index + 1) for index in range(4) if archive["nozzle_mask"] & (1 << index)
+        )
+        return [
+            ("sequence id", archive["session_id"], "stable identifier used in all sequence CSV files"),
+            ("status", archive["status"], ""),
+            ("started local", archive["started_local"].isoformat(timespec="milliseconds"), ""),
+            ("started utc", archive["started_utc"].isoformat(timespec="milliseconds"), ""),
+            (
+                "ended local",
+                "" if archive["ended_local"] is None else archive["ended_local"].isoformat(timespec="milliseconds"),
+                "",
+            ),
+            ("save root", archive["root"], ""),
+            (
+                "measurement folder name",
+                archive["root"].name,
+                "human-readable assignment from the selected folder",
+            ),
+            ("impulse data folder", archive["impulse_dir"].name, ""),
+            ("overview file", archive["overview_path"].name, ""),
+            ("start target pressure", archive["start_pressure_bar"], "bar"),
+            ("end target pressure", archive["end_pressure_bar"], "bar"),
+            ("pressure increment", archive["pressure_step_bar"], "bar"),
+            ("pressure levels", pressure_levels, ""),
+            ("repeats per pressure", archive["repeats"], ""),
+            ("expected impulse count", pressure_levels * archive["repeats"], ""),
+            ("saved impulse count", len(archive["overview_records"]), ""),
+            ("nozzle mask", archive["nozzle_mask"], ""),
+            ("selected nozzles", selected_nozzles, ""),
+            ("nominal valve pulse duration", VALVE_PULSE_DURATION_MS, "ms"),
+            ("Arduino sample interval", SAMPLE_INTERVAL_MS, "ms"),
+            ("flow detection threshold", self.flow_threshold_var.get(), "l/min"),
+            ("force standard filter", 20, "samples, rolling mean"),
+            ("force impulse threshold", self.force_impulse_threshold, "N"),
+            ("QuantumX endpoint", f"{self.quantumx_host_var.get()}:{self.quantumx_port_var.get()}", ""),
+            ("Arduino port", self._selected_port_device(), ""),
+            ("Colibri port", self._selected_colibri_port_device(), ""),
+            ("plate reference contact", COLIBRI_PLATE_CONTACT_POSITION_MM, "mm"),
+            ("nozzle offset", self.nozzle_offset_var.get(), "mm"),
+            ("target distance to plate", self.colibri_plate_distance_var.get(), "mm"),
+            ("part CSV", "" if self.part_csv_path is None else self.part_csv_path, ""),
+            ("part pose", self.part_pose_var.get(), ""),
+            ("part hole", self.part_hole_var.get(), ""),
+            ("German CSV format", archive["german_csv"], "semicolon delimiter and decimal comma"),
+        ]
+
+    def _write_sequence_metadata(self):
+        archive = self.active_sequence_archive
+        if archive is None:
+            return
+        delimiter = ";" if archive["german_csv"] else ","
+        with open(archive["metadata_path"], "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter)
+            writer.writerow(("parameter", "value", "unit / note"))
+            writer.writerows(
+                self._archive_output_row(row, archive) for row in self._sequence_metadata_rows(archive)
+            )
+
+    def _sequence_impulse_paths(self, impulse):
+        archive = self.active_sequence_archive
+        impulse_index = impulse["impulse_index"]
+        impulse_id = f"{archive['session_id']}_i{impulse_index:04d}"
+        try:
+            pressure_tag = f"{float(impulse['target_pressure']):.3f}".replace(".", "p")
+        except (TypeError, ValueError):
+            pressure_tag = "unknown"
+        mask = str(impulse.get("valve_mask") or "unknown")
+        stem = f"impulse_{impulse_index:04d}_{impulse_id}_p{pressure_tag}bar_mask{mask}"
+        return (
+            impulse_id,
+            archive["impulse_dir"] / f"{stem}_timeseries.csv",
+            archive["impulse_dir"] / f"{stem}_summary.csv",
+        )
+
+    def _write_sequence_impulse_timeseries(self, impulse, impulse_id, path):
+        archive = self.active_sequence_archive
+        pulse_start_utc_ns = impulse["pulse_start_utc_ns"]
+        pulse_start_monotonic = impulse["pulse_start_monotonic"]
+        common = (
+            archive["session_id"],
+            impulse_id,
+            impulse["impulse_index"],
+            impulse["target_pressure"],
+            impulse["valve_mask"],
+        )
+        events = []
+        for row in impulse["force_trace"]:
+            standard_total = row[7] if len(row) > 7 and row[7] is not None else row[3]
+            raw_total = row[8] if len(row) > 8 else None
+            events.append(
+                (
+                    (row[1] - pulse_start_utc_ns) / 1e9,
+                    *common,
+                    "force",
+                    row[1],
+                    row[2],
+                    standard_total,
+                    row[4],
+                    row[5],
+                    raw_total,
+                    row[6],
+                    None,
+                    None,
+                    None,
+                )
+            )
+        for received, target_pressure, actual_pressure, pressure_before in impulse["pressure_trace"]:
+            events.append(
+                (
+                    received - pulse_start_monotonic,
+                    *common,
+                    "pressure",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    target_pressure,
+                    actual_pressure,
+                    pressure_before,
+                )
+            )
+        events.sort(key=lambda event: event[0])
+        headers = (
+            "time from valve start s",
+            "sequence id",
+            "impulse id",
+            "impulse index",
+            "target pressure setting bar",
+            "nozzle mask",
+            "sample type",
+            "force timestamp utc ns",
+            "force sequence",
+            "force total mean 20 n",
+            "force 1 mean 20 n",
+            "force 2 mean 20 n",
+            "force total raw n",
+            "force status",
+            "target regulator pressure bar",
+            "actual regulator pressure bar",
+            "pressure before valve bar",
+        )
+        delimiter = ";" if archive["german_csv"] else ","
+        with open(path, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter)
+            writer.writerow(headers)
+            writer.writerows(self._archive_output_row(row, archive) for row in events)
+
+    def _write_sequence_impulse_summary(self, impulse_id, row, metrics, path):
+        archive = self.active_sequence_archive
+        summary_rows = [
+            ("sequence id", archive["session_id"], ""),
+            ("impulse id", impulse_id, ""),
+            ("recorded at local", dt.datetime.now().astimezone().isoformat(timespec="milliseconds"), ""),
+        ]
+        summary_rows.extend(
+            (header, value, "") for header, value in zip(self._impulse_csv_headers(), row)
+        )
+        metric_units = {
+            "baseline_force_n": "N",
+            "baseline_std_n": "N",
+            "peak_force_n": "N",
+            "peak_time_s": "s",
+            "rise_10_90_s": "s",
+            "fall_90_10_s": "s",
+            "fwhm_s": "s",
+            "force_impulse_ns": "Ns",
+            "plateau_mean_n": "N",
+            "plateau_std_n": "N",
+            "target_pressure_bar": "bar",
+            "actual_pressure_bar": "bar",
+            "pressure_before_valve_bar": "bar",
+            "actual_pressure_error_bar": "bar",
+            "peak_per_actual_pressure_n_per_bar": "N/bar",
+            "f1_fraction": "fraction",
+            "f2_fraction": "fraction",
+        }
+        summary_rows.extend(
+            (name, "" if metrics.get(name) is None else metrics[name], unit)
+            for name, unit in metric_units.items()
+        )
+        delimiter = ";" if archive["german_csv"] else ","
+        with open(path, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter)
+            writer.writerow(("parameter", "value", "unit / note"))
+            writer.writerows(self._archive_output_row(item, archive) for item in summary_rows)
+
+    def _archive_finalized_impulse(self, impulse, row, metrics):
+        archive = self.active_sequence_archive
+        if archive is None:
+            return
+        impulse_id, timeseries_path, summary_path = self._sequence_impulse_paths(impulse)
+        recorded_at = dt.datetime.now().astimezone().isoformat(timespec="milliseconds")
+        try:
+            self._write_sequence_impulse_timeseries(impulse, impulse_id, timeseries_path)
+            self._write_sequence_impulse_summary(impulse_id, row, metrics, summary_path)
+            archive["overview_records"].append(
+                [
+                    archive["session_id"],
+                    impulse_id,
+                    recorded_at,
+                    str(timeseries_path.relative_to(archive["root"])),
+                    str(summary_path.relative_to(archive["root"])),
+                    *row,
+                ]
+            )
+            self._write_sequence_overview()
+            self._write_sequence_metadata()
+        except OSError as exc:
+            self._write_debug_log(f"SEQUENCE archive error impulse={impulse_id}: {exc}")
+            self.status_var.set(f"Sequence archive error for impulse {impulse['impulse_index']}: {exc}")
+
+    def _finish_sequence_archive(self, status):
+        archive = self.active_sequence_archive
+        if archive is None:
+            return
+        archive["status"] = status
+        archive["ended_local"] = dt.datetime.now().astimezone()
+        try:
+            self._write_sequence_overview()
+            self._write_sequence_metadata()
+        except OSError as exc:
+            self._write_debug_log(f"SEQUENCE archive finalization error: {exc}")
+            self.status_var.set(f"Sequence archive finalization failed: {exc}")
+        self._write_debug_log(
+            f"SEQUENCE archive finished id={archive['session_id']} status={status} "
+            f"impulses={len(archive['overview_records'])}"
+        )
+        self.active_sequence_archive = None
 
     def _finalize_stale_impulse_before_save(self):
         if not self.current_impulse:
