@@ -10,12 +10,12 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("QuantumXBridge")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("QuantumXMonitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0311f2cb898ff67b2ade22ec3de2db70290c5414")]
-[assembly: System.Reflection.AssemblyProductAttribute("QuantumXBridge")]
-[assembly: System.Reflection.AssemblyTitleAttribute("QuantumXBridge")]
+[assembly: System.Reflection.AssemblyProductAttribute("QuantumXMonitor")]
+[assembly: System.Reflection.AssemblyTitleAttribute("QuantumXMonitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
 
 // Von der MSBuild WriteCodeFragment-Klasse generiert.

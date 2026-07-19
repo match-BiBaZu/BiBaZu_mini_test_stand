@@ -58,3 +58,4 @@ C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXBridge\obj\Rele
 C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXBridge\obj\Release\net48\QuantumX.16E1DDF2.Up2Date
 C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXBridge\obj\Release\net48\QuantumXBridge.exe
 C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXBridge\obj\Release\net48\QuantumXBridge.pdb
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXBridge\obj\Release\net48\QuantumXBridge.exe.config

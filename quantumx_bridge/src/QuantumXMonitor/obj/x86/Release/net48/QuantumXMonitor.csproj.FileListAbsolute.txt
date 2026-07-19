@@ -1,0 +1,6 @@
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.csproj.AssemblyReference.cache
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.AssemblyInfoInputs.cache
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.AssemblyInfo.cs
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.csproj.CoreCompileInputs.cache
+C:\Users\Shieff\Desktop\testrun_code\quantumx_bridge\src\QuantumXMonitor\obj\x86\Release\net48\QuantumXMonitor.sourcelink.json

@@ -6,6 +6,7 @@ using System.Threading;
 using Hbm.Api.Common;
 using Hbm.Api.Common.Entities;
 using Hbm.Api.Common.Entities.Channels;
+using Hbm.Api.Common.Entities.ConnectionInfos;
 using Hbm.Api.Common.Entities.Problems;
 using Hbm.Api.Common.Entities.Signals;
 using Hbm.Api.Common.Enums;
@@ -30,7 +31,7 @@ namespace QuantumXBridge
             try
             {
                 environment = DaqEnvironment.GetInstance();
-                device = new QuantumXDevice(ip);
+                device = FindDevice(environment, ip);
 
                 List<Problem> problems;
                 if (!environment.Connect(device, out problems))
@@ -48,9 +49,13 @@ namespace QuantumXBridge
                     device.FirmwareVersion,
                     device.Connectors.Count);
 
-                if (!string.Equals(device.Model, "MX440B", StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(device.Model, "MX440B", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(device.Name, "MX440B", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.Error.WriteLine("Expected MX440B but connected to '{0}'.", device.Model);
+                    Console.Error.WriteLine(
+                        "Expected MX440B but connected to model='{0}', name='{1}'.",
+                        device.Model,
+                        device.Name);
                     return 3;
                 }
 
@@ -99,8 +104,7 @@ namespace QuantumXBridge
             }
             catch (Exception exception)
             {
-                Console.Error.WriteLine("{0}: {1}", exception.GetType().FullName, exception.Message);
-                Console.Error.WriteLine(exception.StackTrace);
+                Console.Error.WriteLine(exception.ToString());
                 return 1;
             }
             finally
@@ -122,6 +126,48 @@ namespace QuantumXBridge
                     environment.Dispose();
                 }
             }
+        }
+
+        private static QuantumXDevice FindDevice(DaqEnvironment environment, string expectedIp)
+        {
+            List<string> families = environment.GetAvailableDeviceFamilyNames();
+            Console.Error.WriteLine("Scanning device families: {0}", string.Join(", ", families));
+
+            // HBK documents a minimum six-second initialization period between
+            // DaqEnvironment.GetInstance() and the first Scan() call.
+            Thread.Sleep(6500);
+
+            List<Device> devices = environment.Scan(families);
+            foreach (Device scannedDevice in devices)
+            {
+                var ethernet = scannedDevice.ConnectionInfo as EthernetConnectionInfo;
+                string scannedIp = ethernet == null ? "<unknown>" : ethernet.IpAddress;
+                Console.Error.WriteLine(
+                    "Scan result: family={0}, model={1}, name={2}, serial={3}, firmware={4}, ip={5}",
+                    scannedDevice.FamilyName,
+                    scannedDevice.Model,
+                    scannedDevice.Name,
+                    scannedDevice.SerialNo,
+                    scannedDevice.FirmwareVersion,
+                    scannedIp);
+
+                if (string.Equals(scannedIp, expectedIp, StringComparison.OrdinalIgnoreCase))
+                {
+                    QuantumXDevice quantumX = scannedDevice as QuantumXDevice;
+                    if (quantumX == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Device at " + expectedIp + " is not represented as a QuantumX device.");
+                    }
+
+                    return quantumX;
+                }
+            }
+
+            Console.Error.WriteLine(
+                "No scan result matched {0}; trying a direct QuantumX connection.",
+                expectedIp);
+            return new QuantumXDevice(expectedIp);
         }
 
         private static Signal GetPrimarySignal(QuantumXDevice device, int channelNumber)
@@ -156,7 +202,7 @@ namespace QuantumXBridge
         private static void PrintSignalInfo(QuantumXDevice device, int channelNumber, Signal signal)
         {
             Channel channel = device.Connectors[channelNumber - 1].Channels[0];
-            string unit = channel is IUnit unitChannel ? unitChannel.Unit : "<unknown>";
+            string unit = device.GetUnit(channel);
             Console.Error.WriteLine(
                 "Channel {0}: channel='{1}', signal='{2}', unit='{3}', sample_rate={4} Hz, id='{5}'",
                 channelNumber,
@@ -197,7 +243,13 @@ namespace QuantumXBridge
 
             foreach (Problem problem in problems)
             {
-                Console.Error.WriteLine("{0}: {1}", prefix, problem.Message);
+                Console.Error.WriteLine(
+                    "{0}: message='{1}', original='{2}', property='{3}', demanded='{4}'",
+                    prefix,
+                    problem.Message,
+                    problem.OriginalMessage,
+                    problem.PropertyName,
+                    problem.DemandedValue);
             }
         }
     }
