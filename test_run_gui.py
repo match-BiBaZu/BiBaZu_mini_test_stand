@@ -452,6 +452,10 @@ class TestRunGui(tk.Tk):
         self.pending_flip_angle = -1
         self.pending_pulse_mask = ""
         self.pending_pulse_duration_ms = None
+        self.pending_pulse_start_monotonic = None
+        self.pending_pulse_start_utc_ns = None
+        self.current_line_received_monotonic = None
+        self.current_line_received_utc_ns = None
         self.active_test_mask = ""
         self.part_rows = {}
         self.increment_dialog = None
@@ -1896,13 +1900,17 @@ class TestRunGui(tk.Tk):
             return
         self._cancel_test_impulse_capture("Test impulse recording timed out before valve start.")
 
-    def _mark_test_impulse_started(self):
+    def _mark_test_impulse_started(self, pulse_start_monotonic=None, pulse_start_utc_ns=None):
         capture = self.test_impulse_capture
         if capture is None or capture["pulse_start_monotonic"] is not None:
             return
 
-        capture["pulse_start_monotonic"] = time.monotonic()
-        capture["pulse_start_utc_ns"] = time.time_ns()
+        capture["pulse_start_monotonic"] = (
+            time.monotonic() if pulse_start_monotonic is None else pulse_start_monotonic
+        )
+        capture["pulse_start_utc_ns"] = (
+            time.time_ns() if pulse_start_utc_ns is None else pulse_start_utc_ns
+        )
         baseline_values = [
             row[7] if row[7] is not None else row[3]
             for row in capture["force_samples"][-100:]
@@ -2032,7 +2040,7 @@ class TestRunGui(tk.Tk):
             return
         capture["pressure_samples"].append(
             (
-                time.monotonic(),
+                self.current_line_received_monotonic or time.monotonic(),
                 sample["target_pressure"],
                 sample["regulator_feedback"],
                 sample["pressure_before"],
@@ -2287,10 +2295,10 @@ class TestRunGui(tk.Tk):
                         "sample_type",
                         "force_timestamp_utc_ns",
                         "force_sequence",
-                        "force_total_mean_100_n",
-                        "force_1_mean_100_n",
-                        "force_2_mean_100_n",
                         "force_total_mean_20_n",
+                        "force_1_mean_20_n",
+                        "force_2_mean_20_n",
+                        "force_total_mean_20_explicit_n",
                         "force_total_raw_n",
                         "force_status",
                         "target_pressure_bar",
@@ -2359,12 +2367,16 @@ class TestRunGui(tk.Tk):
         pulse_start = capture["pulse_start_monotonic"]
         pulse_start_utc_ns = capture["pulse_start_utc_ns"]
         force_points = [
-            ((row[1] - pulse_start_utc_ns) / 1e9, row[3]) for row in capture["force_samples"]
-        ]
-        fast_force_points = [
-            ((row[1] - pulse_start_utc_ns) / 1e9, row[7])
+            (
+                (row[1] - pulse_start_utc_ns) / 1e9,
+                row[7] if len(row) > 7 and row[7] is not None else row[3],
+            )
             for row in capture["force_samples"]
-            if len(row) > 7 and row[7] is not None
+        ]
+        raw_force_points = [
+            ((row[1] - pulse_start_utc_ns) / 1e9, row[8])
+            for row in capture["force_samples"]
+            if len(row) > 8 and row[8] is not None
         ]
         target_points = [
             (row[0] - pulse_start, row[1])
@@ -2396,7 +2408,7 @@ class TestRunGui(tk.Tk):
                 f"nozzle mask {capture['nozzle_mask']} | "
                 f"duration {capture['plot_end_seconds']:.3f} s | "
                 f"baseline {capture['baseline_force_n']:.4f} N | "
-                f"force: mean 20 + mean 100"
+                f"force: raw + mean 20"
             ),
         ).pack(side=tk.LEFT)
         ttk.Button(header, text="Close", command=dialog.destroy).pack(side=tk.RIGHT)
@@ -2458,7 +2470,7 @@ class TestRunGui(tk.Tk):
             x_min = -TEST_IMPULSE_PRETRIGGER_SECONDS
             x_max = capture["plot_end_seconds"]
 
-            force_values = [point[1] for point in force_points]
+            force_values = [point[1] for point in raw_force_points + force_points]
             pressure_values = [point[1] for point in target_points + actual_points + nozzle_pressure_points]
 
             force_min = min(0.0, min(force_values))
@@ -2534,7 +2546,7 @@ class TestRunGui(tk.Tk):
                         dash=dash,
                     )
 
-            draw_series(fast_force_points, force_y, "#8fd19e", width_px=1)
+            draw_series(raw_force_points, force_y, "#a9d9b8", width_px=1)
             draw_series(force_points, force_y, "#198754", width_px=2)
             draw_series(target_points, pressure_y, "#e67e22", width_px=2, dash=(8, 4))
             draw_series(actual_points, pressure_y, "#0d6efd", width_px=2)
@@ -2542,8 +2554,8 @@ class TestRunGui(tk.Tk):
 
             legend_y = 18
             legends = (
-                ("#8fd19e", "Force mean 20", None),
-                ("#198754", "Force total (mean 100)", None),
+                ("#a9d9b8", "Force raw", None),
+                ("#198754", "Force total (mean 20)", None),
                 ("#e67e22", "Target pressure", (8, 4)),
                 ("#0d6efd", "Actual regulator pressure", None),
                 ("#7b2cbf", "Pressure before valve", None),
@@ -2879,7 +2891,7 @@ class TestRunGui(tk.Tk):
 
     def _force_status(self, prefix):
         return (
-            f"{prefix} | total = F1 + F2 | 100-value mean | "
+            f"{prefix} | total = F1 + F2 | 20-value mean | "
             f"impulse threshold {self.force_impulse_threshold:.4g} N"
         )
 
@@ -3658,8 +3670,10 @@ class TestRunGui(tk.Tk):
                 self.messages.put(("status", f"Serial error: {exc}"))
                 break
             if line:
+                received_monotonic = time.monotonic()
+                received_utc_ns = time.time_ns()
                 self._write_debug_log(f"ARDUINO RX {line}")
-                self.messages.put(("line", line))
+                self.messages.put(("line", (line, received_monotonic, received_utc_ns)))
 
     def _drain_messages(self):
         drained_count = 0
@@ -3736,7 +3750,15 @@ class TestRunGui(tk.Tk):
             self._scroll_log_to_end()
         self.after(1 if drained_count == MAX_QUEUE_DRAIN_PER_TICK else 50, self._drain_messages)
 
-    def _handle_line(self, line):
+    def _handle_line(self, line_message):
+        if isinstance(line_message, tuple):
+            line, received_monotonic, received_utc_ns = line_message
+        else:
+            line = line_message
+            received_monotonic = time.monotonic()
+            received_utc_ns = time.time_ns()
+        self.current_line_received_monotonic = received_monotonic
+        self.current_line_received_utc_ns = received_utc_ns
         self._append_log_line(line)
 
         parts = line.split(";")
@@ -3874,8 +3896,12 @@ class TestRunGui(tk.Tk):
             valve_mask = self.active_test_mask
         pose_number, hole_number = self._current_pose_hole_for_csv()
         read_stepper_y_offset, read_colibri_z_offset = self._current_readback_offsets_for_csv()
-        pulse_start_utc_ns = time.time_ns()
-        pulse_start_monotonic = time.monotonic()
+        pulse_start_utc_ns = self.pending_pulse_start_utc_ns or self.current_line_received_utc_ns or time.time_ns()
+        pulse_start_monotonic = (
+            self.pending_pulse_start_monotonic
+            or self.current_line_received_monotonic
+            or time.monotonic()
+        )
         pretrigger_start_utc_ns = pulse_start_utc_ns - round(TEST_IMPULSE_PRETRIGGER_SECONDS * 1e9)
         with self.force_lock:
             force_history = list(self.force_sample_history)
@@ -3921,6 +3947,10 @@ class TestRunGui(tk.Tk):
         self.pending_flip_angle = -1
         self.pending_pulse_mask = ""
         self.pending_pulse_duration_ms = None
+        self.pending_pulse_start_monotonic = None
+        self.pending_pulse_start_utc_ns = None
+        self.pending_pulse_start_monotonic = None
+        self.pending_pulse_start_utc_ns = None
 
     def _force_sample_trace_row(self, sample, received_monotonic=None):
         return (
@@ -3943,7 +3973,7 @@ class TestRunGui(tk.Tk):
     def _add_pressure_sample(self, sample):
         self.current_impulse["pressure_trace"].append(
             (
-                time.monotonic(),
+                self.current_line_received_monotonic or time.monotonic(),
                 sample["target_pressure"],
                 sample["regulator_feedback"],
                 sample["pressure_before"],
@@ -4116,6 +4146,8 @@ class TestRunGui(tk.Tk):
         self.table.yview_moveto(1.0)
 
     def _is_live_data_line(self, line):
+        if isinstance(line, tuple):
+            line = line[0]
         parts = line.split(";")
         return bool(parts and parts[0].isdigit())
 
@@ -4148,7 +4180,12 @@ class TestRunGui(tk.Tk):
 
         if len(parts) >= 3 and parts[1] == "START":
             self.pending_pulse_mask = parts[2]
-            self._mark_test_impulse_started()
+            self.pending_pulse_start_monotonic = self.current_line_received_monotonic
+            self.pending_pulse_start_utc_ns = self.current_line_received_utc_ns
+            self._mark_test_impulse_started(
+                self.pending_pulse_start_monotonic,
+                self.pending_pulse_start_utc_ns,
+            )
             if self.current_impulse and not self.current_impulse.get("valve_mask"):
                 self.current_impulse["valve_mask"] = parts[2]
             if self.test_impulse_capture is None:
