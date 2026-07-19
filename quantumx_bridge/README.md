@@ -62,3 +62,10 @@ Falls der kontinuierliche HBK-Datenstrom wegen einer Firewallregel nicht
 initialisiert werden kann, wechselt die GUI automatisch zur gepaarten
 Einzelwertabfrage. Der 100-Werte-Mittelwert bleibt aktiv; die niedrigere
 tatsächliche Abfragerate wird in der Statuszeile angezeigt.
+
+Die Anzeige stellt dieselben gemittelten Werte zusätzlich als NDJSON auf
+`127.0.0.1:5500` bereit. `test_run_gui.py` startet sie bei Bedarf mit
+`--server-only`, übernimmt `force_total_n` als kompatiblen bisherigen
+Kraftwert und protokolliert `force_1_n`, `force_2_n`, Zeitstempel, Sequenz und
+Status zusätzlich. Impulsmittelwerte berücksichtigen jeden QuantumX-Messsatz
+anhand von Zeitstempel und Sequenz nur einmal.

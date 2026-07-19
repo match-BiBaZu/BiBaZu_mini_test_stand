@@ -4,12 +4,16 @@ import json
 import math
 import queue
 import re
+import socket
+import subprocess
 import threading
 import time
 import tkinter as tk
 from collections import deque
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+from force_sources import ForceSample, QuantumXTcpClient, UniqueForceAccumulator
 
 try:
     import serial
@@ -58,6 +62,19 @@ FORCE_DEFAULT_SCALING = 14.3758
 FORCE_DEFAULT_IMPULSE_THRESHOLD = 0.1
 GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
+QUANTUMX_HOST = "127.0.0.1"
+QUANTUMX_PORT = 5500
+QUANTUMX_MONITOR_EXE = (
+    Path(__file__).parent
+    / "quantumx_bridge"
+    / "src"
+    / "QuantumXMonitor"
+    / "bin"
+    / "x86"
+    / "Release"
+    / "net48"
+    / "QuantumXMonitor.exe"
+)
 
 
 class ColibriProtocolError(Exception):
@@ -322,8 +339,14 @@ class TestRunGui(tk.Tk):
         self.force_serial_port = None
         self.force_reader_thread = None
         self.force_reader_running = False
+        self.force_client = None
+        self.quantumx_monitor_process = None
         self.force_serial_lock = threading.Lock()
         self.force_lock = threading.Lock()
+        self.latest_force_sample = None
+        self.latest_force_1_n = None
+        self.latest_force_2_n = None
+        self.latest_force_status = "disconnected"
         self.latest_force_raw_n = None
         self.latest_force_n = None
         self.latest_force_time = None
@@ -361,8 +384,10 @@ class TestRunGui(tk.Tk):
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
         self.colibri_position_var = tk.StringVar(value="Position: --")
-        self.force_status_var = tk.StringVar(value=self._force_status("Force sensor: disconnected"))
-        self.force_value_var = tk.StringVar(value="Force reading: --")
+        self.force_status_var = tk.StringVar(value=self._force_status("QuantumX: disconnected"))
+        self.force_value_var = tk.StringVar(value="Force total: --")
+        self.force_1_value_var = tk.StringVar(value="F1: --")
+        self.force_2_value_var = tk.StringVar(value="F2: --")
         self.force_rate_var = tk.StringVar(value="Force rate: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.german_csv_format_var = tk.BooleanVar(value=True)
@@ -425,6 +450,7 @@ class TestRunGui(tk.Tk):
         self._refresh_ports()
         self._refresh_ethercat_adapters()
         self.after(50, self._drain_messages)
+        self.after(100, self._connect_force_sensor)
 
     def _load_user_presets(self):
         try:
@@ -1002,26 +1028,7 @@ class TestRunGui(tk.Tk):
         force_controls = ttk.Frame(root)
         force_controls.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(force_controls, text="Force sensor").pack(side=tk.LEFT)
-        self.force_port_combo = ttk.Combobox(
-            force_controls,
-            textvariable=self.force_port_var,
-            width=36,
-            state="readonly",
-        )
-        self.force_port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        ttk.Label(force_controls, text="Baud").pack(side=tk.LEFT)
-        self.force_baud_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=1200,
-            to=921600,
-            increment=1200,
-            textvariable=self.force_baud_var,
-            width=8,
-            state=tk.NORMAL,
-        )
-        self.force_baud_spinbox.pack(side=tk.LEFT, padx=(6, 8))
+        ttk.Label(force_controls, text=f"QuantumX {QUANTUMX_HOST}:{QUANTUMX_PORT}").pack(side=tk.LEFT)
 
         self.force_connect_button = ttk.Button(
             force_controls,
@@ -1029,23 +1036,6 @@ class TestRunGui(tk.Tk):
             command=self._toggle_force_connection,
         )
         self.force_connect_button.pack(side=tk.LEFT)
-
-        ttk.Label(force_controls, text="Force scaling").pack(side=tk.LEFT, padx=(8, 0))
-        self.force_scale_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=-1000000.0,
-            to=1000000.0,
-            increment=0.0001,
-            textvariable=self.force_scale_var,
-            width=10,
-        )
-        self.force_scale_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        self.force_scale_button = ttk.Button(
-            force_controls,
-            text="Apply scaling",
-            command=self._apply_force_scaling,
-        )
-        self.force_scale_button.pack(side=tk.LEFT)
 
         ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT, padx=(8, 0))
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
@@ -1064,7 +1054,9 @@ class TestRunGui(tk.Tk):
         )
         self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
-        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_1_value_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_2_value_var).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(10, 0))
 
         part_controls = ttk.Frame(root)
         part_controls.pack(fill=tk.X, pady=(10, 0))
@@ -1136,6 +1128,8 @@ class TestRunGui(tk.Tk):
             "valves_open",
             "flow",
             "force",
+            "force_1",
+            "force_2",
         )
         self.table = ttk.Treeview(root, columns=columns, show="headings", height=18)
         headings = {
@@ -1146,7 +1140,9 @@ class TestRunGui(tk.Tk):
             "regulator_pwm": "Regulator PWM",
             "valves_open": "Valves open",
             "flow": "Flow",
-            "force": "Force reading",
+            "force": "Force total",
+            "force_1": "Force 1",
+            "force_2": "Force 2",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
@@ -1324,21 +1320,15 @@ class TestRunGui(tk.Tk):
         labels = list(self.port_devices)
         self.port_combo["values"] = labels
         self.colibri_port_combo["values"] = labels
-        self.force_port_combo["values"] = labels
         if labels and self.port_var.get() not in labels:
             self.port_var.set(self._preferred_port_label(labels, ("arduino", "ttyacm")) or labels[0])
         if labels and self.colibri_port_var.get() not in labels:
             self.colibri_port_var.set(
                 self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
             )
-        if labels and self.force_port_var.get() not in labels:
-            self.force_port_var.set(
-                self._preferred_port_label(labels, ("gsv", "me-", "me ", "usb serial", "usb-serial")) or labels[0]
-            )
-        elif not labels:
+        if not labels:
             self.port_var.set("")
             self.colibri_port_var.set("")
-            self.force_port_var.set("")
             self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
@@ -1455,10 +1445,7 @@ class TestRunGui(tk.Tk):
         self._write_debug_log(
             f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
         )
-        self._write_debug_log(
-            f"GUI force port label={self.force_port_var.get()!r} device={self._selected_force_port_device()!r} "
-            f"baud={self.force_baud_var.get()!r} mode=binary scale={self.force_scaling:.12g}"
-        )
+        self._write_debug_log(f"GUI QuantumX endpoint={QUANTUMX_HOST}:{QUANTUMX_PORT}")
 
     def _stop_debug_log(self):
         self._write_debug_log("LOG stopped")
@@ -1803,89 +1790,78 @@ class TestRunGui(tk.Tk):
         self._send("MOTOR_STOP")
 
     def _toggle_force_connection(self):
-        if self.force_serial_port:
+        if self.force_client:
             self._disconnect_force_sensor()
         else:
             self._connect_force_sensor()
 
     def _connect_force_sensor(self):
-        if serial is None:
-            messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
-            return
-
-        port = self._selected_force_port_device()
-        if not port:
-            messagebox.showerror("No port selected", "Select the force sensor serial port.")
-            return
-        if self.serial_port and port == self._selected_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the Arduino.")
-            return
-        if self.colibri and port == self._selected_colibri_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
+        if self.force_client:
             return
 
         try:
-            baud_rate = int(self.force_baud_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Invalid baud rate", "Enter a numeric baud rate for the force sensor.")
+            self._ensure_quantumx_monitor()
+        except (OSError, RuntimeError) as exc:
+            messagebox.showerror("QuantumX connection failed", str(exc))
             return
-
-        try:
-            self.force_serial_port = serial.Serial(
-                port,
-                baud_rate,
-                bytesize=8,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=FORCE_READ_TIMEOUT_SECONDS,
-                write_timeout=SERIAL_WRITE_TIMEOUT,
-            )
-            self.force_serial_port.reset_input_buffer()
-        except serial.SerialException as exc:
-            self.force_serial_port = None
-            messagebox.showerror("Force sensor connection failed", str(exc))
-            return
-
-        self.force_reader_running = True
-        self.force_reader_thread = threading.Thread(target=self._read_force_serial, daemon=True)
-        self.force_reader_thread.start()
+        self.force_client = QuantumXTcpClient(
+            QUANTUMX_HOST,
+            QUANTUMX_PORT,
+            on_sample=lambda sample: self.messages.put(("quantumx_force_sample", sample)),
+            on_status=lambda status: self.messages.put(("force_status", status)),
+        )
+        self.force_client.start()
         self.force_connect_button.configure(text="Disconnect")
-        self.force_port_combo.configure(state=tk.DISABLED)
-        self.force_baud_spinbox.configure(state=tk.DISABLED)
-        self.force_status_var.set(self._force_status(f"Force sensor: connected to {port} at {baud_rate} baud"))
-        self.status_var.set(f"Connected force sensor on {port}")
-        self._write_debug_log(f"FORCE connected port={port} baud={baud_rate}")
+        self.force_status_var.set(self._force_status("QuantumX: connecting"))
+        self.status_var.set("Connecting to QuantumX force bridge")
+        self._write_debug_log(f"FORCE QuantumX connecting endpoint={QUANTUMX_HOST}:{QUANTUMX_PORT}")
+
+    def _ensure_quantumx_monitor(self):
+        try:
+            with socket.create_connection((QUANTUMX_HOST, QUANTUMX_PORT), timeout=0.15):
+                return
+        except OSError:
+            pass
+
+        if not QUANTUMX_MONITOR_EXE.exists():
+            raise RuntimeError(
+                f"QuantumX monitor not built: {QUANTUMX_MONITOR_EXE}"
+            )
+        self.quantumx_monitor_process = subprocess.Popen(
+            [str(QUANTUMX_MONITOR_EXE), "--server-only"],
+            cwd=str(QUANTUMX_MONITOR_EXE.parent),
+        )
 
     def _disconnect_force_sensor(self):
-        self._write_debug_log("FORCE disconnect requested")
-        self.force_reader_running = False
-        if self.force_reader_thread:
-            self.force_reader_thread.join(timeout=0.5)
-        if self.force_serial_port:
-            self.force_serial_port.close()
-        self.force_serial_port = None
-        self.force_reader_thread = None
+        self._write_debug_log("FORCE QuantumX disconnect requested")
+        if self.force_client:
+            self.force_client.stop()
+        self.force_client = None
         with self.force_lock:
+            self.latest_force_sample = None
+            self.latest_force_1_n = None
+            self.latest_force_2_n = None
+            self.latest_force_status = "disconnected"
             self.latest_force_raw_n = None
             self.latest_force_n = None
             self.latest_force_time = None
             self.force_rate_times.clear()
         self.force_connect_button.configure(text="Connect")
-        self.force_port_combo.configure(state="readonly")
-        self.force_baud_spinbox.configure(state=tk.NORMAL)
-        self.force_value_var.set("Force reading: --")
+        self.force_1_value_var.set("F1: --")
+        self.force_2_value_var.set("F2: --")
+        self.force_value_var.set("Force total: --")
         self.force_rate_var.set("Force rate: --")
-        self.force_status_var.set(self._force_status("Force sensor: disconnected"))
-        self._write_debug_log("FORCE disconnected")
+        self.force_status_var.set(self._force_status("QuantumX: disconnected"))
+        self._write_debug_log("FORCE QuantumX disconnected")
 
     def _force_status(self, prefix):
         return (
-            f"{prefix} | binary 5-byte mode, scale {self.force_scaling:.6g} x{FORCE_BINARY_FULL_SCALE_FACTOR:.3g}, "
-            f"impulse threshold {self.force_impulse_threshold:.4g}"
+            f"{prefix} | total = F1 + F2 | 100-value mean | "
+            f"impulse threshold {self.force_impulse_threshold:.4g} N"
         )
 
     def _format_force_value(self, force_value):
-        return "Force reading: --" if force_value is None else f"Force reading: {force_value:.4f}"
+        return "Force total: --" if force_value is None else f"Force total: {force_value:.4f} N"
 
     def _apply_force_scaling(self):
         try:
@@ -1983,6 +1959,21 @@ class TestRunGui(tk.Tk):
                 self.force_rate_times.popleft()
             return force_n, self._force_rate_hz_locked()
 
+    def _store_quantumx_sample(self, sample):
+        now = time.time()
+        with self.force_lock:
+            self.latest_force_sample = sample
+            self.latest_force_1_n = sample.force_1_n
+            self.latest_force_2_n = sample.force_2_n
+            self.latest_force_n = sample.force_total_n if sample.valid else None
+            self.latest_force_raw_n = None
+            self.latest_force_status = sample.status
+            self.latest_force_time = now
+            self.force_rate_times.append(now)
+            while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
+                self.force_rate_times.popleft()
+            return self._force_rate_hz_locked()
+
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
             return None
@@ -1993,11 +1984,16 @@ class TestRunGui(tk.Tk):
 
     def _force_value_for_live_row(self):
         with self.force_lock:
-            calibrated_force = self.latest_force_n
-            raw_force = self.latest_force_raw_n
+            sample = self.latest_force_sample
+            total_force = self.latest_force_n
         return (
-            "" if calibrated_force is None else f"{calibrated_force:.4f}",
-            "" if raw_force is None else f"{raw_force:.4f}",
+            "" if total_force is None else f"{total_force:.4f}",
+            "",
+            "" if sample is None or sample.force_1_n is None else f"{sample.force_1_n:.4f}",
+            "" if sample is None or sample.force_2_n is None else f"{sample.force_2_n:.4f}",
+            "" if sample is None else str(sample.timestamp_utc_ns),
+            "" if sample is None else str(sample.sequence),
+            "disconnected" if sample is None else sample.status,
         )
 
     def _extract_force_values(self, buffer):
@@ -2672,9 +2668,30 @@ class TestRunGui(tk.Tk):
                 self.force_value_var.set(self._format_force_value(force_n))
                 if rate_hz is not None:
                     self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
+            elif kind == "quantumx_force_sample":
+                rate_hz = self._store_quantumx_sample(value)
+                self.force_1_value_var.set(
+                    "F1: --" if value.force_1_n is None else f"F1: {value.force_1_n:.4f} N"
+                )
+                self.force_2_value_var.set(
+                    "F2: --" if value.force_2_n is None else f"F2: {value.force_2_n:.4f} N"
+                )
+                self.force_value_var.set(self._format_force_value(self.latest_force_n))
+                if rate_hz is not None:
+                    self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
             elif kind == "force_status":
-                self.force_status_var.set(value)
+                self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
+                if "stale" in value.lower() or "disconnected" in value.lower():
+                    with self.force_lock:
+                        self.latest_force_sample = None
+                        self.latest_force_1_n = None
+                        self.latest_force_2_n = None
+                        self.latest_force_n = None
+                        self.latest_force_status = "stale" if "stale" in value.lower() else "disconnected"
+                    self.force_1_value_var.set("F1: --")
+                    self.force_2_value_var.set("F2: --")
+                    self.force_value_var.set("Force total: --")
             else:
                 self._handle_line(value)
         if drained_count:
@@ -2787,6 +2804,11 @@ class TestRunGui(tk.Tk):
                 "flow": self._optional_float(parts[6]),
                 "force": self._optional_float(parts[7]) if len(parts) > 7 else None,
                 "raw_force": self._optional_float(parts[8]) if len(parts) > 8 else None,
+                "force_1": self._optional_float(parts[9]) if len(parts) > 9 else None,
+                "force_2": self._optional_float(parts[10]) if len(parts) > 10 else None,
+                "force_timestamp_utc_ns": int(parts[11]) if len(parts) > 11 and parts[11] else None,
+                "force_sequence": int(parts[12]) if len(parts) > 12 and parts[12] else None,
+                "force_status": parts[13] if len(parts) > 13 else "disconnected",
             }
         except ValueError:
             return None
@@ -2832,10 +2854,9 @@ class TestRunGui(tk.Tk):
             "pressure_count": 0,
             "regulator_pressure_sum": 0.0,
             "regulator_pressure_count": 0,
-            "force_sum": 0.0,
-            "force_count": 0,
             "force_threshold_started": False,
             "force_threshold_done": False,
+            "force_accumulator": UniqueForceAccumulator(self.force_impulse_threshold),
             "max_flow": None,
             "flow_sample_count": 0,
             "last_flow_time_ms": None,
@@ -2862,15 +2883,12 @@ class TestRunGui(tk.Tk):
                 self.current_impulse["regulator_pressure_sum"] += regulator_pressure
                 self.current_impulse["regulator_pressure_count"] += 1
 
-        force = sample["force"]
-        if force is not None and not self.current_impulse["force_threshold_done"]:
-            force_is_over_threshold = abs(force) >= self.force_impulse_threshold
-            if force_is_over_threshold:
-                self.current_impulse["force_threshold_started"] = True
-                self.current_impulse["force_sum"] += force
-                self.current_impulse["force_count"] += 1
-            elif self.current_impulse["force_threshold_started"]:
-                self.current_impulse["force_threshold_done"] = True
+        with self.force_lock:
+            force_sample = self.latest_force_sample
+        accumulator = self.current_impulse["force_accumulator"]
+        accumulator.add(force_sample)
+        self.current_impulse["force_threshold_started"] = accumulator.started
+        self.current_impulse["force_threshold_done"] = accumulator.done
 
     def _add_flow_sample(self, sample):
         flow = sample["flow"]
@@ -2902,8 +2920,11 @@ class TestRunGui(tk.Tk):
             if regulator_pressure_count
             else ""
         )
-        force_count = impulse["force_count"]
-        avg_force = impulse["force_sum"] / force_count if force_count else ""
+        force_accumulator = impulse["force_accumulator"]
+        force_count = force_accumulator.total_count
+        avg_force = force_accumulator.average_total_n
+        avg_force_1 = force_accumulator.average_force_1_n
+        avg_force_2 = force_accumulator.average_force_2_n
         valve_close_time_ms = impulse["valve_close_time_ms"]
         if valve_close_time_ms is None:
             valve_close_time_ms = impulse["capture_end_time_ms"]
@@ -2926,6 +2947,8 @@ class TestRunGui(tk.Tk):
             self._format_csv_number(avg_regulator_pressure),
             self._format_csv_number(avg_pressure),
             self._format_csv_number(avg_force, digits=4),
+            self._format_csv_number(avg_force_1, digits=4),
+            self._format_csv_number(avg_force_2, digits=4),
             self._format_csv_number(impulse["max_flow"]),
             self._format_csv_number(impulse["volume_l"], digits=6),
             *self._nozzle_mask_flags(impulse["valve_mask"]),
@@ -3061,11 +3084,11 @@ class TestRunGui(tk.Tk):
 
         if self.impulse_rows:
             if max_flow is not None:
-                self.impulse_rows[-1][14] = self._format_csv_number(max_flow)
+                self.impulse_rows[-1][16] = self._format_csv_number(max_flow)
             if volume_l is not None:
-                self.impulse_rows[-1][15] = self._format_csv_number(volume_l, digits=6)
+                self.impulse_rows[-1][17] = self._format_csv_number(volume_l, digits=6)
             if flow_sample_count is not None:
-                self.impulse_rows[-1][22] = int(round(flow_sample_count))
+                self.impulse_rows[-1][24] = int(round(flow_sample_count))
 
     def _pulse_field_float(self, parts, field_name):
         if field_name not in parts:
@@ -3120,8 +3143,8 @@ class TestRunGui(tk.Tk):
 
         if self.impulse_rows:
             self.impulse_rows[-1][1] = flip_angle
-            if self.impulse_rows[-1][16] == "":
-                self.impulse_rows[-1][16:20] = self._nozzle_mask_flags(valve_mask)
+            if self.impulse_rows[-1][18] == "":
+                self.impulse_rows[-1][18:22] = self._nozzle_mask_flags(valve_mask)
             return
 
         self.pending_flip_angle = flip_angle
@@ -3268,6 +3291,8 @@ class TestRunGui(tk.Tk):
                 "average actual regulator pressure",
                 "average pressure before valve",
                 "average force reading",
+                "average force 1",
+                "average force 2",
                 "maximum flow",
                 "volume l",
                 "nozzle 1 used",
@@ -3301,6 +3326,11 @@ class TestRunGui(tk.Tk):
                 "flow",
                 "force reading",
                 "raw force reading",
+                "force 1",
+                "force 2",
+                "force timestamp utc ns",
+                "force sequence",
+                "force status",
             ])
             writer.writerows(self._csv_output_row(row) for row in self.rows)
 
@@ -3326,6 +3356,13 @@ class TestRunGui(tk.Tk):
         self.closing = True
         self._disconnect_ethercat()
         self._disconnect_force_sensor()
+        if self.quantumx_monitor_process and self.quantumx_monitor_process.poll() is None:
+            self.quantumx_monitor_process.terminate()
+            try:
+                self.quantumx_monitor_process.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                self.quantumx_monitor_process.kill()
+        self.quantumx_monitor_process = None
         self._disconnect_colibri()
         self._disconnect()
         if self.debug_log_file:

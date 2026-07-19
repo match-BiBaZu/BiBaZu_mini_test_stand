@@ -16,10 +16,11 @@ namespace QuantumXMonitor
         private readonly Label _statusLabel;
         private readonly Label _windowLabel;
         private readonly Button _reconnectButton;
+        private readonly NdjsonForceServer _forceServer;
         private CancellationTokenSource _cancellation;
         private Task _readerTask;
 
-        public MonitorForm()
+        public MonitorForm(bool serverOnly = false)
         {
             Text = "MX440B Kraftanzeige";
             StartPosition = FormStartPosition.CenterScreen;
@@ -97,6 +98,16 @@ namespace QuantumXMonitor
             Controls.Add(footer);
             Controls.Add(heading);
 
+            if (serverOnly)
+            {
+                ShowInTaskbar = false;
+                WindowState = FormWindowState.Minimized;
+                Opacity = 0;
+            }
+
+            _forceServer = new NdjsonForceServer(5500);
+            _forceServer.Start();
+
             Shown += (sender, args) => StartReader();
             FormClosing += OnFormClosing;
         }
@@ -150,7 +161,11 @@ namespace QuantumXMonitor
             _cancellation = new CancellationTokenSource();
             var reader = new QuantumXReader(DeviceIp);
             reader.StatusChanged += status => PostToUi(() => SetStatus(status, StatusColor(status)));
-            reader.SampleReceived += sample => PostToUi(() => DisplaySample(sample));
+            reader.SampleReceived += sample =>
+            {
+                _forceServer.Publish(sample);
+                PostToUi(() => DisplaySample(sample));
+            };
 
             _readerTask = Task.Run(() => reader.Run(_cancellation.Token), _cancellation.Token);
             _readerTask.ContinueWith(task =>
@@ -239,6 +254,7 @@ namespace QuantumXMonitor
 
         private void OnFormClosing(object sender, FormClosingEventArgs eventArgs)
         {
+            _forceServer.Dispose();
             if (_cancellation == null)
             {
                 return;

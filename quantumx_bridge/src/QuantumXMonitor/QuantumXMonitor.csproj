@@ -20,6 +20,10 @@
       <HintPath>$(HbmApiRoot)\Hbm.Api.QuantumX.dll</HintPath>
       <Private>true</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(HbmApiRoot)\Newtonsoft.Json.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
