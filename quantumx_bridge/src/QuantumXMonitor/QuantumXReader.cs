@@ -94,6 +94,8 @@ namespace QuantumXMonitor
                 var average1 = new RollingAverage(AverageWindowSize);
                 var average2 = new RollingAverage(AverageWindowSize);
                 var averageTotal = new RollingAverage(AverageWindowSize);
+                double? measurementTimestampAnchor = null;
+                long utcTimestampAnchorNs = 0;
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -103,6 +105,13 @@ namespace QuantumXMonitor
                     int count2 = signal2.ContinuousMeasurementValues.UpdatedValueCount;
                     int pairedCount = Math.Min(count1, count2);
                     bool overflow = false;
+
+                    if (pairedCount > 0 && !measurementTimestampAnchor.HasValue)
+                    {
+                        measurementTimestampAnchor =
+                            signal1.ContinuousMeasurementValues.Timestamps[pairedCount - 1];
+                        utcTimestampAnchorNs = UtcNowNs();
+                    }
 
                     for (int index = 0; index < pairedCount; index++)
                     {
@@ -118,24 +127,32 @@ namespace QuantumXMonitor
                         average1.Add(force1);
                         average2.Add(force2);
                         averageTotal.Add(force1 + force2);
-                    }
 
-                    if (overflow)
-                    {
-                        OnStatus("Overrange – ungültige Werte werden nicht gemittelt");
-                    }
+                        double measurementTimestamp =
+                            signal1.ContinuousMeasurementValues.Timestamps[index];
+                        long timestampUtcNs = measurementTimestampAnchor.HasValue
+                            ? utcTimestampAnchorNs + (long)Math.Round(
+                                (measurementTimestamp - measurementTimestampAnchor.Value) * 1000000000.0)
+                            : UtcNowNs();
 
-                    if (pairedCount > 0 && averageTotal.Count > 0)
-                    {
+                        // Publish one rolling mean per physical QuantumX sample.
+                        // FillMeasurementValues still transfers data efficiently in blocks,
+                        // while the original timestamps preserve the 2400 Hz time axis.
                         OnSample(new FilteredSample
                         {
                             Force1N = average1.Mean,
                             Force2N = average2.Mean,
                             ForceTotalN = averageTotal.Mean,
+                            TimestampUtcNs = timestampUtcNs,
                             WindowCount = averageTotal.Count,
                             WindowSize = averageTotal.Capacity,
                             SampleRateHz = (double)signal1.SampleRate
                         });
+                    }
+
+                    if (overflow)
+                    {
+                        OnStatus("Overrange – ungültige Werte werden nicht gemittelt");
                     }
 
                     cancellationToken.WaitHandle.WaitOne(20);
@@ -218,6 +235,7 @@ namespace QuantumXMonitor
                         Force1N = average1.Mean,
                         Force2N = average2.Mean,
                         ForceTotalN = averageTotal.Mean,
+                        TimestampUtcNs = UtcNowNs(),
                         WindowCount = averageTotal.Count,
                         WindowSize = averageTotal.Capacity,
                         SampleRateHz = displayedRate
@@ -231,6 +249,11 @@ namespace QuantumXMonitor
                 rateTimer.Restart();
                 cancellationToken.WaitHandle.WaitOne(20);
             }
+        }
+
+        private static long UtcNowNs()
+        {
+            return (DateTime.UtcNow.Ticks - 621355968000000000L) * 100L;
         }
 
         private static void WaitForApiInitialization(CancellationToken cancellationToken)

@@ -160,11 +160,17 @@ namespace QuantumXMonitor
 
             _cancellation = new CancellationTokenSource();
             var reader = new QuantumXReader(DeviceIp);
+            long lastUiUpdateTicks = 0;
             reader.StatusChanged += status => PostToUi(() => SetStatus(status, StatusColor(status)));
             reader.SampleReceived += sample =>
             {
                 _forceServer.Publish(sample);
-                PostToUi(() => DisplaySample(sample));
+                long nowTicks = DateTime.UtcNow.Ticks;
+                if (nowTicks - lastUiUpdateTicks >= TimeSpan.TicksPerSecond / 20)
+                {
+                    lastUiUpdateTicks = nowTicks;
+                    PostToUi(() => DisplaySample(sample));
+                }
             };
 
             _readerTask = Task.Run(() => reader.Run(_cancellation.Token), _cancellation.Token);

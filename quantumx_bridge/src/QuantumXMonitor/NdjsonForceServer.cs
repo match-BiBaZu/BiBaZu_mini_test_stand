@@ -42,7 +42,9 @@ namespace QuantumXMonitor
         public void Publish(FilteredSample sample)
         {
             long sequence = Interlocked.Increment(ref _sequence);
-            long timestampUtcNs = (DateTime.UtcNow.Ticks - 621355968000000000L) * 100L;
+            long timestampUtcNs = sample.TimestampUtcNs > 0
+                ? sample.TimestampUtcNs
+                : (DateTime.UtcNow.Ticks - 621355968000000000L) * 100L;
             string line = JsonConvert.SerializeObject(new
             {
                 schema_version = 1,
