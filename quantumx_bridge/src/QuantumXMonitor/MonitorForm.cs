@@ -198,9 +198,9 @@ namespace QuantumXMonitor
 
         private void DisplaySample(FilteredSample sample)
         {
-            _force1Value.Text = sample.Force1N.ToString("0.000") + " N";
-            _force2Value.Text = sample.Force2N.ToString("0.000") + " N";
-            _totalValue.Text = sample.ForceTotalN.ToString("0.000") + " N";
+            _force1Value.Text = sample.FastForce1N.ToString("0.000") + " N";
+            _force2Value.Text = sample.FastForce2N.ToString("0.000") + " N";
+            _totalValue.Text = sample.FastForceTotalN.ToString("0.000") + " N";
             _windowLabel.Text =
                 "Mittelwertfenster: " + sample.WindowCount + " / " + sample.WindowSize +
                 "   |   Messrate: " + sample.SampleRateHz.ToString("0") + " Hz";

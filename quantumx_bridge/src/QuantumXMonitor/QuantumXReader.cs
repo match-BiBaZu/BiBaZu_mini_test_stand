@@ -17,6 +17,7 @@ namespace QuantumXMonitor
     internal sealed class QuantumXReader
     {
         private const int AverageWindowSize = 100;
+        private const int FastAverageWindowSize = 20;
         private readonly string _ipAddress;
 
         public QuantumXReader(string ipAddress)
@@ -94,6 +95,9 @@ namespace QuantumXMonitor
                 var average1 = new RollingAverage(AverageWindowSize);
                 var average2 = new RollingAverage(AverageWindowSize);
                 var averageTotal = new RollingAverage(AverageWindowSize);
+                var fastAverage1 = new RollingAverage(FastAverageWindowSize);
+                var fastAverage2 = new RollingAverage(FastAverageWindowSize);
+                var fastAverageTotal = new RollingAverage(FastAverageWindowSize);
                 double? measurementTimestampAnchor = null;
                 long utcTimestampAnchorNs = 0;
 
@@ -127,6 +131,9 @@ namespace QuantumXMonitor
                         average1.Add(force1);
                         average2.Add(force2);
                         averageTotal.Add(force1 + force2);
+                        fastAverage1.Add(force1);
+                        fastAverage2.Add(force2);
+                        fastAverageTotal.Add(force1 + force2);
 
                         double measurementTimestamp =
                             signal1.ContinuousMeasurementValues.Timestamps[index];
@@ -143,6 +150,12 @@ namespace QuantumXMonitor
                             Force1N = average1.Mean,
                             Force2N = average2.Mean,
                             ForceTotalN = averageTotal.Mean,
+                            FastForce1N = fastAverage1.Mean,
+                            FastForce2N = fastAverage2.Mean,
+                            FastForceTotalN = fastAverageTotal.Mean,
+                            RawForce1N = force1,
+                            RawForce2N = force2,
+                            RawForceTotalN = force1 + force2,
                             TimestampUtcNs = timestampUtcNs,
                             WindowCount = averageTotal.Count,
                             WindowSize = averageTotal.Capacity,
@@ -206,6 +219,9 @@ namespace QuantumXMonitor
             var average1 = new RollingAverage(AverageWindowSize);
             var average2 = new RollingAverage(AverageWindowSize);
             var averageTotal = new RollingAverage(AverageWindowSize);
+            var fastAverage1 = new RollingAverage(FastAverageWindowSize);
+            var fastAverage2 = new RollingAverage(FastAverageWindowSize);
+            var fastAverageTotal = new RollingAverage(FastAverageWindowSize);
             var rateTimer = Stopwatch.StartNew();
             double displayedRate = 0.0;
 
@@ -221,6 +237,9 @@ namespace QuantumXMonitor
                     average1.Add(value1.Value);
                     average2.Add(value2.Value);
                     averageTotal.Add(value1.Value + value2.Value);
+                    fastAverage1.Add(value1.Value);
+                    fastAverage2.Add(value2.Value);
+                    fastAverageTotal.Add(value1.Value + value2.Value);
 
                     if (rateTimer.Elapsed.TotalSeconds > 0.0)
                     {
@@ -235,6 +254,12 @@ namespace QuantumXMonitor
                         Force1N = average1.Mean,
                         Force2N = average2.Mean,
                         ForceTotalN = averageTotal.Mean,
+                        FastForce1N = fastAverage1.Mean,
+                        FastForce2N = fastAverage2.Mean,
+                        FastForceTotalN = fastAverageTotal.Mean,
+                        RawForce1N = value1.Value,
+                        RawForce2N = value2.Value,
+                        RawForceTotalN = value1.Value + value2.Value,
                         TimestampUtcNs = UtcNowNs(),
                         WindowCount = averageTotal.Count,
                         WindowSize = averageTotal.Capacity,

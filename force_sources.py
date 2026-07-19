@@ -34,6 +34,12 @@ class ForceSample:
     status: str
     channel_1_status: str
     channel_2_status: str
+    force_1_mean_20_n: float | None = None
+    force_2_mean_20_n: float | None = None
+    force_total_mean_20_n: float | None = None
+    force_1_raw_n: float | None = None
+    force_2_raw_n: float | None = None
+    force_total_raw_n: float | None = None
     raw_force: float | None = None
     raw_1_mv_v: float | None = None
     raw_2_mv_v: float | None = None
@@ -126,6 +132,13 @@ def parse_quantumx_message(line: str | bytes) -> ForceSample:
         status=status,
         channel_1_status=channel_1_status,
         channel_2_status=channel_2_status,
+        force_1_mean_20_n=_optional_finite_float(payload, "force_1_mean_20_n"),
+        force_2_mean_20_n=_optional_finite_float(payload, "force_2_mean_20_n"),
+        force_total_mean_20_n=_optional_finite_float(payload, "force_total_mean_20_n"),
+        force_1_raw_n=_optional_finite_float(payload, "force_1_raw_n"),
+        force_2_raw_n=_optional_finite_float(payload, "force_2_raw_n"),
+        force_total_raw_n=_optional_finite_float(payload, "force_total_raw_n"),
+        raw_force=_optional_finite_float(payload, "force_total_raw_n"),
         raw_1_mv_v=_optional_finite_float(payload, "raw_1_mv_v"),
         raw_2_mv_v=_optional_finite_float(payload, "raw_2_mv_v"),
     )
