@@ -1,5 +1,7 @@
 {
+  "force_scaling": 14.3758,
+  "force_impulse_threshold": 0.1,
   "nozzle_offset_mm": 125.41,
-  "test_stand_height_mm": 150.0,
-  "holder_height_mm": 43.53
+  "colibri_max_distance_mm": 75.0,
+  "strain_gauge_holder_thickness_mm": 40.75
 }

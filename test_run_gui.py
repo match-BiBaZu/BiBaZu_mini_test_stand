@@ -43,6 +43,7 @@ COLIBRI_SLAVE_ADDRESS = 0xFF
 COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
+COLIBRI_PLATE_CONTACT_POSITION_MM = 94.7
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
@@ -54,7 +55,6 @@ FORCE_BINARY_BIPOLAR_ZERO = 0x800000
 FORCE_BINARY_POSITIVE_SPAN = 0x7FFFFF
 FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
 FORCE_DEFAULT_SCALING = 14.3758
-FORCE_DEFAULT_AVERAGE_SECONDS = 0.0
 FORCE_DEFAULT_IMPULSE_THRESHOLD = 0.1
 GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
@@ -328,13 +328,9 @@ class TestRunGui(tk.Tk):
         self.latest_force_n = None
         self.latest_force_time = None
         self.force_scaling = self._preset_float("force_scaling", FORCE_DEFAULT_SCALING, -1.0e12, 1.0e12)
-        self.force_average_seconds = self._preset_float(
-            "force_average_seconds", FORCE_DEFAULT_AVERAGE_SECONDS, 0.0, 60.0
-        )
         self.force_impulse_threshold = self._preset_float(
             "force_impulse_threshold", FORCE_DEFAULT_IMPULSE_THRESHOLD, 0.0, 1.0e12
         )
-        self.force_average_samples = deque(maxlen=10000)
         self.force_rate_times = deque(maxlen=2000)
         self.rows = []
         self.impulse_rows = []
@@ -360,7 +356,6 @@ class TestRunGui(tk.Tk):
         self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
-        self.force_average_var = tk.DoubleVar(value=self.force_average_seconds)
         self.force_impulse_threshold_var = tk.DoubleVar(value=self.force_impulse_threshold)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
@@ -395,14 +390,16 @@ class TestRunGui(tk.Tk):
         self.part_csv_status_var = tk.StringVar(value="No part CSV loaded")
         self.use_cap_offsets_var = tk.BooleanVar(value=False)
         self.nozzle_offset_var = tk.DoubleVar(value=self._preset_float("nozzle_offset_mm", 0.0, -2000.0, 2000.0))
-        self.test_stand_height_var = tk.DoubleVar(
-            value=self._preset_float("test_stand_height_mm", 0.0, -2000.0, 2000.0)
-        )
-        self.holder_height_var = tk.DoubleVar(
-            value=self._preset_float("holder_height_mm", 0.0, -2000.0, 2000.0)
+        self.colibri_plate_distance_var = tk.DoubleVar(
+            value=self._preset_float(
+                "colibri_plate_distance_mm",
+                0.0,
+                0.0,
+                COLIBRI_PLATE_CONTACT_POSITION_MM,
+            )
         )
         self.part_y_offset_var = tk.StringVar(value="Y offset: --")
-        self.part_z_offset_var = tk.StringVar(value="Z offset: --")
+        self.part_z_offset_var = tk.StringVar(value="Cap height: --")
         self.part_stepper_position_var = tk.StringVar(value="Stepper target: --")
         self.part_colibri_position_var = tk.StringVar(value="Colibri target: --")
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
@@ -422,8 +419,7 @@ class TestRunGui(tk.Tk):
         for variable in (
             self.use_cap_offsets_var,
             self.nozzle_offset_var,
-            self.test_stand_height_var,
-            self.holder_height_var,
+            self.colibri_plate_distance_var,
         ):
             variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
@@ -462,7 +458,10 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current force settings, nozzle offset, test stand height, and holder height as defaults?",
+            text=(
+                "Save the current force settings, nozzle offset, and target distance "
+                "to the plate as defaults?"
+            ),
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -493,11 +492,9 @@ class TestRunGui(tk.Tk):
         try:
             presets = {
                 "force_scaling": float(self.force_scale_var.get()),
-                "force_average_seconds": float(self.force_average_var.get()),
                 "force_impulse_threshold": float(self.force_impulse_threshold_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
-                "test_stand_height_mm": float(self.test_stand_height_var.get()),
-                "holder_height_mm": float(self.holder_height_var.get()),
+                "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
             }
         except (tk.TclError, ValueError) as exc:
             messagebox.showerror("Preset save failed", f"One of the preset values is not numeric: {exc}")
@@ -973,6 +970,35 @@ class TestRunGui(tk.Tk):
             self.colibri_stop_button,
         ]
 
+        colibri_geometry_controls = ttk.Frame(root)
+        colibri_geometry_controls.pack(fill=tk.X, pady=(6, 0))
+
+        ttk.Label(colibri_geometry_controls, text="Plate contact\nreference").pack(side=tk.LEFT)
+        ttk.Label(
+            colibri_geometry_controls,
+            text=f"{COLIBRI_PLATE_CONTACT_POSITION_MM:.1f} mm",
+        ).pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(colibri_geometry_controls, text="Target distance\nto plate").pack(side=tk.LEFT, padx=(18, 0))
+        self.colibri_plate_distance_spinbox = ttk.Spinbox(
+            colibri_geometry_controls,
+            from_=0.0,
+            to=COLIBRI_PLATE_CONTACT_POSITION_MM,
+            increment=0.1,
+            textvariable=self.colibri_plate_distance_var,
+            width=8,
+        )
+        self.colibri_plate_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(colibri_geometry_controls, text="mm").pack(side=tk.LEFT)
+        self.part_colibri_move_button = ttk.Button(
+            colibri_geometry_controls,
+            text="Move Colibri",
+            command=self._move_colibri_to_part_target,
+            state=tk.DISABLED,
+        )
+        self.part_colibri_move_button.pack(side=tk.LEFT, padx=(12, 0))
+        self.colibri_controls.append(self.part_colibri_move_button)
+
         force_controls = ttk.Frame(root)
         force_controls.pack(fill=tk.X, pady=(10, 0))
 
@@ -1021,24 +1047,6 @@ class TestRunGui(tk.Tk):
         )
         self.force_scale_button.pack(side=tk.LEFT)
 
-        ttk.Label(force_controls, text="Force average").pack(side=tk.LEFT, padx=(8, 0))
-        self.force_average_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=0.0,
-            to=60.0,
-            increment=0.05,
-            textvariable=self.force_average_var,
-            width=7,
-        )
-        self.force_average_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(force_controls, text="s").pack(side=tk.LEFT)
-        self.force_average_button = ttk.Button(
-            force_controls,
-            text="Apply average",
-            command=self._apply_force_average,
-        )
-        self.force_average_button.pack(side=tk.LEFT, padx=(6, 0))
-
         ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT, padx=(8, 0))
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
             force_controls,
@@ -1057,8 +1065,6 @@ class TestRunGui(tk.Tk):
         self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
         ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
-        ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
-        ttk.Label(force_controls, textvariable=self.force_rate_var).pack(side=tk.LEFT, padx=(18, 0))
 
         part_controls = ttk.Frame(root)
         part_controls.pack(fill=tk.X, pady=(10, 0))
@@ -1108,30 +1114,6 @@ class TestRunGui(tk.Tk):
         self.nozzle_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
         ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
 
-        ttk.Label(part_position_controls, text="Test stand height").pack(side=tk.LEFT, padx=(18, 0))
-        self.test_stand_height_spinbox = ttk.Spinbox(
-            part_position_controls,
-            from_=-2000.0,
-            to=2000.0,
-            increment=0.1,
-            textvariable=self.test_stand_height_var,
-            width=8,
-        )
-        self.test_stand_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
-
-        ttk.Label(part_position_controls, text="Holder height").pack(side=tk.LEFT, padx=(18, 0))
-        self.holder_height_spinbox = ttk.Spinbox(
-            part_position_controls,
-            from_=-2000.0,
-            to=2000.0,
-            increment=0.1,
-            textvariable=self.holder_height_var,
-            width=8,
-        )
-        self.holder_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
-
         ttk.Label(part_position_controls, textvariable=self.part_y_offset_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(part_position_controls, textvariable=self.part_z_offset_var).pack(side=tk.LEFT, padx=(12, 0))
         ttk.Label(part_position_controls, textvariable=self.part_stepper_position_var).pack(side=tk.LEFT, padx=(12, 0))
@@ -1154,7 +1136,6 @@ class TestRunGui(tk.Tk):
             "valves_open",
             "flow",
             "force",
-            "raw_force",
         )
         self.table = ttk.Treeview(root, columns=columns, show="headings", height=18)
         headings = {
@@ -1166,7 +1147,6 @@ class TestRunGui(tk.Tk):
             "valves_open": "Valves open",
             "flow": "Flow",
             "force": "Force reading",
-            "raw_force": "Raw force reading",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
@@ -1889,7 +1869,6 @@ class TestRunGui(tk.Tk):
             self.latest_force_raw_n = None
             self.latest_force_n = None
             self.latest_force_time = None
-            self.force_average_samples.clear()
             self.force_rate_times.clear()
         self.force_connect_button.configure(text="Connect")
         self.force_port_combo.configure(state="readonly")
@@ -1902,7 +1881,7 @@ class TestRunGui(tk.Tk):
     def _force_status(self, prefix):
         return (
             f"{prefix} | binary 5-byte mode, scale {self.force_scaling:.6g} x{FORCE_BINARY_FULL_SCALE_FACTOR:.3g}, "
-            f"avg {self.force_average_seconds:.3g} s, impulse threshold {self.force_impulse_threshold:.4g}"
+            f"impulse threshold {self.force_impulse_threshold:.4g}"
         )
 
     def _format_force_value(self, force_value):
@@ -1921,7 +1900,6 @@ class TestRunGui(tk.Tk):
 
         with self.force_lock:
             self.force_scaling = force_scaling
-            self.force_average_samples.clear()
             if self.latest_force_raw_n is not None:
                 signed_fraction = (self.latest_force_raw_n - FORCE_BINARY_BIPOLAR_ZERO) / FORCE_BINARY_POSITIVE_SPAN
                 self.latest_force_n = signed_fraction * self.force_scaling * FORCE_BINARY_FULL_SCALE_FACTOR
@@ -1933,27 +1911,6 @@ class TestRunGui(tk.Tk):
         self.force_status_var.set(self._force_status("Force sensor: scaling applied"))
         self.status_var.set(f"Force scaling set to {force_scaling:.6g}")
         self._write_debug_log(f"FORCE scaling={force_scaling:.12g}")
-
-    def _apply_force_average(self):
-        try:
-            average_seconds = float(self.force_average_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Invalid force average", "Enter a numeric force average window in seconds.")
-            return
-
-        if average_seconds < 0.0:
-            messagebox.showerror("Invalid force average", "Force average window must be zero or greater.")
-            return
-
-        with self.force_lock:
-            self.force_average_seconds = average_seconds
-            self.force_average_samples.clear()
-            latest_force = self.latest_force_n
-
-        self.force_value_var.set(self._format_force_value(latest_force))
-        self.force_status_var.set(self._force_status("Force sensor: average applied"))
-        self.status_var.set(f"Force average window set to {average_seconds:.3g} s")
-        self._write_debug_log(f"FORCE average_seconds={average_seconds:.12g}")
 
     def _apply_force_impulse_threshold(self):
         try:
@@ -2017,7 +1974,7 @@ class TestRunGui(tk.Tk):
     def _store_force_value(self, force_reading, raw_reading=None):
         now = time.time()
         with self.force_lock:
-            force_n = self._filtered_force_value_locked(now, force_reading)
+            force_n = force_reading
             self.latest_force_raw_n = force_reading if raw_reading is None else raw_reading
             self.latest_force_n = force_n
             self.latest_force_time = now
@@ -2025,19 +1982,6 @@ class TestRunGui(tk.Tk):
             while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
                 self.force_rate_times.popleft()
             return force_n, self._force_rate_hz_locked()
-
-    def _filtered_force_value_locked(self, now, force_reading):
-        self.force_average_samples.append((now, force_reading))
-        if self.force_average_seconds <= 0.0:
-            return force_reading
-
-        cutoff = now - self.force_average_seconds
-        while self.force_average_samples and self.force_average_samples[0][0] < cutoff:
-            self.force_average_samples.popleft()
-        if not self.force_average_samples:
-            return force_reading
-
-        return sum(value for _, value in self.force_average_samples) / len(self.force_average_samples)
 
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
@@ -2268,7 +2212,7 @@ class TestRunGui(tk.Tk):
         def worker():
             try:
                 snapshot = task()
-            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
+            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError, RuntimeError) as exc:
                 self._write_debug_log(f"COLIBRI TASK error {label}: {exc}")
                 self.messages.put(("colibri_error", f"{label} failed: {exc}"))
             else:
@@ -2519,15 +2463,18 @@ class TestRunGui(tk.Tk):
     def _part_position_values(self):
         offsets = self._selected_part_offsets()
         nozzle_offset = self._part_float_value(self.nozzle_offset_var)
-        test_stand_height = self._part_float_value(self.test_stand_height_var)
-        holder_height = self._part_float_value(self.holder_height_var)
-        if offsets is None or nozzle_offset is None or test_stand_height is None or holder_height is None:
+        plate_distance = self._part_float_value(self.colibri_plate_distance_var)
+        if (
+            offsets is None
+            or nozzle_offset is None
+            or plate_distance is None
+        ):
             return None
 
-        y_offset, z_offset = offsets
+        y_offset, cap_height = offsets
         stepper_position = nozzle_offset + y_offset
-        colibri_position = test_stand_height - holder_height + z_offset
-        return y_offset, z_offset, stepper_position, colibri_position
+        colibri_position = COLIBRI_PLATE_CONTACT_POSITION_MM - cap_height - plate_distance
+        return y_offset, cap_height, stepper_position, colibri_position
 
     def _current_pose_hole_for_csv(self):
         pose = self.part_pose_var.get().strip()
@@ -2544,15 +2491,17 @@ class TestRunGui(tk.Tk):
         if self.motor_enabled_var.get() and self.last_motor_position_mm is not None and nozzle_offset is not None:
             stepper_y_offset = self.last_motor_position_mm - nozzle_offset
 
-        test_stand_height = self._part_float_value(self.test_stand_height_var)
-        holder_height = self._part_float_value(self.holder_height_var)
+        plate_distance = self._part_float_value(self.colibri_plate_distance_var)
         if (
             self.colibri_enabled_var.get()
             and self.last_colibri_position_mm is not None
-            and test_stand_height is not None
-            and holder_height is not None
+            and plate_distance is not None
         ):
-            colibri_z_offset = self.last_colibri_position_mm - test_stand_height + holder_height
+            colibri_z_offset = (
+                COLIBRI_PLATE_CONTACT_POSITION_MM
+                - plate_distance
+                - self.last_colibri_position_mm
+            )
 
         return stepper_y_offset, colibri_z_offset
 
@@ -2560,14 +2509,14 @@ class TestRunGui(tk.Tk):
         values = self._part_position_values()
         if values is None:
             self.part_y_offset_var.set("Y offset: --")
-            self.part_z_offset_var.set("Z offset: --")
+            self.part_z_offset_var.set("Cap height: --")
             self.part_stepper_position_var.set("Stepper target: --")
             self.part_colibri_position_var.set("Colibri target: --")
             return
 
-        y_offset, z_offset, stepper_position, colibri_position = values
+        y_offset, cap_height, stepper_position, colibri_position = values
         self.part_y_offset_var.set(f"Y offset: {y_offset:.3f} mm")
-        self.part_z_offset_var.set(f"Z offset: {z_offset:.3f} mm")
+        self.part_z_offset_var.set(f"Cap height: {cap_height:.3f} mm")
         self.part_stepper_position_var.set(f"Stepper target: {stepper_position:.3f} mm")
         self.part_colibri_position_var.set(f"Colibri target: {colibri_position:.3f} mm")
 
@@ -2583,6 +2532,24 @@ class TestRunGui(tk.Tk):
         self.status_var.set(
             f"Part targets set: stepper {stepper_position:.3f} mm, Colibri {colibri_position:.3f} mm"
         )
+
+    def _move_colibri_to_part_target(self):
+        values = self._part_position_values()
+        if values is None:
+            messagebox.showerror("No part target", "Load a part CSV and select a pose/hole first.")
+            return
+
+        _y_offset, _cap_height, _stepper_position, colibri_position = values
+        if not 0.0 <= colibri_position <= COLIBRI_TRAVEL_MM:
+            messagebox.showerror(
+                "Colibri target outside travel",
+                f"The calculated target is {colibri_position:.3f} mm. "
+                f"It must be between 0 and {COLIBRI_TRAVEL_MM:.1f} mm.",
+            )
+            return
+
+        self.colibri_absolute_var.set(round(colibri_position, 3))
+        self._colibri_move_absolute()
 
     def _mm_to_steps(self, distance_mm):
         return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
@@ -2758,7 +2725,7 @@ class TestRunGui(tk.Tk):
         parts.extend(self._force_value_for_live_row())
         self._update_impulse_capture(parts)
         self.rows.append(parts)
-        self.table.insert("", tk.END, values=parts)
+        self.table.insert("", tk.END, values=parts[: len(self.table["columns"])])
         children = self.table.get_children()
         if len(children) > 250:
             self.table.delete(children[0])
@@ -2867,6 +2834,8 @@ class TestRunGui(tk.Tk):
             "regulator_pressure_count": 0,
             "force_sum": 0.0,
             "force_count": 0,
+            "force_threshold_started": False,
+            "force_threshold_done": False,
             "max_flow": None,
             "flow_sample_count": 0,
             "last_flow_time_ms": None,
@@ -2894,9 +2863,14 @@ class TestRunGui(tk.Tk):
                 self.current_impulse["regulator_pressure_count"] += 1
 
         force = sample["force"]
-        if force is not None and abs(force) >= self.force_impulse_threshold:
-            self.current_impulse["force_sum"] += force
-            self.current_impulse["force_count"] += 1
+        if force is not None and not self.current_impulse["force_threshold_done"]:
+            force_is_over_threshold = abs(force) >= self.force_impulse_threshold
+            if force_is_over_threshold:
+                self.current_impulse["force_threshold_started"] = True
+                self.current_impulse["force_sum"] += force
+                self.current_impulse["force_count"] += 1
+            elif self.current_impulse["force_threshold_started"]:
+                self.current_impulse["force_threshold_done"] = True
 
     def _add_flow_sample(self, sample):
         flow = sample["flow"]

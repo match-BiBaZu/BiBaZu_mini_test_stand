@@ -1,0 +1,2853 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<QuantumX api_version="4.15.1.238" application="QuantumX Assistant V4.15.1.355" os_version="Microsoft Windows NT 6.2.9200.0" os_platform="Win32NT">
+  <Device uuid="0009E5006EE2" name="MX440B">
+    <Amplifier>
+      <Communication>
+        <Network>
+          <Routing>
+            <Supported>0</Supported>
+            <Enabled>0</Enabled>
+          </Routing>
+          <eth0>
+            <Config>2</Config>
+            <IpAdr>192.168.10.20</IpAdr>
+            <SubMask>255.255.0.0</SubMask>
+            <Description>ethernet backplane side</Description>
+          </eth0>
+          <GateWay>0.0.0.0</GateWay>
+          <TcpPort>5001</TcpPort>
+        </Network>
+      </Communication>
+      <System>
+        <ModuleName>MX440B</ModuleName>
+        <ModuleLabel>MX440B</ModuleLabel>
+        <ModuleFamily>MX440A</ModuleFamily>
+        <ModuleType>MX440A</ModuleType>
+        <Extension>B</Extension>
+        <Selection>
+        </Selection>
+        <Revision>3D</Revision>
+        <SpecialVersion>
+        </SpecialVersion>
+        <SpecialFw>
+        </SpecialFw>
+        <Housing>IP20</Housing>
+        <ModuleID>0</ModuleID>
+        <SyncStatus>SINGLE</SyncStatus>
+        <TimeSource choice="Auto">
+          <Auto>
+          </Auto>
+        </TimeSource>
+        <DataRateDomain>
+          <Request>0</Request>
+          <CurrentState>0</CurrentState>
+        </DataRateDomain>
+        <Platform>
+          <SerialNumber>42496716514</SerialNumber>
+          <!-- 0009E5006EE2 -->
+          <FirmwareVersion>4.2.10.0</FirmwareVersion>
+          <FirmwareRepository>
+          </FirmwareRepository>
+          <FirmwareCommitId>
+          </FirmwareCommitId>
+          <FirmwareCommitDate>
+          </FirmwareCommitDate>
+          <FirmwareCommitState>
+          </FirmwareCommitState>
+          <FPGAVersion>10</FPGAVersion>
+          <BootloaderVersion>
+          </BootloaderVersion>
+          <HardwareRevision>2.20</HardwareRevision>
+          <HardwareIdentification>801226947002</HardwareIdentification>
+          <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+          <CtrlLoaderDate>Jan 24 2014 10:33:06</CtrlLoaderDate>
+          <CtrlApplVersion>03.00</CtrlApplVersion>
+          <CtrlApplDate>Jan 24 2014 10:25:22</CtrlApplDate>
+        </Platform>
+        <AnalogIn address="1">
+          <SerialNumber>CNT</SerialNumber>
+          <HardwareRevision>3.00</HardwareRevision>
+          <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+          <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+          <CtrlApplVersion>04.00</CtrlApplVersion>
+          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        </AnalogIn>
+        <AnalogIn address="2">
+          <SerialNumber>CNT</SerialNumber>
+          <HardwareRevision>3.00</HardwareRevision>
+          <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+          <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+          <CtrlApplVersion>04.00</CtrlApplVersion>
+          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        </AnalogIn>
+        <AnalogIn address="3">
+          <SerialNumber>CNT</SerialNumber>
+          <HardwareRevision>3.00</HardwareRevision>
+          <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+          <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+          <CtrlApplVersion>04.00</CtrlApplVersion>
+          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        </AnalogIn>
+        <AnalogIn address="4">
+          <SerialNumber>CNT</SerialNumber>
+          <HardwareRevision>3.00</HardwareRevision>
+          <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+          <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+          <CtrlApplVersion>04.00</CtrlApplVersion>
+          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        </AnalogIn>
+      </System>
+      <Connector1>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <ChannelName>Messung an Klemmen</ChannelName>
+            <OriginOfName>1</OriginOfName>
+            <SpeedMode>0</SpeedMode>
+            <OutputUnit>
+              <UnitId>1900</UnitId>
+              <!-- N -->
+              <UserText>N</UserText>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+            </OutputUnit>
+            <Sensor>
+              <Identification>
+                <SensorName>KD24s_25200802_DIAG</SensorName>
+                <SensorId>462216777854775</SensorId>
+                <UserDefId>
+                </UserDefId>
+                <ManuName>ME-Meßsysteme</ManuName>
+                <SerialNumber>25200802</SerialNumber>
+                <TypeName>KD24s 2 N</TypeName>
+                <Location>
+                </Location>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <_EX_Identification_Comment>
+                </_EX_Identification_Comment>
+                <_EX_Identification_Description>
+                </_EX_Identification_Description>
+              </Identification>
+              <TedsOptions>
+                <UseTeds>0</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>12.5</MaxElectrical>
+                  <ExciteAmpl>1</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <Impedance>350</Impedance>
+                  <Wiring>6</Wiring>
+                  <BridgeType>4</BridgeType>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0</ElecZero>
+                    <ElecSpan>0.48455</ElecSpan>
+                    <PhysSpan>2</PhysSpan>
+                  </ZeroSpan>
+                </Scalingtype>
+              </Scaling>
+              <Supply>0</Supply>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1900</PhysUnit>
+              <!-- N -->
+              <PhysUnitUsr>N</PhysUnitUsr>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>Messung an Klemmen</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>200</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>2400</OutputRate>
+              <Output>
+                <Description>analog input: connector 1, signal 1</Description>
+                <SignalReference>AnalogIn_Connector1.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>1</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>1200</OutputRate>
+              <Output>
+                <Description>analog input: connector 1, signal 2</Description>
+                <SignalReference>AnalogIn_Connector1.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <ZeroOffset>
+              <Offset>9.296161</Offset>
+              <Target>0</Target>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector1>
+      <Connector2>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <ChannelName>Kraft_KD24s_26202259</ChannelName>
+            <OriginOfName>1</OriginOfName>
+            <SpeedMode>0</SpeedMode>
+            <OutputUnit>
+              <UnitId>1900</UnitId>
+              <!-- N -->
+              <UserText>N</UserText>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+            </OutputUnit>
+            <Sensor>
+              <Identification>
+                <SensorName>KD24s_26202259</SensorName>
+                <SensorId>462216332577205</SensorId>
+                <UserDefId>
+                </UserDefId>
+                <ManuName>ME-Meßsysteme</ManuName>
+                <SerialNumber>26202259</SerialNumber>
+                <TypeName>KD24s 2 N</TypeName>
+                <Location>MX440B_K2</Location>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <_EX_Identification_Comment>
+                </_EX_Identification_Comment>
+                <_EX_Identification_Description>
+                </_EX_Identification_Description>
+              </Identification>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5</MaxElectrical>
+                  <ExciteAmpl>2.5</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <Impedance>350</Impedance>
+                  <Wiring>6</Wiring>
+                  <BridgeType>4</BridgeType>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0</ElecZero>
+                    <ElecSpan>0.95666</ElecSpan>
+                    <PhysSpan>2</PhysSpan>
+                  </ZeroSpan>
+                </Scalingtype>
+              </Scaling>
+              <Supply>0</Supply>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1900</PhysUnit>
+              <!-- N -->
+              <PhysUnitUsr>N</PhysUnitUsr>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>Kraft_KD24s_26202259</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>200</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>2400</OutputRate>
+              <Output>
+                <Description>analog input: connector 2, signal 1</Description>
+                <SignalReference>AnalogIn_Connector2.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>U93 10kN</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>1200</OutputRate>
+              <Output>
+                <Description>analog input: connector 2, signal 2</Description>
+                <SignalReference>AnalogIn_Connector2.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <ZeroOffset>
+              <Offset>0.07511056</Offset>
+              <Target>0</Target>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Periodic">
+                <Periodic>
+                  <Waveform>0</Waveform>
+                  <Amplitude choice="Level">
+                    <Level>
+                      <LowLevel>0</LowLevel>
+                      <HighLevel>4</HighLevel>
+                    </Level>
+                  </Amplitude>
+                  <Frequency>2</Frequency>
+                  <DutyCycle>50</DutyCycle>
+                </Periodic>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector2>
+      <Connector3>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <ChannelName>
+            </ChannelName>
+            <OriginOfName>0</OriginOfName>
+            <SpeedMode>0</SpeedMode>
+            <OutputUnit>
+              <UnitId>1901</UnitId>
+              <!-- kN -->
+              <UserText>kN</UserText>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+            </OutputUnit>
+            <Sensor>
+              <Identification>
+                <SensorName>
+                </SensorName>
+                <SensorId>
+                </SensorId>
+                <UserDefId>
+                </UserDefId>
+                <ManuName>
+                </ManuName>
+                <SerialNumber>
+                </SerialNumber>
+                <TypeName>
+                </TypeName>
+                <Location>
+                </Location>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <_EX_Identification_Comment>
+                </_EX_Identification_Comment>
+                <_EX_Identification_Description>
+                </_EX_Identification_Description>
+              </Identification>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5</MaxElectrical>
+                  <ExciteAmpl>2.5</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <Impedance>350</Impedance>
+                  <Wiring>6</Wiring>
+                  <BridgeType>4</BridgeType>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="LinTable">
+                  <LinTable>
+                    <Count>2</Count>
+                    <Point address="1">
+                      <X>0</X>
+                      <Y>0</Y>
+                    </Point>
+                    <Point address="2">
+                      <X>1</X>
+                      <Y>10</Y>
+                    </Point>
+                  </LinTable>
+                </Scalingtype>
+              </Scaling>
+              <Supply>0</Supply>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1901</PhysUnit>
+              <!-- kN -->
+              <PhysUnitUsr>kN</PhysUnitUsr>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>20</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>200</OutputRate>
+              <Output>
+                <Description>analog input: connector 3, signal 1</Description>
+                <SignalReference>AnalogIn_Connector3.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>1</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>1200</OutputRate>
+              <Output>
+                <Description>analog input: connector 3, signal 2</Description>
+                <SignalReference>AnalogIn_Connector3.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <ZeroOffset>
+              <Offset>0</Offset>
+              <Target>0</Target>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector3>
+      <Connector4>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <ChannelName>
+            </ChannelName>
+            <OriginOfName>0</OriginOfName>
+            <SpeedMode>0</SpeedMode>
+            <OutputUnit>
+              <UnitId>1901</UnitId>
+              <!-- kN -->
+              <UserText>kN</UserText>
+              <Factor>1</Factor>
+              <Offset>0</Offset>
+            </OutputUnit>
+            <Sensor>
+              <Identification>
+                <SensorName>
+                </SensorName>
+                <SensorId>
+                </SensorId>
+                <UserDefId>
+                </UserDefId>
+                <ManuName>
+                </ManuName>
+                <SerialNumber>
+                </SerialNumber>
+                <TypeName>
+                </TypeName>
+                <Location>
+                </Location>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <_EX_Identification_Comment>
+                </_EX_Identification_Comment>
+                <_EX_Identification_Description>
+                </_EX_Identification_Description>
+              </Identification>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5</MaxElectrical>
+                  <ExciteAmpl>2.5</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <Impedance>350</Impedance>
+                  <Wiring>6</Wiring>
+                  <BridgeType>4</BridgeType>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="LinTable">
+                  <LinTable>
+                    <Count>2</Count>
+                    <Point address="1">
+                      <X>0</X>
+                      <Y>0</Y>
+                    </Point>
+                    <Point address="2">
+                      <X>1</X>
+                      <Y>10</Y>
+                    </Point>
+                  </LinTable>
+                </Scalingtype>
+              </Scaling>
+              <Supply>0</Supply>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1901</PhysUnit>
+              <!-- kN -->
+              <PhysUnitUsr>kN</PhysUnitUsr>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>20</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>200</OutputRate>
+              <Output>
+                <Description>analog input: connector 4, signal 1</Description>
+                <SignalReference>AnalogIn_Connector4.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <OutputRate>1200</OutputRate>
+              <Output>
+                <Description>analog input: connector 4, signal 2</Description>
+                <SignalReference>AnalogIn_Connector4.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+            </SyncSignal>
+            <ZeroOffset>
+              <Offset>0</Offset>
+              <Target>0</Target>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector4>
+      <AdditionalConnectors>
+      </AdditionalConnectors>
+    </Amplifier>
+  </Device>
+  <!--For diagnostics only-->
+  <RawDevice uuid="0009E5006EE2" name="MX440B">
+    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <System>
+      <ModuleName>MX440B</ModuleName>
+      <ModuleLabel>MX440B</ModuleLabel>
+      <ModuleFamily>MX440A</ModuleFamily>
+      <ModuleType>MX440A</ModuleType>
+      <Extension>B</Extension>
+      <Selection>
+      </Selection>
+      <Revision>3D</Revision>
+      <SpecialVersion>
+      </SpecialVersion>
+      <SpecialFw>
+      </SpecialFw>
+      <Housing>IP20</Housing>
+      <FeatureAttr>10000000</FeatureAttr>
+      <ModuleID>0</ModuleID>
+      <SyncStatus>SINGLE</SyncStatus>
+      <LicenceKey>
+      </LicenceKey>
+      <TimeSource choice="Auto">
+        <Auto />
+      </TimeSource>
+      <DataRateDomain>
+        <Request>0</Request>
+        <CurrentState>0</CurrentState>
+      </DataRateDomain>
+      <Platform>
+        <SerialNumber>42496716514</SerialNumber>
+        <SerialNo>0009E5006EE2</SerialNo>
+        <FirmwareVersion>4.2.10.0</FirmwareVersion>
+        <FPGAVersion>10</FPGAVersion>
+        <HardwareRevision>2.20</HardwareRevision>
+        <HardwareIdentification>801226947002</HardwareIdentification>
+        <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+        <CtrlLoaderDate>Jan 24 2014 10:33:06</CtrlLoaderDate>
+        <CtrlApplVersion>03.00</CtrlApplVersion>
+        <CtrlApplDate>Jan 24 2014 10:25:22</CtrlApplDate>
+      </Platform>
+      <AnalogIn address="1">
+        <SerialNumber>CNT</SerialNumber>
+        <HardwareRevision>3.00</HardwareRevision>
+        <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+        <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+        <CtrlApplVersion>04.00</CtrlApplVersion>
+        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+      </AnalogIn>
+      <AnalogIn address="2">
+        <SerialNumber>CNT</SerialNumber>
+        <HardwareRevision>3.00</HardwareRevision>
+        <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+        <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+        <CtrlApplVersion>04.00</CtrlApplVersion>
+        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+      </AnalogIn>
+      <AnalogIn address="3">
+        <SerialNumber>CNT</SerialNumber>
+        <HardwareRevision>3.00</HardwareRevision>
+        <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+        <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+        <CtrlApplVersion>04.00</CtrlApplVersion>
+        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+      </AnalogIn>
+      <AnalogIn address="4">
+        <SerialNumber>CNT</SerialNumber>
+        <HardwareRevision>3.00</HardwareRevision>
+        <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
+        <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
+        <CtrlApplVersion>04.00</CtrlApplVersion>
+        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+      </AnalogIn>
+      <LogFiles>
+        <ComLog>
+          <Status>0</Status>
+          <FileName>
+          </FileName>
+          <Format>0</Format>
+          <WrapMode>0</WrapMode>
+          <MaxFileSize>0</MaxFileSize>
+          <StatusLogServer>0</StatusLogServer>
+          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
+          <Services>0</Services>
+          <SrvDataInXml>0</SrvDataInXml>
+          <SrvDataOutXml>0</SrvDataOutXml>
+          <SrvDataInMval>0</SrvDataInMval>
+          <SrvDataOutMval>0</SrvDataOutMval>
+          <RespTrans>0</RespTrans>
+          <ReqTrans>0</ReqTrans>
+          <AdrRes>0</AdrRes>
+          <ConnIn>0</ConnIn>
+          <ConnOut>0</ConnOut>
+          <LowLvlIn>0</LowLvlIn>
+          <LowLvlOut>0</LowLvlOut>
+          <IpSock>0</IpSock>
+        </ComLog>
+        <ErrLog>
+          <Status>0</Status>
+          <FileName>
+          </FileName>
+          <Format>0</Format>
+          <WrapMode>0</WrapMode>
+          <MaxFileSize>0</MaxFileSize>
+          <StatusLogServer>0</StatusLogServer>
+          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
+          <Debug>0</Debug>
+          <Communication>0</Communication>
+          <Services>0</Services>
+          <Methods>0</Methods>
+          <Hal>0</Hal>
+          <Daq>0</Daq>
+          <Param>0</Param>
+          <TEDs>0</TEDs>
+          <Fieldbus>0</Fieldbus>
+        </ErrLog>
+        <DbgLog>
+          <StatusLogServer>0</StatusLogServer>
+          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
+          <Status>0</Status>
+          <FileName>
+          </FileName>
+          <Format>0</Format>
+          <WrapMode>0</WrapMode>
+          <MaxFileSize>0</MaxFileSize>
+          <MessageQueue>0</MessageQueue>
+          <Daq>0</Daq>
+          <Param>0</Param>
+          <TEDs>0</TEDs>
+          <Hal>0</Hal>
+          <Msp>0</Msp>
+          <SystemLog>0</SystemLog>
+          <Threads>0</Threads>
+          <Timesync>0</Timesync>
+          <Thermo>0</Thermo>
+          <AutoAdjust>0</AutoAdjust>
+          <Fieldbus>0</Fieldbus>
+          <Simulation>0</Simulation>
+        </DbgLog>
+      </LogFiles>
+    </System>
+    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <Communication>
+      <Network>
+        <GateWay>0.0.0.0</GateWay>
+        <TcpPort>5001</TcpPort>
+        <eth0>
+          <Config>2</Config>
+          <IpAdr>192.168.10.20</IpAdr>
+          <SubMask>255.255.0.0</SubMask>
+          <Description>ethernet backplane side</Description>
+        </eth0>
+      </Network>
+    </Communication>
+    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <Amplifier>
+      <Connector1>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <Sensor>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>12.500000</MaxElectrical>
+                  <ExciteAmpl>1.000000</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <BridgeType>4</BridgeType>
+                  <Wiring>6</Wiring>
+                  <Impedance>350.000000</Impedance>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0.000000</ElecZero>
+                    <ElecSpan>0.484550</ElecSpan>
+                    <PhysSpan>2.000000</PhysSpan>
+                  </ZeroSpan>
+                </Scalingtype>
+              </Scaling>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1900</PhysUnit>
+              <PhysUnitUsr>N</PhysUnitUsr>
+              <Supply>0.000000</Supply>
+              <TedsOptions>
+                <UseTeds>0</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Identification>
+                <SensorId>462216777854775</SensorId>
+                <SensorName>KD24s_25200802_DIAG</SensorName>
+                <ManuName>ME-Meßsysteme</ManuName>
+                <SerialNumber>25200802</SerialNumber>
+                <TypeName>KD24s 2 N</TypeName>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <Location>
+                </Location>
+                <UserDefId>
+                </UserDefId>
+              </Identification>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>Messung an Klemmen</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>2400.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>200.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 1, signal 1</Description>
+                <SignalReference>AnalogIn_Connector1.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>1</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <OutputRate>1200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 1, signal 2</Description>
+                <SignalReference>AnalogIn_Connector1.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <ChannelName>Messung an Klemmen</ChannelName>
+            <OriginOfName>1</OriginOfName>
+            <ZeroOffset>
+              <Target>0.000000</Target>
+              <Offset>9.296161</Offset>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <OutputUnit>
+              <UnitId>1900</UnitId>
+              <UserText>N</UserText>
+              <Factor>1.000000</Factor>
+              <Offset>0.000000</Offset>
+            </OutputUnit>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0.000000</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector1>
+      <Connector2>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <Sensor>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5.000000</MaxElectrical>
+                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <BridgeType>4</BridgeType>
+                  <Wiring>6</Wiring>
+                  <Impedance>350.000000</Impedance>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0.000000</ElecZero>
+                    <ElecSpan>0.956660</ElecSpan>
+                    <PhysSpan>2.000000</PhysSpan>
+                  </ZeroSpan>
+                </Scalingtype>
+              </Scaling>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1900</PhysUnit>
+              <PhysUnitUsr>N</PhysUnitUsr>
+              <Supply>0.000000</Supply>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Identification>
+                <SensorId>462216332577205</SensorId>
+                <SensorName>KD24s_26202259</SensorName>
+                <ManuName>ME-Meßsysteme</ManuName>
+                <SerialNumber>26202259</SerialNumber>
+                <TypeName>KD24s 2 N</TypeName>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <Location>MX440B_K2</Location>
+                <UserDefId>
+                </UserDefId>
+              </Identification>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>Kraft_KD24s_26202259</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>2400.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>200.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 2, signal 1</Description>
+                <SignalReference>AnalogIn_Connector2.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>U93 10kN</SignalName>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>1200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 2, signal 2</Description>
+                <SignalReference>AnalogIn_Connector2.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <ChannelName>Kraft_KD24s_26202259</ChannelName>
+            <OriginOfName>1</OriginOfName>
+            <ZeroOffset>
+              <Target>0.000000</Target>
+              <Offset>7.511056e-02</Offset>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <OutputUnit>
+              <UnitId>1900</UnitId>
+              <UserText>N</UserText>
+              <Factor>1.000000</Factor>
+              <Offset>0.000000</Offset>
+            </OutputUnit>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Periodic">
+                <Periodic>
+                  <Waveform>0</Waveform>
+                  <Amplitude choice="Level">
+                    <Level>
+                      <LowLevel>0.000000</LowLevel>
+                      <HighLevel>4.000000</HighLevel>
+                    </Level>
+                  </Amplitude>
+                  <Frequency>2.000000</Frequency>
+                  <DutyCycle>50.000000</DutyCycle>
+                </Periodic>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector2>
+      <Connector3>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <Sensor>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5.000000</MaxElectrical>
+                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <BridgeType>4</BridgeType>
+                  <Wiring>6</Wiring>
+                  <Impedance>350.000000</Impedance>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="LinTable">
+                  <LinTable>
+                    <Count>2</Count>
+                    <Point address="1">
+                      <X>0.000000</X>
+                      <Y>0.000000</Y>
+                    </Point>
+                    <Point address="2">
+                      <X>1.000000</X>
+                      <Y>10.000000</Y>
+                    </Point>
+                  </LinTable>
+                </Scalingtype>
+              </Scaling>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1901</PhysUnit>
+              <PhysUnitUsr>kN</PhysUnitUsr>
+              <Supply>0.000000</Supply>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Identification>
+                <SensorId>
+                </SensorId>
+                <SensorName>
+                </SensorName>
+                <ManuName>
+                </ManuName>
+                <SerialNumber>
+                </SerialNumber>
+                <TypeName>
+                </TypeName>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <Location>
+                </Location>
+                <UserDefId>
+                </UserDefId>
+              </Identification>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <OutputRate>200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>20.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 3, signal 1</Description>
+                <SignalReference>AnalogIn_Connector3.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>1</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <OutputRate>1200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 3, signal 2</Description>
+                <SignalReference>AnalogIn_Connector3.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <ChannelName>
+            </ChannelName>
+            <OriginOfName>0</OriginOfName>
+            <ZeroOffset>
+              <Target>0.000000</Target>
+              <Offset>0.000000</Offset>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <OutputUnit>
+              <UnitId>1901</UnitId>
+              <UserText>kN</UserText>
+              <Factor>1.000000</Factor>
+              <Offset>0.000000</Offset>
+            </OutputUnit>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0.000000</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector3>
+      <Connector4>
+        <Mode choice="AnalogInChannel">
+          <AnalogInChannel>
+            <Sensor>
+              <Sensortype choice="Bridge">
+                <Bridge>
+                  <MaxElectrical>5.000000</MaxElectrical>
+                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <ExciteFreq>5</ExciteFreq>
+                  <BridgeType>4</BridgeType>
+                  <Wiring>6</Wiring>
+                  <Impedance>350.000000</Impedance>
+                  <DriftCompensation>
+                    <Request choice="Default">
+                      <Default />
+                    </Request>
+                    <CurrentState choice="AutoAdjust">
+                      <AutoAdjust>
+                        <RepetitionTime>30</RepetitionTime>
+                      </AutoAdjust>
+                    </CurrentState>
+                  </DriftCompensation>
+                </Bridge>
+              </Sensortype>
+              <Scaling>
+                <Scalingtype choice="LinTable">
+                  <LinTable>
+                    <Count>2</Count>
+                    <Point address="1">
+                      <X>0.000000</X>
+                      <Y>0.000000</Y>
+                    </Point>
+                    <Point address="2">
+                      <X>1.000000</X>
+                      <Y>10.000000</Y>
+                    </Point>
+                  </LinTable>
+                </Scalingtype>
+              </Scaling>
+              <ElectricalUnit>
+                <UnitId>1001</UnitId>
+                <UnitText>mV/V</UnitText>
+              </ElectricalUnit>
+              <PhysUnit>1901</PhysUnit>
+              <PhysUnitUsr>kN</PhysUnitUsr>
+              <Supply>0.000000</Supply>
+              <TedsOptions>
+                <UseTeds>2</UseTeds>
+                <BinData>
+                </BinData>
+              </TedsOptions>
+              <Identification>
+                <SensorId>
+                </SensorId>
+                <SensorName>
+                </SensorName>
+                <ManuName>
+                </ManuName>
+                <SerialNumber>
+                </SerialNumber>
+                <TypeName>
+                </TypeName>
+                <CalDate>
+                </CalDate>
+                <CalInitials>
+                </CalInitials>
+                <CalPeriod>0</CalPeriod>
+                <Location>
+                </Location>
+                <UserDefId>
+                </UserDefId>
+              </Identification>
+            </Sensor>
+            <SyncSignal address="1">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <OutputRate>200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>20.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 4, signal 1</Description>
+                <SignalReference>AnalogIn_Connector4.Signal1</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <SyncSignal address="2">
+              <SignalName>
+              </SignalName>
+              <OriginOfName>0</OriginOfName>
+              <OutputRate>1200.000000</OutputRate>
+              <FilterType choice="Lowpass">
+                <Lowpass>
+                  <FiltCharact>1</FiltCharact>
+                  <FiltFreq>10.000000</FiltFreq>
+                </Lowpass>
+              </FilterType>
+              <Decimals>3</Decimals>
+              <SignalFormat>4</SignalFormat>
+              <Output>
+                <Description>analog input: connector 4, signal 2</Description>
+                <SignalReference>AnalogIn_Connector4.Signal2</SignalReference>
+                <DaqAvailable>1</DaqAvailable>
+                <RtAvailable>0</RtAvailable>
+              </Output>
+            </SyncSignal>
+            <ChannelName>
+            </ChannelName>
+            <OriginOfName>0</OriginOfName>
+            <ZeroOffset>
+              <Target>0.000000</Target>
+              <Offset>0.000000</Offset>
+              <Inhibit>0</Inhibit>
+            </ZeroOffset>
+            <OutputUnit>
+              <UnitId>1901</UnitId>
+              <UserText>kN</UserText>
+              <Factor>1.000000</Factor>
+              <Offset>0.000000</Offset>
+            </OutputUnit>
+            <Testsignal>
+              <Active>0</Active>
+              <Mode choice="Constant">
+                <Constant>
+                  <Value>0.000000</Value>
+                </Constant>
+              </Mode>
+            </Testsignal>
+          </AnalogInChannel>
+        </Mode>
+      </Connector4>
+    </Amplifier>
+    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <FactAdjust>
+      <Connector address="0">
+        <FactAdjustPoint address="1">
+          <CalSignal>-6.57110000e-06</CalSignal>
+          <ZeroSignal>-1.00308500</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="2">
+          <CalSignal>-5.30627900e-05</CalSignal>
+          <ZeroSignal>2495.56412200</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="3">
+          <CalSignal>3.54975600</CalSignal>
+          <ZeroSignal>-1.41721300e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="4">
+          <CalSignal>3.55738600</CalSignal>
+          <ZeroSignal>-5.80900800e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="5">
+          <CalSignal>3.56408600</CalSignal>
+          <ZeroSignal>4.70669200e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="6">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="7">
+          <CalSignal>3.56253200</CalSignal>
+          <ZeroSignal>4.60175800e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="8">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="9">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="10">
+          <CalSignal>110.43759100</CalSignal>
+          <ZeroSignal>-5.41843200e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="11">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="12">
+          <CalSignal>110.45548500</CalSignal>
+          <ZeroSignal>4.42643100e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="13">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="14">
+          <CalSignal>110.41315500</CalSignal>
+          <ZeroSignal>3.67032600e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="15">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="16">
+          <CalSignal>997.49340000</CalSignal>
+          <ZeroSignal>3.56104000</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="17">
+          <CalSignal>997.45255100</CalSignal>
+          <ZeroSignal>3.56482000</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="18">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="19">
+          <CalSignal>997.93168400</CalSignal>
+          <ZeroSignal>4.27402000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="20">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="21">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="22">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="23">
+          <CalSignal>3.64838900</CalSignal>
+          <ZeroSignal>8.44604100e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="24">
+          <CalSignal>3.56131700</CalSignal>
+          <ZeroSignal>-1.87859300e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="25">
+          <CalSignal>3.64906600</CalSignal>
+          <ZeroSignal>8.54510000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="26">
+          <CalSignal>110.53885200</CalSignal>
+          <ZeroSignal>8.38119200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="27">
+          <CalSignal>3.64654800</CalSignal>
+          <ZeroSignal>8.44763700e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="28">
+          <CalSignal>110.49765700</CalSignal>
+          <ZeroSignal>8.48716200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="29">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="30">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="31">
+          <CalSignal>997.64313500</CalSignal>
+          <ZeroSignal>3.72472200</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="32">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="33">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="34">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="35">
+          <CalSignal>11.52822300</CalSignal>
+          <ZeroSignal>5.54069800e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="36">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="37">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="38">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="39">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="40">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="41">
+          <CalSignal>998.34003700</CalSignal>
+          <ZeroSignal>0.11749500</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="42">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="43">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="44">
+          <CalSignal>0.22598300</CalSignal>
+          <ZeroSignal>-1.83708500e-08</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="45">
+          <CalSignal>11.52820600</CalSignal>
+          <ZeroSignal>5.37612000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="46">
+          <CalSignal>57.95492200</CalSignal>
+          <ZeroSignal>7.42567400e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="47">
+          <CalSignal>30.28940400</CalSignal>
+          <ZeroSignal>1.83619700e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="48">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="49">
+          <CalSignal>2494.05492800</CalSignal>
+          <ZeroSignal>-0.80000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="50">
+          <CalSignal>0.22598300</CalSignal>
+          <ZeroSignal>-1.83708500e-08</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="51">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="52">
+          <CalSignal>997.45255100</CalSignal>
+          <ZeroSignal>3.56482000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="53">
+          <CalSignal>997.49340000</CalSignal>
+          <ZeroSignal>3.56104000</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <Checksum>1428788081</Checksum>
+      </Connector>
+      <Connector address="1">
+        <FactAdjustPoint address="1">
+          <CalSignal>-9.26390000e-06</CalSignal>
+          <ZeroSignal>-1.00310700</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="2">
+          <CalSignal>-6.64487900e-05</CalSignal>
+          <ZeroSignal>2496.73253500</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="3">
+          <CalSignal>3.55085200</CalSignal>
+          <ZeroSignal>-1.36862600e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="4">
+          <CalSignal>3.55751800</CalSignal>
+          <ZeroSignal>-5.53585900e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="5">
+          <CalSignal>3.56443300</CalSignal>
+          <ZeroSignal>6.91388000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="6">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="7">
+          <CalSignal>3.56286600</CalSignal>
+          <ZeroSignal>6.82901300e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="8">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="9">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="10">
+          <CalSignal>110.44080700</CalSignal>
+          <ZeroSignal>-5.49546300e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="11">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="12">
+          <CalSignal>110.46237600</CalSignal>
+          <ZeroSignal>6.62461800e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="13">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="14">
+          <CalSignal>110.41928900</CalSignal>
+          <ZeroSignal>6.42876800e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="15">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="16">
+          <CalSignal>997.41419700</CalSignal>
+          <ZeroSignal>3.56067000</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="17">
+          <CalSignal>997.36697800</CalSignal>
+          <ZeroSignal>3.56000900</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="18">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="19">
+          <CalSignal>997.87209800</CalSignal>
+          <ZeroSignal>8.11544600e-05</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="20">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="21">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="22">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="23">
+          <CalSignal>3.63899300</CalSignal>
+          <ZeroSignal>7.44543700e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="24">
+          <CalSignal>3.52506500</CalSignal>
+          <ZeroSignal>-3.79892000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="25">
+          <CalSignal>3.64198400</CalSignal>
+          <ZeroSignal>7.82416200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="26">
+          <CalSignal>110.53847800</CalSignal>
+          <ZeroSignal>7.67618100e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="27">
+          <CalSignal>3.64010400</CalSignal>
+          <ZeroSignal>7.79210400e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="28">
+          <CalSignal>110.49669600</CalSignal>
+          <ZeroSignal>7.80546600e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="29">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="30">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="31">
+          <CalSignal>997.57886600</CalSignal>
+          <ZeroSignal>3.71500800</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="32">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="33">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="34">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="35">
+          <CalSignal>11.52170800</CalSignal>
+          <ZeroSignal>5.47221000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="36">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="37">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="38">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="39">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="40">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="41">
+          <CalSignal>998.16507800</CalSignal>
+          <ZeroSignal>3.82887900e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="42">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="43">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="44">
+          <CalSignal>0.22600400</CalSignal>
+          <ZeroSignal>1.63114100e-06</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="45">
+          <CalSignal>11.52170200</CalSignal>
+          <ZeroSignal>5.40573500e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="46">
+          <CalSignal>57.92827500</CalSignal>
+          <ZeroSignal>4.64810400e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="47">
+          <CalSignal>30.30651400</CalSignal>
+          <ZeroSignal>1.79545800e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="48">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="49">
+          <CalSignal>2495.50941200</CalSignal>
+          <ZeroSignal>-156.80000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="50">
+          <CalSignal>0.22600400</CalSignal>
+          <ZeroSignal>1.63114100e-06</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="51">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="52">
+          <CalSignal>997.36697800</CalSignal>
+          <ZeroSignal>3.56000900</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="53">
+          <CalSignal>997.41419700</CalSignal>
+          <ZeroSignal>3.56067000</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <Checksum>3016823749</Checksum>
+      </Connector>
+      <Connector address="2">
+        <FactAdjustPoint address="1">
+          <CalSignal>-6.81750000e-06</CalSignal>
+          <ZeroSignal>-1.00302500</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="2">
+          <CalSignal>-4.89956800e-05</CalSignal>
+          <ZeroSignal>2494.36256100</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="3">
+          <CalSignal>3.55007400</CalSignal>
+          <ZeroSignal>-1.49145900e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="4">
+          <CalSignal>3.55733900</CalSignal>
+          <ZeroSignal>-6.27911900e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="5">
+          <CalSignal>3.56430100</CalSignal>
+          <ZeroSignal>3.09165100e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="6">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="7">
+          <CalSignal>3.56265800</CalSignal>
+          <ZeroSignal>3.02723500e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="8">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="9">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="10">
+          <CalSignal>110.40618900</CalSignal>
+          <ZeroSignal>-5.85944700e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="11">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="12">
+          <CalSignal>110.42825900</CalSignal>
+          <ZeroSignal>2.56490100e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="13">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="14">
+          <CalSignal>110.37908900</CalSignal>
+          <ZeroSignal>2.32205700e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="15">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="16">
+          <CalSignal>997.37493400</CalSignal>
+          <ZeroSignal>3.56197200</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="17">
+          <CalSignal>997.32105800</CalSignal>
+          <ZeroSignal>3.56290600</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="18">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="19">
+          <CalSignal>997.83143500</CalSignal>
+          <ZeroSignal>5.41010900e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="20">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="21">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="22">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="23">
+          <CalSignal>3.60050500</CalSignal>
+          <ZeroSignal>3.55166200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="24">
+          <CalSignal>3.55585100</CalSignal>
+          <ZeroSignal>-7.76690900e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="25">
+          <CalSignal>3.60433800</CalSignal>
+          <ZeroSignal>4.03461200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="26">
+          <CalSignal>110.46740700</CalSignal>
+          <ZeroSignal>3.94063400e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="27">
+          <CalSignal>3.60182900</CalSignal>
+          <ZeroSignal>3.94731800e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="28">
+          <CalSignal>110.41798400</CalSignal>
+          <ZeroSignal>3.91292900e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="29">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="30">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="31">
+          <CalSignal>997.49151600</CalSignal>
+          <ZeroSignal>3.67542900</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="32">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="33">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="34">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="35">
+          <CalSignal>11.53402000</CalSignal>
+          <ZeroSignal>4.95528100e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="36">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="37">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="38">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="39">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="40">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="41">
+          <CalSignal>998.18294500</CalSignal>
+          <ZeroSignal>6.60061200e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="42">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="43">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="44">
+          <CalSignal>0.22625200</CalSignal>
+          <ZeroSignal>5.39329700e-07</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="45">
+          <CalSignal>11.53408000</CalSignal>
+          <ZeroSignal>5.55308800e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="46">
+          <CalSignal>57.89165400</CalSignal>
+          <ZeroSignal>4.90244900e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="47">
+          <CalSignal>30.35775100</CalSignal>
+          <ZeroSignal>1.48384000e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="48">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="49">
+          <CalSignal>2493.24573100</CalSignal>
+          <ZeroSignal>41.50000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="50">
+          <CalSignal>0.22625200</CalSignal>
+          <ZeroSignal>5.39329700e-07</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="51">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="52">
+          <CalSignal>997.32105800</CalSignal>
+          <ZeroSignal>3.56290600</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="53">
+          <CalSignal>997.37493400</CalSignal>
+          <ZeroSignal>3.56197200</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <Checksum>297462552</Checksum>
+      </Connector>
+      <Connector address="3">
+        <FactAdjustPoint address="1">
+          <CalSignal>-7.92610000e-06</CalSignal>
+          <ZeroSignal>-1.00309600</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="2">
+          <CalSignal>-5.67106000e-05</CalSignal>
+          <ZeroSignal>2492.98128500</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="3">
+          <CalSignal>3.55077500</CalSignal>
+          <ZeroSignal>-1.32535800e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="4">
+          <CalSignal>3.55767200</CalSignal>
+          <ZeroSignal>-5.64333800e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="5">
+          <CalSignal>3.56436800</CalSignal>
+          <ZeroSignal>6.82430500e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="6">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="7">
+          <CalSignal>3.56273300</CalSignal>
+          <ZeroSignal>6.75699600e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="8">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="9">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="10">
+          <CalSignal>110.41290300</CalSignal>
+          <ZeroSignal>-5.44148800e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="11">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="12">
+          <CalSignal>110.43656600</CalSignal>
+          <ZeroSignal>7.99385600e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="13">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="14">
+          <CalSignal>110.39178400</CalSignal>
+          <ZeroSignal>7.13608900e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="15">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="16">
+          <CalSignal>997.44909300</CalSignal>
+          <ZeroSignal>3.56272700</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="17">
+          <CalSignal>997.44126600</CalSignal>
+          <ZeroSignal>3.56292800</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="18">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="19">
+          <CalSignal>997.86101600</CalSignal>
+          <ZeroSignal>8.76831000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="20">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="21">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="22">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="23">
+          <CalSignal>3.62650100</CalSignal>
+          <ZeroSignal>6.24722000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="24">
+          <CalSignal>3.56306800</CalSignal>
+          <ZeroSignal>-2.46970900e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="25">
+          <CalSignal>3.61873100</CalSignal>
+          <ZeroSignal>5.50460000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="26">
+          <CalSignal>110.48983100</CalSignal>
+          <ZeroSignal>5.40635900e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="27">
+          <CalSignal>3.61571700</CalSignal>
+          <ZeroSignal>5.36599700e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="28">
+          <CalSignal>110.44511600</CalSignal>
+          <ZeroSignal>5.40411000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="29">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="30">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="31">
+          <CalSignal>997.56056100</CalSignal>
+          <ZeroSignal>3.68085200</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="32">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="33">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="34">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="35">
+          <CalSignal>11.54068400</CalSignal>
+          <ZeroSignal>7.41184000e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="36">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="37">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="38">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="39">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="40">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="41">
+          <CalSignal>997.85564400</CalSignal>
+          <ZeroSignal>3.32446000e-02</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="42">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="43">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="44">
+          <CalSignal>0.22627800</CalSignal>
+          <ZeroSignal>4.36814600e-06</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="45">
+          <CalSignal>11.54062300</CalSignal>
+          <ZeroSignal>6.80607600e-04</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="46">
+          <CalSignal>57.95250300</CalSignal>
+          <ZeroSignal>1.66119300e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="47">
+          <CalSignal>30.32502900</CalSignal>
+          <ZeroSignal>1.74396900e-03</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="48">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="49">
+          <CalSignal>2491.56266400</CalSignal>
+          <ZeroSignal>101.70000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="50">
+          <CalSignal>0.22627800</CalSignal>
+          <ZeroSignal>4.36814600e-06</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="51">
+          <CalSignal>2.00000000</CalSignal>
+          <ZeroSignal>0.00000000</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="52">
+          <CalSignal>997.44126600</CalSignal>
+          <ZeroSignal>3.56292800</ZeroSignal>
+          <MinCalValue>0</MinCalValue>
+          <MaxCalValue>2147483547</MaxCalValue>
+          <MaxZeroDeviation>1000000</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <FactAdjustPoint address="53">
+          <CalSignal>997.44909300</CalSignal>
+          <ZeroSignal>3.56272700</ZeroSignal>
+          <MinCalValue>28386</MinCalValue>
+          <MaxCalValue>4002010</MaxCalValue>
+          <MaxZeroDeviation>-1</MaxZeroDeviation>
+        </FactAdjustPoint>
+        <Checksum>736375247</Checksum>
+      </Connector>
+    </FactAdjust>
+  </RawDevice>
+</QuantumX>
