@@ -4,12 +4,16 @@ import json
 import math
 import queue
 import re
+import socket
+import subprocess
 import threading
 import time
 import tkinter as tk
 from collections import deque
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+from force_sources import ForceSample, QuantumXTcpClient, UniqueForceAccumulator
 
 try:
     import serial
@@ -43,6 +47,7 @@ COLIBRI_SLAVE_ADDRESS = 0xFF
 COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
+COLIBRI_PLATE_CONTACT_POSITION_MM = 94.7
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
@@ -54,10 +59,22 @@ FORCE_BINARY_BIPOLAR_ZERO = 0x800000
 FORCE_BINARY_POSITIVE_SPAN = 0x7FFFFF
 FORCE_BINARY_FULL_SCALE_FACTOR = 1.05
 FORCE_DEFAULT_SCALING = 14.3758
-FORCE_DEFAULT_AVERAGE_SECONDS = 0.0
 FORCE_DEFAULT_IMPULSE_THRESHOLD = 0.1
 GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
+QUANTUMX_HOST = "127.0.0.1"
+QUANTUMX_PORT = 5500
+QUANTUMX_MONITOR_EXE = (
+    Path(__file__).parent
+    / "quantumx_bridge"
+    / "src"
+    / "QuantumXMonitor"
+    / "bin"
+    / "x86"
+    / "Release"
+    / "net48"
+    / "QuantumXMonitor.exe"
+)
 
 
 class ColibriProtocolError(Exception):
@@ -322,19 +339,21 @@ class TestRunGui(tk.Tk):
         self.force_serial_port = None
         self.force_reader_thread = None
         self.force_reader_running = False
+        self.force_client = None
+        self.quantumx_monitor_process = None
         self.force_serial_lock = threading.Lock()
         self.force_lock = threading.Lock()
+        self.latest_force_sample = None
+        self.latest_force_1_n = None
+        self.latest_force_2_n = None
+        self.latest_force_status = "disconnected"
         self.latest_force_raw_n = None
         self.latest_force_n = None
         self.latest_force_time = None
         self.force_scaling = self._preset_float("force_scaling", FORCE_DEFAULT_SCALING, -1.0e12, 1.0e12)
-        self.force_average_seconds = self._preset_float(
-            "force_average_seconds", FORCE_DEFAULT_AVERAGE_SECONDS, 0.0, 60.0
-        )
         self.force_impulse_threshold = self._preset_float(
             "force_impulse_threshold", FORCE_DEFAULT_IMPULSE_THRESHOLD, 0.0, 1.0e12
         )
-        self.force_average_samples = deque(maxlen=10000)
         self.force_rate_times = deque(maxlen=2000)
         self.rows = []
         self.impulse_rows = []
@@ -357,17 +376,25 @@ class TestRunGui(tk.Tk):
         self.colibri_port_var = tk.StringVar()
         self.force_port_var = tk.StringVar()
         self.ethercat_adapter_var = tk.StringVar()
+        self.quantumx_host_var = tk.StringVar(
+            value=str(self.user_presets.get("quantumx_host", QUANTUMX_HOST))
+        )
+        self.quantumx_port_var = tk.IntVar(
+            value=self._preset_int("quantumx_port", QUANTUMX_PORT, 1, 65535)
+        )
+        self.connection_summary_var = tk.StringVar(value="Connections: initializing")
         self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
-        self.force_average_var = tk.DoubleVar(value=self.force_average_seconds)
         self.force_impulse_threshold_var = tk.DoubleVar(value=self.force_impulse_threshold)
         self.status_var = tk.StringVar(value="Disconnected")
         self.mode_var = tk.StringVar(value="Mode: disconnected")
         self.colibri_status_var = tk.StringVar(value="Colibri: disconnected")
         self.colibri_position_var = tk.StringVar(value="Position: --")
-        self.force_status_var = tk.StringVar(value=self._force_status("Force sensor: disconnected"))
-        self.force_value_var = tk.StringVar(value="Force reading: --")
+        self.force_status_var = tk.StringVar(value=self._force_status("QuantumX: disconnected"))
+        self.force_value_var = tk.StringVar(value="Force total: --")
+        self.force_1_value_var = tk.StringVar(value="F1: --")
+        self.force_2_value_var = tk.StringVar(value="F2: --")
         self.force_rate_var = tk.StringVar(value="Force rate: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.german_csv_format_var = tk.BooleanVar(value=True)
@@ -395,14 +422,16 @@ class TestRunGui(tk.Tk):
         self.part_csv_status_var = tk.StringVar(value="No part CSV loaded")
         self.use_cap_offsets_var = tk.BooleanVar(value=False)
         self.nozzle_offset_var = tk.DoubleVar(value=self._preset_float("nozzle_offset_mm", 0.0, -2000.0, 2000.0))
-        self.test_stand_height_var = tk.DoubleVar(
-            value=self._preset_float("test_stand_height_mm", 0.0, -2000.0, 2000.0)
-        )
-        self.holder_height_var = tk.DoubleVar(
-            value=self._preset_float("holder_height_mm", 0.0, -2000.0, 2000.0)
+        self.colibri_plate_distance_var = tk.DoubleVar(
+            value=self._preset_float(
+                "colibri_plate_distance_mm",
+                0.0,
+                0.0,
+                COLIBRI_PLATE_CONTACT_POSITION_MM,
+            )
         )
         self.part_y_offset_var = tk.StringVar(value="Y offset: --")
-        self.part_z_offset_var = tk.StringVar(value="Z offset: --")
+        self.part_z_offset_var = tk.StringVar(value="Cap height: --")
         self.part_stepper_position_var = tk.StringVar(value="Stepper target: --")
         self.part_colibri_position_var = tk.StringVar(value="Colibri target: --")
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
@@ -417,18 +446,21 @@ class TestRunGui(tk.Tk):
         self.pending_pulse_duration_ms = None
         self.active_test_mask = ""
         self.part_rows = {}
+        self.increment_dialog = None
+        self.increment_dialog_controls = []
+        self.increment_dialog_pulse_buttons = []
 
         self._build_ui()
         for variable in (
             self.use_cap_offsets_var,
             self.nozzle_offset_var,
-            self.test_stand_height_var,
-            self.holder_height_var,
+            self.colibri_plate_distance_var,
         ):
             variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
         self._refresh_ethercat_adapters()
         self.after(50, self._drain_messages)
+        self.after(100, self._connect_force_sensor)
 
     def _load_user_presets(self):
         try:
@@ -441,6 +473,13 @@ class TestRunGui(tk.Tk):
     def _preset_float(self, key, default, minimum, maximum):
         try:
             value = float(self.user_presets.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return min(max(value, minimum), maximum)
+
+    def _preset_int(self, key, default, minimum, maximum):
+        try:
+            value = int(self.user_presets.get(key, default))
         except (TypeError, ValueError):
             value = default
         return min(max(value, minimum), maximum)
@@ -462,7 +501,10 @@ class TestRunGui(tk.Tk):
 
         ttk.Label(
             dialog,
-            text="Save the current force settings, nozzle offset, test stand height, and holder height as defaults?",
+            text=(
+                "Save the current connection and force settings, nozzle offset, and target "
+                "distance to the plate as defaults?"
+            ),
             wraplength=420,
             justify=tk.LEFT,
         ).pack(padx=18, pady=(16, 12))
@@ -493,11 +535,11 @@ class TestRunGui(tk.Tk):
         try:
             presets = {
                 "force_scaling": float(self.force_scale_var.get()),
-                "force_average_seconds": float(self.force_average_var.get()),
                 "force_impulse_threshold": float(self.force_impulse_threshold_var.get()),
+                "quantumx_host": self.quantumx_host_var.get().strip(),
+                "quantumx_port": int(self.quantumx_port_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
-                "test_stand_height_mm": float(self.test_stand_height_var.get()),
-                "holder_height_mm": float(self.holder_height_var.get()),
+                "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
             }
         except (tk.TclError, ValueError) as exc:
             messagebox.showerror("Preset save failed", f"One of the preset values is not numeric: {exc}")
@@ -516,16 +558,52 @@ class TestRunGui(tk.Tk):
         root = ttk.Frame(self, padding=12)
         root.pack(fill=tk.BOTH, expand=True)
 
+        connection_controls = ttk.Frame(root)
+        connection_controls.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Button(
+            connection_controls,
+            text="Connection settings…",
+            command=self._open_connection_settings,
+        ).pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="Arduino").pack(side=tk.LEFT, padx=(16, 4))
+        self.connect_button = ttk.Button(connection_controls, text="Connect", command=self._toggle_connection)
+        self.connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="Colibri").pack(side=tk.LEFT, padx=(12, 4))
+        self.colibri_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_colibri_connection,
+        )
+        self.colibri_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="EtherCAT").pack(side=tk.LEFT, padx=(12, 4))
+        self.ethercat_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_ethercat_connection,
+        )
+        self.ethercat_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="QuantumX").pack(side=tk.LEFT, padx=(12, 4))
+        self.force_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_force_connection,
+        )
+        self.force_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, textvariable=self.connection_summary_var).pack(
+            side=tk.LEFT,
+            padx=(18, 0),
+        )
+
+        # Persistent, non-visible selectors hold the values used by connection
+        # routines. The user-facing selectors live in the settings dialog.
+        self.port_combo = ttk.Combobox(root, textvariable=self.port_var, state="readonly")
+        self.colibri_port_combo = ttk.Combobox(root, textvariable=self.colibri_port_var, state="readonly")
+        self.ethercat_adapter_combo = ttk.Combobox(root, textvariable=self.ethercat_adapter_var, state="readonly")
+        self.ethercat_refresh_button = ttk.Button(root, command=self._refresh_ethercat_adapters)
+
         controls = ttk.Frame(root)
         controls.pack(fill=tk.X)
-
-        ttk.Label(controls, text="Port").pack(side=tk.LEFT)
-        self.port_combo = ttk.Combobox(controls, textvariable=self.port_var, width=18, state="readonly")
-        self.port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        ttk.Button(controls, text="Refresh", command=self._refresh_ports).pack(side=tk.LEFT)
-        self.connect_button = ttk.Button(controls, text="Connect", command=self._toggle_connection)
-        self.connect_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.start_button = ttk.Button(controls, text="Start test", command=self._start_test, state=tk.DISABLED)
         self.start_button.pack(side=tk.LEFT, padx=(18, 0))
@@ -574,30 +652,6 @@ class TestRunGui(tk.Tk):
         self.debug_log_button = ttk.Button(controls, text="Start debug log", command=self._toggle_debug_log)
         self.debug_log_button.pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(controls, text="Clear", command=self._clear_log).pack(side=tk.RIGHT, padx=(0, 8))
-
-        ethercat_controls = ttk.Frame(root)
-        ethercat_controls.pack(fill=tk.X, pady=(10, 0))
-        ttk.Label(ethercat_controls, text="EtherCAT (EK1100)").pack(side=tk.LEFT)
-        self.ethercat_adapter_combo = ttk.Combobox(
-            ethercat_controls,
-            textvariable=self.ethercat_adapter_var,
-            width=52,
-            state="readonly",
-        )
-        self.ethercat_adapter_combo.pack(side=tk.LEFT, padx=(6, 8))
-        self.ethercat_refresh_button = ttk.Button(
-            ethercat_controls,
-            text="Refresh adapters",
-            command=self._refresh_ethercat_adapters,
-        )
-        self.ethercat_refresh_button.pack(side=tk.LEFT)
-        self.ethercat_connect_button = ttk.Button(
-            ethercat_controls,
-            text="Scan and connect",
-            command=self._toggle_ethercat_connection,
-        )
-        self.ethercat_connect_button.pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Label(ethercat_controls, textvariable=self.ethercat_status_var).pack(side=tk.LEFT, padx=(12, 0))
 
         pressure_controls = ttk.Frame(root)
         pressure_controls.pack(fill=tk.X, pady=(10, 0))
@@ -675,13 +729,18 @@ class TestRunGui(tk.Tk):
         )
         self.manual_pulse_button.pack(side=tk.LEFT, padx=(18, 0))
 
+        ttk.Button(
+            pulse_controls,
+            text="Increment pressure…",
+            command=self._open_increment_pressure_settings,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
         self.increment_pulse_button = ttk.Button(
             pulse_controls,
             text="Pulse + increment",
             command=self._increment_pulse,
             state=tk.DISABLED,
         )
-        self.increment_pulse_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.decrement_pulse_button = ttk.Button(
             pulse_controls,
@@ -689,10 +748,8 @@ class TestRunGui(tk.Tk):
             command=self._decrement_pulse,
             state=tk.DISABLED,
         )
-        self.decrement_pulse_button.pack(side=tk.LEFT, padx=(8, 0))
 
         increment_controls = ttk.Frame(root)
-        increment_controls.pack(fill=tk.X, pady=(10, 0))
 
         ttk.Label(increment_controls, text="Starting pressure").pack(side=tk.LEFT)
         self.starting_pressure_spinbox = ttk.Spinbox(
@@ -851,21 +908,7 @@ class TestRunGui(tk.Tk):
         colibri_connection_controls = ttk.Frame(root)
         colibri_connection_controls.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(colibri_connection_controls, text="Colibri").pack(side=tk.LEFT)
-        self.colibri_port_combo = ttk.Combobox(
-            colibri_connection_controls,
-            textvariable=self.colibri_port_var,
-            width=36,
-            state="readonly",
-        )
-        self.colibri_port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        self.colibri_connect_button = ttk.Button(
-            colibri_connection_controls,
-            text="Connect",
-            command=self._toggle_colibri_connection,
-        )
-        self.colibri_connect_button.pack(side=tk.LEFT)
+        ttk.Label(colibri_connection_controls, text="Colibri position").pack(side=tk.LEFT)
         self.colibri_refresh_button = ttk.Button(
             colibri_connection_controls,
             text="Read status",
@@ -973,71 +1016,39 @@ class TestRunGui(tk.Tk):
             self.colibri_stop_button,
         ]
 
+        colibri_geometry_controls = ttk.Frame(root)
+        colibri_geometry_controls.pack(fill=tk.X, pady=(6, 0))
+
+        ttk.Label(colibri_geometry_controls, text="Plate contact\nreference").pack(side=tk.LEFT)
+        ttk.Label(
+            colibri_geometry_controls,
+            text=f"{COLIBRI_PLATE_CONTACT_POSITION_MM:.1f} mm",
+        ).pack(side=tk.LEFT, padx=(6, 0))
+
+        ttk.Label(colibri_geometry_controls, text="Target distance\nto plate").pack(side=tk.LEFT, padx=(18, 0))
+        self.colibri_plate_distance_spinbox = ttk.Spinbox(
+            colibri_geometry_controls,
+            from_=0.0,
+            to=COLIBRI_PLATE_CONTACT_POSITION_MM,
+            increment=0.1,
+            textvariable=self.colibri_plate_distance_var,
+            width=8,
+        )
+        self.colibri_plate_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(colibri_geometry_controls, text="mm").pack(side=tk.LEFT)
+        self.part_colibri_move_button = ttk.Button(
+            colibri_geometry_controls,
+            text="Move Colibri",
+            command=self._move_colibri_to_part_target,
+            state=tk.DISABLED,
+        )
+        self.part_colibri_move_button.pack(side=tk.LEFT, padx=(12, 0))
+        self.colibri_controls.append(self.part_colibri_move_button)
+
         force_controls = ttk.Frame(root)
         force_controls.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(force_controls, text="Force sensor").pack(side=tk.LEFT)
-        self.force_port_combo = ttk.Combobox(
-            force_controls,
-            textvariable=self.force_port_var,
-            width=36,
-            state="readonly",
-        )
-        self.force_port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        ttk.Label(force_controls, text="Baud").pack(side=tk.LEFT)
-        self.force_baud_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=1200,
-            to=921600,
-            increment=1200,
-            textvariable=self.force_baud_var,
-            width=8,
-            state=tk.NORMAL,
-        )
-        self.force_baud_spinbox.pack(side=tk.LEFT, padx=(6, 8))
-
-        self.force_connect_button = ttk.Button(
-            force_controls,
-            text="Connect",
-            command=self._toggle_force_connection,
-        )
-        self.force_connect_button.pack(side=tk.LEFT)
-
-        ttk.Label(force_controls, text="Force scaling").pack(side=tk.LEFT, padx=(8, 0))
-        self.force_scale_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=-1000000.0,
-            to=1000000.0,
-            increment=0.0001,
-            textvariable=self.force_scale_var,
-            width=10,
-        )
-        self.force_scale_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        self.force_scale_button = ttk.Button(
-            force_controls,
-            text="Apply scaling",
-            command=self._apply_force_scaling,
-        )
-        self.force_scale_button.pack(side=tk.LEFT)
-
-        ttk.Label(force_controls, text="Force average").pack(side=tk.LEFT, padx=(8, 0))
-        self.force_average_spinbox = ttk.Spinbox(
-            force_controls,
-            from_=0.0,
-            to=60.0,
-            increment=0.05,
-            textvariable=self.force_average_var,
-            width=7,
-        )
-        self.force_average_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(force_controls, text="s").pack(side=tk.LEFT)
-        self.force_average_button = ttk.Button(
-            force_controls,
-            text="Apply average",
-            command=self._apply_force_average,
-        )
-        self.force_average_button.pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Label(force_controls, text="Force").pack(side=tk.LEFT)
 
         ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT, padx=(8, 0))
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
@@ -1056,9 +1067,9 @@ class TestRunGui(tk.Tk):
         )
         self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
-        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(18, 0))
-        ttk.Label(force_controls, textvariable=self.force_status_var).pack(side=tk.LEFT, padx=(18, 0))
-        ttk.Label(force_controls, textvariable=self.force_rate_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_1_value_var).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(force_controls, textvariable=self.force_2_value_var).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(10, 0))
 
         part_controls = ttk.Frame(root)
         part_controls.pack(fill=tk.X, pady=(10, 0))
@@ -1108,30 +1119,6 @@ class TestRunGui(tk.Tk):
         self.nozzle_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
         ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
 
-        ttk.Label(part_position_controls, text="Test stand height").pack(side=tk.LEFT, padx=(18, 0))
-        self.test_stand_height_spinbox = ttk.Spinbox(
-            part_position_controls,
-            from_=-2000.0,
-            to=2000.0,
-            increment=0.1,
-            textvariable=self.test_stand_height_var,
-            width=8,
-        )
-        self.test_stand_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
-
-        ttk.Label(part_position_controls, text="Holder height").pack(side=tk.LEFT, padx=(18, 0))
-        self.holder_height_spinbox = ttk.Spinbox(
-            part_position_controls,
-            from_=-2000.0,
-            to=2000.0,
-            increment=0.1,
-            textvariable=self.holder_height_var,
-            width=8,
-        )
-        self.holder_height_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
-
         ttk.Label(part_position_controls, textvariable=self.part_y_offset_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(part_position_controls, textvariable=self.part_z_offset_var).pack(side=tk.LEFT, padx=(12, 0))
         ttk.Label(part_position_controls, textvariable=self.part_stepper_position_var).pack(side=tk.LEFT, padx=(12, 0))
@@ -1154,7 +1141,8 @@ class TestRunGui(tk.Tk):
             "valves_open",
             "flow",
             "force",
-            "raw_force",
+            "force_1",
+            "force_2",
         )
         self.table = ttk.Treeview(root, columns=columns, show="headings", height=18)
         headings = {
@@ -1165,8 +1153,9 @@ class TestRunGui(tk.Tk):
             "regulator_pwm": "Regulator PWM",
             "valves_open": "Valves open",
             "flow": "Flow",
-            "force": "Force reading",
-            "raw_force": "Raw force reading",
+            "force": "Force total",
+            "force_1": "Force 1",
+            "force_2": "Force 2",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
@@ -1184,6 +1173,211 @@ class TestRunGui(tk.Tk):
         self.bind("1", lambda event: _trigger_pulse_btn(event, self.manual_pulse_button))
         self.bind("2", lambda event: _trigger_pulse_btn(event, self.increment_pulse_button))
         self.bind("3", lambda event: _trigger_pulse_btn(event, self.decrement_pulse_button))
+
+    def _open_connection_settings(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("Connection Settings")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(body, text="Arduino COM port").grid(row=0, column=0, sticky=tk.W, pady=5)
+        arduino_combo = ttk.Combobox(
+            body,
+            textvariable=self.port_var,
+            values=list(self.port_devices),
+            width=52,
+            state=tk.DISABLED if self.serial_port else "readonly",
+        )
+        arduino_combo.grid(row=0, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="Colibri COM port").grid(row=1, column=0, sticky=tk.W, pady=5)
+        colibri_combo = ttk.Combobox(
+            body,
+            textvariable=self.colibri_port_var,
+            values=list(self.port_devices),
+            width=52,
+            state=tk.DISABLED if self.colibri else "readonly",
+        )
+        colibri_combo.grid(row=1, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="EtherCAT adapter").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ethercat_combo = ttk.Combobox(
+            body,
+            textvariable=self.ethercat_adapter_var,
+            values=list(self.ethercat_adapters),
+            width=52,
+            state=tk.DISABLED if self.ethercat_master else "readonly",
+        )
+        ethercat_combo.grid(row=2, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="QuantumX host").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(
+            body,
+            textvariable=self.quantumx_host_var,
+            width=24,
+            state=tk.DISABLED if self.force_client else tk.NORMAL,
+        ).grid(
+            row=3,
+            column=1,
+            sticky=tk.W,
+            padx=(12, 0),
+            pady=5,
+        )
+
+        ttk.Label(body, text="QuantumX port").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(
+            body,
+            from_=1,
+            to=65535,
+            textvariable=self.quantumx_port_var,
+            width=10,
+            state=tk.DISABLED if self.force_client else tk.NORMAL,
+        ).grid(row=4, column=1, sticky=tk.W, padx=(12, 0), pady=5)
+
+        ttk.Label(
+            body,
+            text=(
+                "Auto-detect uses the device descriptions and avoids assigning Arduino and "
+                "Colibri to the same COM port. Changes take effect on the next connection."
+            ),
+            wraplength=560,
+            foreground="#555555",
+        ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(10, 4))
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=6, column=0, columnspan=2, sticky=tk.E, pady=(12, 0))
+
+        def auto_detect():
+            self._refresh_ports()
+            self._refresh_ethercat_adapters()
+            arduino_combo["values"] = list(self.port_devices)
+            colibri_combo["values"] = list(self.port_devices)
+            ethercat_combo["values"] = list(self.ethercat_adapters)
+            self._update_connection_summary()
+
+        ttk.Button(buttons, text="Auto-detect", command=auto_detect).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side=tk.LEFT)
+
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        dialog.focus_force()
+
+    def _open_increment_pressure_settings(self):
+        if self.increment_dialog and self.increment_dialog.winfo_exists():
+            self.increment_dialog.lift()
+            self.increment_dialog.focus_force()
+            return
+
+        dialog = tk.Toplevel(self)
+        self.increment_dialog = dialog
+        dialog.title("Increment Pressure")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(body, text="Starting pressure").grid(row=0, column=0, sticky=tk.W, pady=6)
+        starting_spinbox = ttk.Spinbox(
+            body,
+            from_=0.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
+            increment=0.05,
+            textvariable=self.starting_pressure_var,
+            width=10,
+        )
+        starting_spinbox.grid(row=0, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+        ttk.Label(body, text="bar").grid(row=0, column=2, sticky=tk.W, pady=6)
+
+        ttk.Label(body, text="Pressure increment").grid(row=1, column=0, sticky=tk.W, pady=6)
+        increment_spinbox = ttk.Spinbox(
+            body,
+            from_=0.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
+            increment=0.05,
+            textvariable=self.pressure_increment_var,
+            width=10,
+        )
+        increment_spinbox.grid(row=1, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+        ttk.Label(body, text="bar").grid(row=1, column=2, sticky=tk.W, pady=6)
+
+        ttk.Label(body, text="Increment count").grid(row=2, column=0, sticky=tk.W, pady=6)
+        ttk.Label(
+            body,
+            textvariable=self.increment_count_var,
+            width=10,
+            font=("TkDefaultFont", 11, "bold"),
+        ).grid(row=2, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+
+        pulse_frame = ttk.Frame(body)
+        pulse_frame.grid(row=3, column=0, columnspan=3, sticky=tk.EW, pady=(12, 4))
+        pulse_plus_button = ttk.Button(
+            pulse_frame,
+            text="Pulse + increment",
+            command=self._increment_pulse,
+        )
+        pulse_plus_button.pack(side=tk.LEFT)
+        pulse_minus_button = ttk.Button(
+            pulse_frame,
+            text="Pulse - increment",
+            command=self._decrement_pulse,
+        )
+        pulse_minus_button.pack(side=tk.LEFT, padx=(8, 0))
+        reset_button = ttk.Button(
+            pulse_frame,
+            text="Reset increment",
+            command=self._reset_increment,
+        )
+        reset_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(
+            body,
+            text="Keyboard shortcuts remain active: 2 = plus, 3 = minus.",
+            foreground="#555555",
+        ).grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(10, 4))
+
+        close_button = ttk.Button(body, text="Close")
+        close_button.grid(
+            row=5,
+            column=0,
+            columnspan=3,
+            sticky=tk.E,
+            pady=(12, 0),
+        )
+
+        self.increment_dialog_controls = [starting_spinbox, increment_spinbox, reset_button]
+        self.increment_dialog_pulse_buttons = [pulse_plus_button, pulse_minus_button]
+
+        def on_close():
+            self.increment_dialog = None
+            self.increment_dialog_controls = []
+            self.increment_dialog_pulse_buttons = []
+            dialog.destroy()
+
+        close_button.configure(command=on_close)
+        dialog.protocol("WM_DELETE_WINDOW", on_close)
+        self._update_increment_dialog_state()
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.focus_force()
+
+    def _update_increment_dialog_state(self):
+        enabled = bool(self.serial_port) and not self.pulse_in_progress
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for control in self.increment_dialog_controls:
+            if control.winfo_exists():
+                control.configure(state=state)
+        for button in self.increment_dialog_pulse_buttons:
+            if button.winfo_exists():
+                button.configure(state=state)
 
     def _refresh_ethercat_adapters(self):
         if pysoem is None:
@@ -1221,6 +1415,7 @@ class TestRunGui(tk.Tk):
         else:
             self.ethercat_adapter_var.set("")
             self.ethercat_status_var.set("EtherCAT: no Npcap-compatible adapter found")
+        self._update_connection_summary()
 
     @staticmethod
     def _ethercat_adapter_text(value):
@@ -1242,6 +1437,7 @@ class TestRunGui(tk.Tk):
                 "'Install Npcap in WinPcap API-compatible Mode'.",
             )
             return
+        self._refresh_ethercat_adapters()
         adapter_name = self.ethercat_adapters.get(self.ethercat_adapter_var.get())
         if not adapter_name:
             messagebox.showerror("No adapter selected", "Select the Ethernet adapter connected to the EK1100.")
@@ -1298,6 +1494,7 @@ class TestRunGui(tk.Tk):
         self.ethercat_connect_button.configure(text="Disconnect", state=tk.NORMAL)
         self.ethercat_status_var.set(f"EtherCAT: connected, {len(devices)} device(s) in PRE-OP")
         self.status_var.set(f"EtherCAT bus found on {adapter_name}: {len(devices)} device(s)")
+        self._update_connection_summary()
         self._write_debug_log(f"ETHERCAT connected adapter={adapter_name!r} devices={len(devices)}")
         for device in devices:
             line = (
@@ -1310,11 +1507,12 @@ class TestRunGui(tk.Tk):
 
     def _handle_ethercat_error(self, error):
         self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
         self.ethercat_refresh_button.configure(state=tk.NORMAL)
         self.ethercat_adapter_combo.configure(state="readonly")
         self.ethercat_status_var.set(f"EtherCAT: {error}")
         self.status_var.set(f"EtherCAT connection failed: {error}")
+        self._update_connection_summary()
         self._write_debug_log(f"ETHERCAT error {error}")
 
     def _disconnect_ethercat(self):
@@ -1325,10 +1523,11 @@ class TestRunGui(tk.Tk):
                 self._write_debug_log(f"ETHERCAT close error {exc}")
         self.ethercat_master = None
         self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
         self.ethercat_refresh_button.configure(state=tk.NORMAL)
         self.ethercat_adapter_combo.configure(state="readonly")
         self.ethercat_status_var.set("EtherCAT: disconnected")
+        self._update_connection_summary()
         self._write_debug_log("ETHERCAT disconnected")
 
     def _refresh_ports(self):
@@ -1344,24 +1543,28 @@ class TestRunGui(tk.Tk):
         labels = list(self.port_devices)
         self.port_combo["values"] = labels
         self.colibri_port_combo["values"] = labels
-        self.force_port_combo["values"] = labels
         if labels and self.port_var.get() not in labels:
             self.port_var.set(self._preferred_port_label(labels, ("arduino", "ttyacm")) or labels[0])
         if labels and self.colibri_port_var.get() not in labels:
             self.colibri_port_var.set(
                 self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
             )
-        if labels and self.force_port_var.get() not in labels:
-            self.force_port_var.set(
-                self._preferred_port_label(labels, ("gsv", "me-", "me ", "usb serial", "usb-serial")) or labels[0]
+        if (
+            len(labels) > 1
+            and self.colibri_port_var.get() == self.port_var.get()
+        ):
+            unused_labels = [label for label in labels if label != self.port_var.get()]
+            self.colibri_port_var.set(
+                self._preferred_port_label(unused_labels, ("dedi", "ftdi", "rs485", "ttyusb"))
+                or unused_labels[0]
             )
-        elif not labels:
+        if not labels:
             self.port_var.set("")
             self.colibri_port_var.set("")
-            self.force_port_var.set("")
             self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
+        self._update_connection_summary()
 
     def _preferred_port_label(self, labels, keywords):
         for keyword in keywords:
@@ -1369,6 +1572,22 @@ class TestRunGui(tk.Tk):
                 if keyword in label.lower():
                     return label
         return None
+
+    def _update_connection_summary(self):
+        arduino = "connected" if self.serial_port else "off"
+        colibri = "connected" if self.colibri else "off"
+        ethercat = "connected" if self.ethercat_master else "off"
+        with self.force_lock:
+            quantumx = self.latest_force_status
+        if quantumx == "ok":
+            quantumx = "connected"
+        elif self.force_client and quantumx in ("disconnected", "stale"):
+            quantumx = "connecting" if quantumx == "disconnected" else "stale"
+        else:
+            quantumx = "off" if not self.force_client else quantumx
+        self.connection_summary_var.set(
+            f"Arduino {arduino} | Colibri {colibri} | EtherCAT {ethercat} | QuantumX {quantumx}"
+        )
 
     def _toggle_connection(self):
         if self.serial_port:
@@ -1381,6 +1600,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
             return
 
+        self._refresh_ports()
         port = self._selected_port_device()
         if not port:
             messagebox.showerror("No port selected", "Select the Arduino serial port.")
@@ -1423,6 +1643,7 @@ class TestRunGui(tk.Tk):
         self._set_motor_controls_enabled(True)
         self.mode_var.set("Mode: connected")
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
+        self._update_connection_summary()
         self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
         self._apply_flow_threshold_setting()
@@ -1476,8 +1697,7 @@ class TestRunGui(tk.Tk):
             f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
         )
         self._write_debug_log(
-            f"GUI force port label={self.force_port_var.get()!r} device={self._selected_force_port_device()!r} "
-            f"baud={self.force_baud_var.get()!r} mode=binary scale={self.force_scaling:.12g}"
+            f"GUI QuantumX endpoint={self.quantumx_host_var.get()}:{self.quantumx_port_var.get()}"
         )
 
     def _stop_debug_log(self):
@@ -1546,6 +1766,7 @@ class TestRunGui(tk.Tk):
         self.last_valves_open = False
         self.mode_var.set("Mode: disconnected")
         self.status_var.set("Disconnected")
+        self._update_connection_summary()
         self._write_debug_log("ARDUINO disconnected")
 
     def _start_test(self):
@@ -1663,6 +1884,7 @@ class TestRunGui(tk.Tk):
         self.manual_pulse_button.configure(state=state)
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
+        self._update_increment_dialog_state()
 
     def _reset_increment(self):
         starting_pressure = self._validated_pressure(self.starting_pressure_var, "starting pressure")
@@ -1823,90 +2045,86 @@ class TestRunGui(tk.Tk):
         self._send("MOTOR_STOP")
 
     def _toggle_force_connection(self):
-        if self.force_serial_port:
+        if self.force_client:
             self._disconnect_force_sensor()
         else:
             self._connect_force_sensor()
 
     def _connect_force_sensor(self):
-        if serial is None:
-            messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
-            return
-
-        port = self._selected_force_port_device()
-        if not port:
-            messagebox.showerror("No port selected", "Select the force sensor serial port.")
-            return
-        if self.serial_port and port == self._selected_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the Arduino.")
-            return
-        if self.colibri and port == self._selected_colibri_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
+        if self.force_client:
             return
 
         try:
-            baud_rate = int(self.force_baud_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Invalid baud rate", "Enter a numeric baud rate for the force sensor.")
+            host = self.quantumx_host_var.get().strip()
+            port = int(self.quantumx_port_var.get())
+            if not host or not 1 <= port <= 65535:
+                raise ValueError("Enter a valid QuantumX host and port (1-65535).")
+            self._ensure_quantumx_monitor(host, port)
+        except (OSError, RuntimeError, ValueError, tk.TclError) as exc:
+            messagebox.showerror("QuantumX connection failed", str(exc))
             return
-
-        try:
-            self.force_serial_port = serial.Serial(
-                port,
-                baud_rate,
-                bytesize=8,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=FORCE_READ_TIMEOUT_SECONDS,
-                write_timeout=SERIAL_WRITE_TIMEOUT,
-            )
-            self.force_serial_port.reset_input_buffer()
-        except serial.SerialException as exc:
-            self.force_serial_port = None
-            messagebox.showerror("Force sensor connection failed", str(exc))
-            return
-
-        self.force_reader_running = True
-        self.force_reader_thread = threading.Thread(target=self._read_force_serial, daemon=True)
-        self.force_reader_thread.start()
+        self.force_client = QuantumXTcpClient(
+            host,
+            port,
+            on_sample=lambda sample: self.messages.put(("quantumx_force_sample", sample)),
+            on_status=lambda status: self.messages.put(("force_status", status)),
+        )
+        self.force_client.start()
         self.force_connect_button.configure(text="Disconnect")
-        self.force_port_combo.configure(state=tk.DISABLED)
-        self.force_baud_spinbox.configure(state=tk.DISABLED)
-        self.force_status_var.set(self._force_status(f"Force sensor: connected to {port} at {baud_rate} baud"))
-        self.status_var.set(f"Connected force sensor on {port}")
-        self._write_debug_log(f"FORCE connected port={port} baud={baud_rate}")
+        self.force_status_var.set(self._force_status("QuantumX: connecting"))
+        self.status_var.set("Connecting to QuantumX force bridge")
+        self._write_debug_log(f"FORCE QuantumX connecting endpoint={host}:{port}")
+        self._update_connection_summary()
+
+    def _ensure_quantumx_monitor(self, host, port):
+        try:
+            with socket.create_connection((host, port), timeout=0.15):
+                return
+        except OSError:
+            pass
+
+        if host not in ("127.0.0.1", "localhost") or port != QUANTUMX_PORT:
+            return
+        if not QUANTUMX_MONITOR_EXE.exists():
+            raise RuntimeError(
+                f"QuantumX monitor not built: {QUANTUMX_MONITOR_EXE}"
+            )
+        self.quantumx_monitor_process = subprocess.Popen(
+            [str(QUANTUMX_MONITOR_EXE), "--server-only"],
+            cwd=str(QUANTUMX_MONITOR_EXE.parent),
+        )
 
     def _disconnect_force_sensor(self):
-        self._write_debug_log("FORCE disconnect requested")
-        self.force_reader_running = False
-        if self.force_reader_thread:
-            self.force_reader_thread.join(timeout=0.5)
-        if self.force_serial_port:
-            self.force_serial_port.close()
-        self.force_serial_port = None
-        self.force_reader_thread = None
+        self._write_debug_log("FORCE QuantumX disconnect requested")
+        if self.force_client:
+            self.force_client.stop()
+        self.force_client = None
         with self.force_lock:
+            self.latest_force_sample = None
+            self.latest_force_1_n = None
+            self.latest_force_2_n = None
+            self.latest_force_status = "disconnected"
             self.latest_force_raw_n = None
             self.latest_force_n = None
             self.latest_force_time = None
-            self.force_average_samples.clear()
             self.force_rate_times.clear()
         self.force_connect_button.configure(text="Connect")
-        self.force_port_combo.configure(state="readonly")
-        self.force_baud_spinbox.configure(state=tk.NORMAL)
-        self.force_value_var.set("Force reading: --")
+        self.force_1_value_var.set("F1: --")
+        self.force_2_value_var.set("F2: --")
+        self.force_value_var.set("Force total: --")
         self.force_rate_var.set("Force rate: --")
-        self.force_status_var.set(self._force_status("Force sensor: disconnected"))
-        self._write_debug_log("FORCE disconnected")
+        self.force_status_var.set(self._force_status("QuantumX: disconnected"))
+        self._write_debug_log("FORCE QuantumX disconnected")
+        self._update_connection_summary()
 
     def _force_status(self, prefix):
         return (
-            f"{prefix} | binary 5-byte mode, scale {self.force_scaling:.6g} x{FORCE_BINARY_FULL_SCALE_FACTOR:.3g}, "
-            f"avg {self.force_average_seconds:.3g} s, impulse threshold {self.force_impulse_threshold:.4g}"
+            f"{prefix} | total = F1 + F2 | 100-value mean | "
+            f"impulse threshold {self.force_impulse_threshold:.4g} N"
         )
 
     def _format_force_value(self, force_value):
-        return "Force reading: --" if force_value is None else f"Force reading: {force_value:.4f}"
+        return "Force total: --" if force_value is None else f"Force total: {force_value:.4f} N"
 
     def _apply_force_scaling(self):
         try:
@@ -1921,7 +2139,6 @@ class TestRunGui(tk.Tk):
 
         with self.force_lock:
             self.force_scaling = force_scaling
-            self.force_average_samples.clear()
             if self.latest_force_raw_n is not None:
                 signed_fraction = (self.latest_force_raw_n - FORCE_BINARY_BIPOLAR_ZERO) / FORCE_BINARY_POSITIVE_SPAN
                 self.latest_force_n = signed_fraction * self.force_scaling * FORCE_BINARY_FULL_SCALE_FACTOR
@@ -1933,27 +2150,6 @@ class TestRunGui(tk.Tk):
         self.force_status_var.set(self._force_status("Force sensor: scaling applied"))
         self.status_var.set(f"Force scaling set to {force_scaling:.6g}")
         self._write_debug_log(f"FORCE scaling={force_scaling:.12g}")
-
-    def _apply_force_average(self):
-        try:
-            average_seconds = float(self.force_average_var.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Invalid force average", "Enter a numeric force average window in seconds.")
-            return
-
-        if average_seconds < 0.0:
-            messagebox.showerror("Invalid force average", "Force average window must be zero or greater.")
-            return
-
-        with self.force_lock:
-            self.force_average_seconds = average_seconds
-            self.force_average_samples.clear()
-            latest_force = self.latest_force_n
-
-        self.force_value_var.set(self._format_force_value(latest_force))
-        self.force_status_var.set(self._force_status("Force sensor: average applied"))
-        self.status_var.set(f"Force average window set to {average_seconds:.3g} s")
-        self._write_debug_log(f"FORCE average_seconds={average_seconds:.12g}")
 
     def _apply_force_impulse_threshold(self):
         try:
@@ -2017,7 +2213,7 @@ class TestRunGui(tk.Tk):
     def _store_force_value(self, force_reading, raw_reading=None):
         now = time.time()
         with self.force_lock:
-            force_n = self._filtered_force_value_locked(now, force_reading)
+            force_n = force_reading
             self.latest_force_raw_n = force_reading if raw_reading is None else raw_reading
             self.latest_force_n = force_n
             self.latest_force_time = now
@@ -2026,18 +2222,20 @@ class TestRunGui(tk.Tk):
                 self.force_rate_times.popleft()
             return force_n, self._force_rate_hz_locked()
 
-    def _filtered_force_value_locked(self, now, force_reading):
-        self.force_average_samples.append((now, force_reading))
-        if self.force_average_seconds <= 0.0:
-            return force_reading
-
-        cutoff = now - self.force_average_seconds
-        while self.force_average_samples and self.force_average_samples[0][0] < cutoff:
-            self.force_average_samples.popleft()
-        if not self.force_average_samples:
-            return force_reading
-
-        return sum(value for _, value in self.force_average_samples) / len(self.force_average_samples)
+    def _store_quantumx_sample(self, sample):
+        now = time.time()
+        with self.force_lock:
+            self.latest_force_sample = sample
+            self.latest_force_1_n = sample.force_1_n
+            self.latest_force_2_n = sample.force_2_n
+            self.latest_force_n = sample.force_total_n if sample.valid else None
+            self.latest_force_raw_n = None
+            self.latest_force_status = sample.status
+            self.latest_force_time = now
+            self.force_rate_times.append(now)
+            while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
+                self.force_rate_times.popleft()
+            return self._force_rate_hz_locked()
 
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
@@ -2049,11 +2247,16 @@ class TestRunGui(tk.Tk):
 
     def _force_value_for_live_row(self):
         with self.force_lock:
-            calibrated_force = self.latest_force_n
-            raw_force = self.latest_force_raw_n
+            sample = self.latest_force_sample
+            total_force = self.latest_force_n
         return (
-            "" if calibrated_force is None else f"{calibrated_force:.4f}",
-            "" if raw_force is None else f"{raw_force:.4f}",
+            "" if total_force is None else f"{total_force:.4f}",
+            "",
+            "" if sample is None or sample.force_1_n is None else f"{sample.force_1_n:.4f}",
+            "" if sample is None or sample.force_2_n is None else f"{sample.force_2_n:.4f}",
+            "" if sample is None else str(sample.timestamp_utc_ns),
+            "" if sample is None else str(sample.sequence),
+            "disconnected" if sample is None else sample.status,
         )
 
     def _extract_force_values(self, buffer):
@@ -2102,6 +2305,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
             return
 
+        self._refresh_ports()
         port = self._selected_colibri_port_device()
         if not port:
             messagebox.showerror("No port selected", "Select the Colibri serial port.")
@@ -2128,6 +2332,7 @@ class TestRunGui(tk.Tk):
         self._set_colibri_controls_enabled(True)
         self._handle_colibri_snapshot(snapshot, prefix=f"Connected to {port}")
         self._write_debug_log(f"COLIBRI connected port={port}")
+        self._update_connection_summary()
 
     def _disconnect_colibri(self):
         if self.colibri:
@@ -2142,6 +2347,7 @@ class TestRunGui(tk.Tk):
         self.colibri_position_var.set("Position: --")
         self.last_colibri_position_mm = None
         self.colibri_status_var.set("Colibri: disconnected")
+        self._update_connection_summary()
 
     def _set_colibri_controls_enabled(self, enabled):
         state = tk.NORMAL if enabled and self.colibri and not self.colibri_busy else tk.DISABLED
@@ -2268,7 +2474,7 @@ class TestRunGui(tk.Tk):
         def worker():
             try:
                 snapshot = task()
-            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
+            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError, RuntimeError) as exc:
                 self._write_debug_log(f"COLIBRI TASK error {label}: {exc}")
                 self.messages.put(("colibri_error", f"{label} failed: {exc}"))
             else:
@@ -2519,15 +2725,18 @@ class TestRunGui(tk.Tk):
     def _part_position_values(self):
         offsets = self._selected_part_offsets()
         nozzle_offset = self._part_float_value(self.nozzle_offset_var)
-        test_stand_height = self._part_float_value(self.test_stand_height_var)
-        holder_height = self._part_float_value(self.holder_height_var)
-        if offsets is None or nozzle_offset is None or test_stand_height is None or holder_height is None:
+        plate_distance = self._part_float_value(self.colibri_plate_distance_var)
+        if (
+            offsets is None
+            or nozzle_offset is None
+            or plate_distance is None
+        ):
             return None
 
-        y_offset, z_offset = offsets
+        y_offset, cap_height = offsets
         stepper_position = nozzle_offset + y_offset
-        colibri_position = test_stand_height - holder_height + z_offset
-        return y_offset, z_offset, stepper_position, colibri_position
+        colibri_position = COLIBRI_PLATE_CONTACT_POSITION_MM - cap_height - plate_distance
+        return y_offset, cap_height, stepper_position, colibri_position
 
     def _current_pose_hole_for_csv(self):
         pose = self.part_pose_var.get().strip()
@@ -2544,15 +2753,17 @@ class TestRunGui(tk.Tk):
         if self.motor_enabled_var.get() and self.last_motor_position_mm is not None and nozzle_offset is not None:
             stepper_y_offset = self.last_motor_position_mm - nozzle_offset
 
-        test_stand_height = self._part_float_value(self.test_stand_height_var)
-        holder_height = self._part_float_value(self.holder_height_var)
+        plate_distance = self._part_float_value(self.colibri_plate_distance_var)
         if (
             self.colibri_enabled_var.get()
             and self.last_colibri_position_mm is not None
-            and test_stand_height is not None
-            and holder_height is not None
+            and plate_distance is not None
         ):
-            colibri_z_offset = self.last_colibri_position_mm - test_stand_height + holder_height
+            colibri_z_offset = (
+                COLIBRI_PLATE_CONTACT_POSITION_MM
+                - plate_distance
+                - self.last_colibri_position_mm
+            )
 
         return stepper_y_offset, colibri_z_offset
 
@@ -2560,14 +2771,14 @@ class TestRunGui(tk.Tk):
         values = self._part_position_values()
         if values is None:
             self.part_y_offset_var.set("Y offset: --")
-            self.part_z_offset_var.set("Z offset: --")
+            self.part_z_offset_var.set("Cap height: --")
             self.part_stepper_position_var.set("Stepper target: --")
             self.part_colibri_position_var.set("Colibri target: --")
             return
 
-        y_offset, z_offset, stepper_position, colibri_position = values
+        y_offset, cap_height, stepper_position, colibri_position = values
         self.part_y_offset_var.set(f"Y offset: {y_offset:.3f} mm")
-        self.part_z_offset_var.set(f"Z offset: {z_offset:.3f} mm")
+        self.part_z_offset_var.set(f"Cap height: {cap_height:.3f} mm")
         self.part_stepper_position_var.set(f"Stepper target: {stepper_position:.3f} mm")
         self.part_colibri_position_var.set(f"Colibri target: {colibri_position:.3f} mm")
 
@@ -2583,6 +2794,24 @@ class TestRunGui(tk.Tk):
         self.status_var.set(
             f"Part targets set: stepper {stepper_position:.3f} mm, Colibri {colibri_position:.3f} mm"
         )
+
+    def _move_colibri_to_part_target(self):
+        values = self._part_position_values()
+        if values is None:
+            messagebox.showerror("No part target", "Load a part CSV and select a pose/hole first.")
+            return
+
+        _y_offset, _cap_height, _stepper_position, colibri_position = values
+        if not 0.0 <= colibri_position <= COLIBRI_TRAVEL_MM:
+            messagebox.showerror(
+                "Colibri target outside travel",
+                f"The calculated target is {colibri_position:.3f} mm. "
+                f"It must be between 0 and {COLIBRI_TRAVEL_MM:.1f} mm.",
+            )
+            return
+
+        self.colibri_absolute_var.set(round(colibri_position, 3))
+        self._colibri_move_absolute()
 
     def _mm_to_steps(self, distance_mm):
         return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
@@ -2705,9 +2934,32 @@ class TestRunGui(tk.Tk):
                 self.force_value_var.set(self._format_force_value(force_n))
                 if rate_hz is not None:
                     self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
+            elif kind == "quantumx_force_sample":
+                rate_hz = self._store_quantumx_sample(value)
+                self.force_1_value_var.set(
+                    "F1: --" if value.force_1_n is None else f"F1: {value.force_1_n:.4f} N"
+                )
+                self.force_2_value_var.set(
+                    "F2: --" if value.force_2_n is None else f"F2: {value.force_2_n:.4f} N"
+                )
+                self.force_value_var.set(self._format_force_value(self.latest_force_n))
+                if rate_hz is not None:
+                    self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
+                self._update_connection_summary()
             elif kind == "force_status":
-                self.force_status_var.set(value)
+                self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
+                if "stale" in value.lower() or "disconnected" in value.lower():
+                    with self.force_lock:
+                        self.latest_force_sample = None
+                        self.latest_force_1_n = None
+                        self.latest_force_2_n = None
+                        self.latest_force_n = None
+                        self.latest_force_status = "stale" if "stale" in value.lower() else "disconnected"
+                    self.force_1_value_var.set("F1: --")
+                    self.force_2_value_var.set("F2: --")
+                    self.force_value_var.set("Force total: --")
+                self._update_connection_summary()
             else:
                 self._handle_line(value)
         if drained_count:
@@ -2758,7 +3010,7 @@ class TestRunGui(tk.Tk):
         parts.extend(self._force_value_for_live_row())
         self._update_impulse_capture(parts)
         self.rows.append(parts)
-        self.table.insert("", tk.END, values=parts)
+        self.table.insert("", tk.END, values=parts[: len(self.table["columns"])])
         children = self.table.get_children()
         if len(children) > 250:
             self.table.delete(children[0])
@@ -2820,6 +3072,11 @@ class TestRunGui(tk.Tk):
                 "flow": self._optional_float(parts[6]),
                 "force": self._optional_float(parts[7]) if len(parts) > 7 else None,
                 "raw_force": self._optional_float(parts[8]) if len(parts) > 8 else None,
+                "force_1": self._optional_float(parts[9]) if len(parts) > 9 else None,
+                "force_2": self._optional_float(parts[10]) if len(parts) > 10 else None,
+                "force_timestamp_utc_ns": int(parts[11]) if len(parts) > 11 and parts[11] else None,
+                "force_sequence": int(parts[12]) if len(parts) > 12 and parts[12] else None,
+                "force_status": parts[13] if len(parts) > 13 else "disconnected",
             }
         except ValueError:
             return None
@@ -2865,8 +3122,9 @@ class TestRunGui(tk.Tk):
             "pressure_count": 0,
             "regulator_pressure_sum": 0.0,
             "regulator_pressure_count": 0,
-            "force_sum": 0.0,
-            "force_count": 0,
+            "force_threshold_started": False,
+            "force_threshold_done": False,
+            "force_accumulator": UniqueForceAccumulator(self.force_impulse_threshold),
             "max_flow": None,
             "flow_sample_count": 0,
             "last_flow_time_ms": None,
@@ -2893,10 +3151,12 @@ class TestRunGui(tk.Tk):
                 self.current_impulse["regulator_pressure_sum"] += regulator_pressure
                 self.current_impulse["regulator_pressure_count"] += 1
 
-        force = sample["force"]
-        if force is not None and abs(force) >= self.force_impulse_threshold:
-            self.current_impulse["force_sum"] += force
-            self.current_impulse["force_count"] += 1
+        with self.force_lock:
+            force_sample = self.latest_force_sample
+        accumulator = self.current_impulse["force_accumulator"]
+        accumulator.add(force_sample)
+        self.current_impulse["force_threshold_started"] = accumulator.started
+        self.current_impulse["force_threshold_done"] = accumulator.done
 
     def _add_flow_sample(self, sample):
         flow = sample["flow"]
@@ -2928,8 +3188,11 @@ class TestRunGui(tk.Tk):
             if regulator_pressure_count
             else ""
         )
-        force_count = impulse["force_count"]
-        avg_force = impulse["force_sum"] / force_count if force_count else ""
+        force_accumulator = impulse["force_accumulator"]
+        force_count = force_accumulator.total_count
+        avg_force = force_accumulator.average_total_n
+        avg_force_1 = force_accumulator.average_force_1_n
+        avg_force_2 = force_accumulator.average_force_2_n
         valve_close_time_ms = impulse["valve_close_time_ms"]
         if valve_close_time_ms is None:
             valve_close_time_ms = impulse["capture_end_time_ms"]
@@ -2952,6 +3215,8 @@ class TestRunGui(tk.Tk):
             self._format_csv_number(avg_regulator_pressure),
             self._format_csv_number(avg_pressure),
             self._format_csv_number(avg_force, digits=4),
+            self._format_csv_number(avg_force_1, digits=4),
+            self._format_csv_number(avg_force_2, digits=4),
             self._format_csv_number(impulse["max_flow"]),
             self._format_csv_number(impulse["volume_l"], digits=6),
             *self._nozzle_mask_flags(impulse["valve_mask"]),
@@ -3087,11 +3352,11 @@ class TestRunGui(tk.Tk):
 
         if self.impulse_rows:
             if max_flow is not None:
-                self.impulse_rows[-1][14] = self._format_csv_number(max_flow)
+                self.impulse_rows[-1][16] = self._format_csv_number(max_flow)
             if volume_l is not None:
-                self.impulse_rows[-1][15] = self._format_csv_number(volume_l, digits=6)
+                self.impulse_rows[-1][17] = self._format_csv_number(volume_l, digits=6)
             if flow_sample_count is not None:
-                self.impulse_rows[-1][22] = int(round(flow_sample_count))
+                self.impulse_rows[-1][24] = int(round(flow_sample_count))
 
     def _pulse_field_float(self, parts, field_name):
         if field_name not in parts:
@@ -3146,8 +3411,8 @@ class TestRunGui(tk.Tk):
 
         if self.impulse_rows:
             self.impulse_rows[-1][1] = flip_angle
-            if self.impulse_rows[-1][16] == "":
-                self.impulse_rows[-1][16:20] = self._nozzle_mask_flags(valve_mask)
+            if self.impulse_rows[-1][18] == "":
+                self.impulse_rows[-1][18:22] = self._nozzle_mask_flags(valve_mask)
             return
 
         self.pending_flip_angle = flip_angle
@@ -3294,6 +3559,8 @@ class TestRunGui(tk.Tk):
                 "average actual regulator pressure",
                 "average pressure before valve",
                 "average force reading",
+                "average force 1",
+                "average force 2",
                 "maximum flow",
                 "volume l",
                 "nozzle 1 used",
@@ -3327,6 +3594,11 @@ class TestRunGui(tk.Tk):
                 "flow",
                 "force reading",
                 "raw force reading",
+                "force 1",
+                "force 2",
+                "force timestamp utc ns",
+                "force sequence",
+                "force status",
             ])
             writer.writerows(self._csv_output_row(row) for row in self.rows)
 
@@ -3352,6 +3624,13 @@ class TestRunGui(tk.Tk):
         self.closing = True
         self._disconnect_ethercat()
         self._disconnect_force_sensor()
+        if self.quantumx_monitor_process and self.quantumx_monitor_process.poll() is None:
+            self.quantumx_monitor_process.terminate()
+            try:
+                self.quantumx_monitor_process.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                self.quantumx_monitor_process.kill()
+        self.quantumx_monitor_process = None
         self._disconnect_colibri()
         self._disconnect()
         if self.debug_log_file:

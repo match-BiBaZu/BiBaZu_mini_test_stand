@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>true</Prefer32Bit>
+    <BaseOutputPath>bin\x86\</BaseOutputPath>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <HbmApiRoot Condition="'$(HbmApiRoot)' == ''">C:\Users\Public\Documents\HBM\HBM Common API\API</HbmApiRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Hbm.Api.Common">
+      <HintPath>$(HbmApiRoot)\Hbm.Api.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Hbm.Api.QuantumX">
+      <HintPath>$(HbmApiRoot)\Hbm.Api.QuantumX.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(HbmApiRoot)\Newtonsoft.Json.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="$(HbmApiRoot)\*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <Content Include="$(HbmApiRoot)\*.json" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <Content Include="$(HbmApiRoot)\DeviceDriver.plugins" CopyToOutputDirectory="PreserveNewest" Link="DeviceDriver.plugins" />
+    <Content Include="$(HbmApiRoot)\x86\*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <Content Include="$(HbmApiRoot)\Databases\*.*" CopyToOutputDirectory="PreserveNewest" Link="Databases\%(Filename)%(Extension)" />
+    <Content Include="$(HbmApiRoot)\TEDSDefinition\*.*" CopyToOutputDirectory="PreserveNewest" Link="TEDSDefinition\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
