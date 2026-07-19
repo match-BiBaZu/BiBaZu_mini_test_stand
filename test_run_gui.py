@@ -446,6 +446,9 @@ class TestRunGui(tk.Tk):
         self.pending_pulse_duration_ms = None
         self.active_test_mask = ""
         self.part_rows = {}
+        self.increment_dialog = None
+        self.increment_dialog_controls = []
+        self.increment_dialog_pulse_buttons = []
 
         self._build_ui()
         for variable in (
@@ -726,13 +729,18 @@ class TestRunGui(tk.Tk):
         )
         self.manual_pulse_button.pack(side=tk.LEFT, padx=(18, 0))
 
+        ttk.Button(
+            pulse_controls,
+            text="Increment pressure…",
+            command=self._open_increment_pressure_settings,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
         self.increment_pulse_button = ttk.Button(
             pulse_controls,
             text="Pulse + increment",
             command=self._increment_pulse,
             state=tk.DISABLED,
         )
-        self.increment_pulse_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.decrement_pulse_button = ttk.Button(
             pulse_controls,
@@ -740,10 +748,8 @@ class TestRunGui(tk.Tk):
             command=self._decrement_pulse,
             state=tk.DISABLED,
         )
-        self.decrement_pulse_button.pack(side=tk.LEFT, padx=(8, 0))
 
         increment_controls = ttk.Frame(root)
-        increment_controls.pack(fill=tk.X, pady=(10, 0))
 
         ttk.Label(increment_controls, text="Starting pressure").pack(side=tk.LEFT)
         self.starting_pressure_spinbox = ttk.Spinbox(
@@ -1262,6 +1268,117 @@ class TestRunGui(tk.Tk):
         dialog.grab_set()
         dialog.focus_force()
 
+    def _open_increment_pressure_settings(self):
+        if self.increment_dialog and self.increment_dialog.winfo_exists():
+            self.increment_dialog.lift()
+            self.increment_dialog.focus_force()
+            return
+
+        dialog = tk.Toplevel(self)
+        self.increment_dialog = dialog
+        dialog.title("Increment Pressure")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(body, text="Starting pressure").grid(row=0, column=0, sticky=tk.W, pady=6)
+        starting_spinbox = ttk.Spinbox(
+            body,
+            from_=0.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
+            increment=0.05,
+            textvariable=self.starting_pressure_var,
+            width=10,
+        )
+        starting_spinbox.grid(row=0, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+        ttk.Label(body, text="bar").grid(row=0, column=2, sticky=tk.W, pady=6)
+
+        ttk.Label(body, text="Pressure increment").grid(row=1, column=0, sticky=tk.W, pady=6)
+        increment_spinbox = ttk.Spinbox(
+            body,
+            from_=0.0,
+            to=REGULATOR_MAX_PRESSURE_BAR,
+            increment=0.05,
+            textvariable=self.pressure_increment_var,
+            width=10,
+        )
+        increment_spinbox.grid(row=1, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+        ttk.Label(body, text="bar").grid(row=1, column=2, sticky=tk.W, pady=6)
+
+        ttk.Label(body, text="Increment count").grid(row=2, column=0, sticky=tk.W, pady=6)
+        ttk.Label(
+            body,
+            textvariable=self.increment_count_var,
+            width=10,
+            font=("TkDefaultFont", 11, "bold"),
+        ).grid(row=2, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+
+        pulse_frame = ttk.Frame(body)
+        pulse_frame.grid(row=3, column=0, columnspan=3, sticky=tk.EW, pady=(12, 4))
+        pulse_plus_button = ttk.Button(
+            pulse_frame,
+            text="Pulse + increment",
+            command=self._increment_pulse,
+        )
+        pulse_plus_button.pack(side=tk.LEFT)
+        pulse_minus_button = ttk.Button(
+            pulse_frame,
+            text="Pulse - increment",
+            command=self._decrement_pulse,
+        )
+        pulse_minus_button.pack(side=tk.LEFT, padx=(8, 0))
+        reset_button = ttk.Button(
+            pulse_frame,
+            text="Reset increment",
+            command=self._reset_increment,
+        )
+        reset_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(
+            body,
+            text="Keyboard shortcuts remain active: 2 = plus, 3 = minus.",
+            foreground="#555555",
+        ).grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(10, 4))
+
+        close_button = ttk.Button(body, text="Close")
+        close_button.grid(
+            row=5,
+            column=0,
+            columnspan=3,
+            sticky=tk.E,
+            pady=(12, 0),
+        )
+
+        self.increment_dialog_controls = [starting_spinbox, increment_spinbox, reset_button]
+        self.increment_dialog_pulse_buttons = [pulse_plus_button, pulse_minus_button]
+
+        def on_close():
+            self.increment_dialog = None
+            self.increment_dialog_controls = []
+            self.increment_dialog_pulse_buttons = []
+            dialog.destroy()
+
+        close_button.configure(command=on_close)
+        dialog.protocol("WM_DELETE_WINDOW", on_close)
+        self._update_increment_dialog_state()
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.focus_force()
+
+    def _update_increment_dialog_state(self):
+        enabled = bool(self.serial_port) and not self.pulse_in_progress
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for control in self.increment_dialog_controls:
+            if control.winfo_exists():
+                control.configure(state=state)
+        for button in self.increment_dialog_pulse_buttons:
+            if button.winfo_exists():
+                button.configure(state=state)
+
     def _refresh_ethercat_adapters(self):
         if pysoem is None:
             self.ethercat_status_var.set("EtherCAT: install pysoem and Npcap first")
@@ -1767,6 +1884,7 @@ class TestRunGui(tk.Tk):
         self.manual_pulse_button.configure(state=state)
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
+        self._update_increment_dialog_state()
 
     def _reset_increment(self):
         starting_pressure = self._validated_pressure(self.starting_pressure_var, "starting pressure")
