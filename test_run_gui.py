@@ -376,6 +376,13 @@ class TestRunGui(tk.Tk):
         self.colibri_port_var = tk.StringVar()
         self.force_port_var = tk.StringVar()
         self.ethercat_adapter_var = tk.StringVar()
+        self.quantumx_host_var = tk.StringVar(
+            value=str(self.user_presets.get("quantumx_host", QUANTUMX_HOST))
+        )
+        self.quantumx_port_var = tk.IntVar(
+            value=self._preset_int("quantumx_port", QUANTUMX_PORT, 1, 65535)
+        )
+        self.connection_summary_var = tk.StringVar(value="Connections: initializing")
         self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
@@ -467,6 +474,13 @@ class TestRunGui(tk.Tk):
             value = default
         return min(max(value, minimum), maximum)
 
+    def _preset_int(self, key, default, minimum, maximum):
+        try:
+            value = int(self.user_presets.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return min(max(value, minimum), maximum)
+
     def _on_close(self):
         response = self._ask_save_user_presets()
         if response is None:
@@ -485,8 +499,8 @@ class TestRunGui(tk.Tk):
         ttk.Label(
             dialog,
             text=(
-                "Save the current force settings, nozzle offset, and target distance "
-                "to the plate as defaults?"
+                "Save the current connection and force settings, nozzle offset, and target "
+                "distance to the plate as defaults?"
             ),
             wraplength=420,
             justify=tk.LEFT,
@@ -519,6 +533,8 @@ class TestRunGui(tk.Tk):
             presets = {
                 "force_scaling": float(self.force_scale_var.get()),
                 "force_impulse_threshold": float(self.force_impulse_threshold_var.get()),
+                "quantumx_host": self.quantumx_host_var.get().strip(),
+                "quantumx_port": int(self.quantumx_port_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
             }
@@ -539,16 +555,52 @@ class TestRunGui(tk.Tk):
         root = ttk.Frame(self, padding=12)
         root.pack(fill=tk.BOTH, expand=True)
 
+        connection_controls = ttk.Frame(root)
+        connection_controls.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Button(
+            connection_controls,
+            text="Connection settings…",
+            command=self._open_connection_settings,
+        ).pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="Arduino").pack(side=tk.LEFT, padx=(16, 4))
+        self.connect_button = ttk.Button(connection_controls, text="Connect", command=self._toggle_connection)
+        self.connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="Colibri").pack(side=tk.LEFT, padx=(12, 4))
+        self.colibri_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_colibri_connection,
+        )
+        self.colibri_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="EtherCAT").pack(side=tk.LEFT, padx=(12, 4))
+        self.ethercat_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_ethercat_connection,
+        )
+        self.ethercat_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, text="QuantumX").pack(side=tk.LEFT, padx=(12, 4))
+        self.force_connect_button = ttk.Button(
+            connection_controls,
+            text="Connect",
+            command=self._toggle_force_connection,
+        )
+        self.force_connect_button.pack(side=tk.LEFT)
+        ttk.Label(connection_controls, textvariable=self.connection_summary_var).pack(
+            side=tk.LEFT,
+            padx=(18, 0),
+        )
+
+        # Persistent, non-visible selectors hold the values used by connection
+        # routines. The user-facing selectors live in the settings dialog.
+        self.port_combo = ttk.Combobox(root, textvariable=self.port_var, state="readonly")
+        self.colibri_port_combo = ttk.Combobox(root, textvariable=self.colibri_port_var, state="readonly")
+        self.ethercat_adapter_combo = ttk.Combobox(root, textvariable=self.ethercat_adapter_var, state="readonly")
+        self.ethercat_refresh_button = ttk.Button(root, command=self._refresh_ethercat_adapters)
+
         controls = ttk.Frame(root)
         controls.pack(fill=tk.X)
-
-        ttk.Label(controls, text="Port").pack(side=tk.LEFT)
-        self.port_combo = ttk.Combobox(controls, textvariable=self.port_var, width=18, state="readonly")
-        self.port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        ttk.Button(controls, text="Refresh", command=self._refresh_ports).pack(side=tk.LEFT)
-        self.connect_button = ttk.Button(controls, text="Connect", command=self._toggle_connection)
-        self.connect_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.start_button = ttk.Button(controls, text="Start test", command=self._start_test, state=tk.DISABLED)
         self.start_button.pack(side=tk.LEFT, padx=(18, 0))
@@ -597,30 +649,6 @@ class TestRunGui(tk.Tk):
         self.debug_log_button = ttk.Button(controls, text="Start debug log", command=self._toggle_debug_log)
         self.debug_log_button.pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(controls, text="Clear", command=self._clear_log).pack(side=tk.RIGHT, padx=(0, 8))
-
-        ethercat_controls = ttk.Frame(root)
-        ethercat_controls.pack(fill=tk.X, pady=(10, 0))
-        ttk.Label(ethercat_controls, text="EtherCAT (EK1100)").pack(side=tk.LEFT)
-        self.ethercat_adapter_combo = ttk.Combobox(
-            ethercat_controls,
-            textvariable=self.ethercat_adapter_var,
-            width=52,
-            state="readonly",
-        )
-        self.ethercat_adapter_combo.pack(side=tk.LEFT, padx=(6, 8))
-        self.ethercat_refresh_button = ttk.Button(
-            ethercat_controls,
-            text="Refresh adapters",
-            command=self._refresh_ethercat_adapters,
-        )
-        self.ethercat_refresh_button.pack(side=tk.LEFT)
-        self.ethercat_connect_button = ttk.Button(
-            ethercat_controls,
-            text="Scan and connect",
-            command=self._toggle_ethercat_connection,
-        )
-        self.ethercat_connect_button.pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Label(ethercat_controls, textvariable=self.ethercat_status_var).pack(side=tk.LEFT, padx=(12, 0))
 
         pressure_controls = ttk.Frame(root)
         pressure_controls.pack(fill=tk.X, pady=(10, 0))
@@ -874,21 +902,7 @@ class TestRunGui(tk.Tk):
         colibri_connection_controls = ttk.Frame(root)
         colibri_connection_controls.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(colibri_connection_controls, text="Colibri").pack(side=tk.LEFT)
-        self.colibri_port_combo = ttk.Combobox(
-            colibri_connection_controls,
-            textvariable=self.colibri_port_var,
-            width=36,
-            state="readonly",
-        )
-        self.colibri_port_combo.pack(side=tk.LEFT, padx=(6, 8))
-
-        self.colibri_connect_button = ttk.Button(
-            colibri_connection_controls,
-            text="Connect",
-            command=self._toggle_colibri_connection,
-        )
-        self.colibri_connect_button.pack(side=tk.LEFT)
+        ttk.Label(colibri_connection_controls, text="Colibri position").pack(side=tk.LEFT)
         self.colibri_refresh_button = ttk.Button(
             colibri_connection_controls,
             text="Read status",
@@ -1028,14 +1042,7 @@ class TestRunGui(tk.Tk):
         force_controls = ttk.Frame(root)
         force_controls.pack(fill=tk.X, pady=(10, 0))
 
-        ttk.Label(force_controls, text=f"QuantumX {QUANTUMX_HOST}:{QUANTUMX_PORT}").pack(side=tk.LEFT)
-
-        self.force_connect_button = ttk.Button(
-            force_controls,
-            text="Connect",
-            command=self._toggle_force_connection,
-        )
-        self.force_connect_button.pack(side=tk.LEFT)
+        ttk.Label(force_controls, text="Force").pack(side=tk.LEFT)
 
         ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT, padx=(8, 0))
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
@@ -1161,6 +1168,100 @@ class TestRunGui(tk.Tk):
         self.bind("2", lambda event: _trigger_pulse_btn(event, self.increment_pulse_button))
         self.bind("3", lambda event: _trigger_pulse_btn(event, self.decrement_pulse_button))
 
+    def _open_connection_settings(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("Connection Settings")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(body, text="Arduino COM port").grid(row=0, column=0, sticky=tk.W, pady=5)
+        arduino_combo = ttk.Combobox(
+            body,
+            textvariable=self.port_var,
+            values=list(self.port_devices),
+            width=52,
+            state=tk.DISABLED if self.serial_port else "readonly",
+        )
+        arduino_combo.grid(row=0, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="Colibri COM port").grid(row=1, column=0, sticky=tk.W, pady=5)
+        colibri_combo = ttk.Combobox(
+            body,
+            textvariable=self.colibri_port_var,
+            values=list(self.port_devices),
+            width=52,
+            state=tk.DISABLED if self.colibri else "readonly",
+        )
+        colibri_combo.grid(row=1, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="EtherCAT adapter").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ethercat_combo = ttk.Combobox(
+            body,
+            textvariable=self.ethercat_adapter_var,
+            values=list(self.ethercat_adapters),
+            width=52,
+            state=tk.DISABLED if self.ethercat_master else "readonly",
+        )
+        ethercat_combo.grid(row=2, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="QuantumX host").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(
+            body,
+            textvariable=self.quantumx_host_var,
+            width=24,
+            state=tk.DISABLED if self.force_client else tk.NORMAL,
+        ).grid(
+            row=3,
+            column=1,
+            sticky=tk.W,
+            padx=(12, 0),
+            pady=5,
+        )
+
+        ttk.Label(body, text="QuantumX port").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(
+            body,
+            from_=1,
+            to=65535,
+            textvariable=self.quantumx_port_var,
+            width=10,
+            state=tk.DISABLED if self.force_client else tk.NORMAL,
+        ).grid(row=4, column=1, sticky=tk.W, padx=(12, 0), pady=5)
+
+        ttk.Label(
+            body,
+            text=(
+                "Auto-detect uses the device descriptions and avoids assigning Arduino and "
+                "Colibri to the same COM port. Changes take effect on the next connection."
+            ),
+            wraplength=560,
+            foreground="#555555",
+        ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(10, 4))
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=6, column=0, columnspan=2, sticky=tk.E, pady=(12, 0))
+
+        def auto_detect():
+            self._refresh_ports()
+            self._refresh_ethercat_adapters()
+            arduino_combo["values"] = list(self.port_devices)
+            colibri_combo["values"] = list(self.port_devices)
+            ethercat_combo["values"] = list(self.ethercat_adapters)
+            self._update_connection_summary()
+
+        ttk.Button(buttons, text="Auto-detect", command=auto_detect).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side=tk.LEFT)
+
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        dialog.focus_force()
+
     def _refresh_ethercat_adapters(self):
         if pysoem is None:
             self.ethercat_status_var.set("EtherCAT: install pysoem and Npcap first")
@@ -1197,6 +1298,7 @@ class TestRunGui(tk.Tk):
         else:
             self.ethercat_adapter_var.set("")
             self.ethercat_status_var.set("EtherCAT: no Npcap-compatible adapter found")
+        self._update_connection_summary()
 
     @staticmethod
     def _ethercat_adapter_text(value):
@@ -1218,6 +1320,7 @@ class TestRunGui(tk.Tk):
                 "'Install Npcap in WinPcap API-compatible Mode'.",
             )
             return
+        self._refresh_ethercat_adapters()
         adapter_name = self.ethercat_adapters.get(self.ethercat_adapter_var.get())
         if not adapter_name:
             messagebox.showerror("No adapter selected", "Select the Ethernet adapter connected to the EK1100.")
@@ -1274,6 +1377,7 @@ class TestRunGui(tk.Tk):
         self.ethercat_connect_button.configure(text="Disconnect", state=tk.NORMAL)
         self.ethercat_status_var.set(f"EtherCAT: connected, {len(devices)} device(s) in PRE-OP")
         self.status_var.set(f"EtherCAT bus found on {adapter_name}: {len(devices)} device(s)")
+        self._update_connection_summary()
         self._write_debug_log(f"ETHERCAT connected adapter={adapter_name!r} devices={len(devices)}")
         for device in devices:
             line = (
@@ -1286,11 +1390,12 @@ class TestRunGui(tk.Tk):
 
     def _handle_ethercat_error(self, error):
         self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
         self.ethercat_refresh_button.configure(state=tk.NORMAL)
         self.ethercat_adapter_combo.configure(state="readonly")
         self.ethercat_status_var.set(f"EtherCAT: {error}")
         self.status_var.set(f"EtherCAT connection failed: {error}")
+        self._update_connection_summary()
         self._write_debug_log(f"ETHERCAT error {error}")
 
     def _disconnect_ethercat(self):
@@ -1301,10 +1406,11 @@ class TestRunGui(tk.Tk):
                 self._write_debug_log(f"ETHERCAT close error {exc}")
         self.ethercat_master = None
         self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Scan and connect", state=tk.NORMAL)
+        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
         self.ethercat_refresh_button.configure(state=tk.NORMAL)
         self.ethercat_adapter_combo.configure(state="readonly")
         self.ethercat_status_var.set("EtherCAT: disconnected")
+        self._update_connection_summary()
         self._write_debug_log("ETHERCAT disconnected")
 
     def _refresh_ports(self):
@@ -1326,12 +1432,22 @@ class TestRunGui(tk.Tk):
             self.colibri_port_var.set(
                 self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
             )
+        if (
+            len(labels) > 1
+            and self.colibri_port_var.get() == self.port_var.get()
+        ):
+            unused_labels = [label for label in labels if label != self.port_var.get()]
+            self.colibri_port_var.set(
+                self._preferred_port_label(unused_labels, ("dedi", "ftdi", "rs485", "ttyusb"))
+                or unused_labels[0]
+            )
         if not labels:
             self.port_var.set("")
             self.colibri_port_var.set("")
             self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
+        self._update_connection_summary()
 
     def _preferred_port_label(self, labels, keywords):
         for keyword in keywords:
@@ -1339,6 +1455,22 @@ class TestRunGui(tk.Tk):
                 if keyword in label.lower():
                     return label
         return None
+
+    def _update_connection_summary(self):
+        arduino = "connected" if self.serial_port else "off"
+        colibri = "connected" if self.colibri else "off"
+        ethercat = "connected" if self.ethercat_master else "off"
+        with self.force_lock:
+            quantumx = self.latest_force_status
+        if quantumx == "ok":
+            quantumx = "connected"
+        elif self.force_client and quantumx in ("disconnected", "stale"):
+            quantumx = "connecting" if quantumx == "disconnected" else "stale"
+        else:
+            quantumx = "off" if not self.force_client else quantumx
+        self.connection_summary_var.set(
+            f"Arduino {arduino} | Colibri {colibri} | EtherCAT {ethercat} | QuantumX {quantumx}"
+        )
 
     def _toggle_connection(self):
         if self.serial_port:
@@ -1351,6 +1483,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
             return
 
+        self._refresh_ports()
         port = self._selected_port_device()
         if not port:
             messagebox.showerror("No port selected", "Select the Arduino serial port.")
@@ -1393,6 +1526,7 @@ class TestRunGui(tk.Tk):
         self._set_motor_controls_enabled(True)
         self.mode_var.set("Mode: connected")
         self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
+        self._update_connection_summary()
         self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
         self._apply_flow_threshold_setting()
@@ -1445,7 +1579,9 @@ class TestRunGui(tk.Tk):
         self._write_debug_log(
             f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
         )
-        self._write_debug_log(f"GUI QuantumX endpoint={QUANTUMX_HOST}:{QUANTUMX_PORT}")
+        self._write_debug_log(
+            f"GUI QuantumX endpoint={self.quantumx_host_var.get()}:{self.quantumx_port_var.get()}"
+        )
 
     def _stop_debug_log(self):
         self._write_debug_log("LOG stopped")
@@ -1513,6 +1649,7 @@ class TestRunGui(tk.Tk):
         self.last_valves_open = False
         self.mode_var.set("Mode: disconnected")
         self.status_var.set("Disconnected")
+        self._update_connection_summary()
         self._write_debug_log("ARDUINO disconnected")
 
     def _start_test(self):
@@ -1800,13 +1937,17 @@ class TestRunGui(tk.Tk):
             return
 
         try:
-            self._ensure_quantumx_monitor()
-        except (OSError, RuntimeError) as exc:
+            host = self.quantumx_host_var.get().strip()
+            port = int(self.quantumx_port_var.get())
+            if not host or not 1 <= port <= 65535:
+                raise ValueError("Enter a valid QuantumX host and port (1-65535).")
+            self._ensure_quantumx_monitor(host, port)
+        except (OSError, RuntimeError, ValueError, tk.TclError) as exc:
             messagebox.showerror("QuantumX connection failed", str(exc))
             return
         self.force_client = QuantumXTcpClient(
-            QUANTUMX_HOST,
-            QUANTUMX_PORT,
+            host,
+            port,
             on_sample=lambda sample: self.messages.put(("quantumx_force_sample", sample)),
             on_status=lambda status: self.messages.put(("force_status", status)),
         )
@@ -1814,15 +1955,18 @@ class TestRunGui(tk.Tk):
         self.force_connect_button.configure(text="Disconnect")
         self.force_status_var.set(self._force_status("QuantumX: connecting"))
         self.status_var.set("Connecting to QuantumX force bridge")
-        self._write_debug_log(f"FORCE QuantumX connecting endpoint={QUANTUMX_HOST}:{QUANTUMX_PORT}")
+        self._write_debug_log(f"FORCE QuantumX connecting endpoint={host}:{port}")
+        self._update_connection_summary()
 
-    def _ensure_quantumx_monitor(self):
+    def _ensure_quantumx_monitor(self, host, port):
         try:
-            with socket.create_connection((QUANTUMX_HOST, QUANTUMX_PORT), timeout=0.15):
+            with socket.create_connection((host, port), timeout=0.15):
                 return
         except OSError:
             pass
 
+        if host not in ("127.0.0.1", "localhost") or port != QUANTUMX_PORT:
+            return
         if not QUANTUMX_MONITOR_EXE.exists():
             raise RuntimeError(
                 f"QuantumX monitor not built: {QUANTUMX_MONITOR_EXE}"
@@ -1853,6 +1997,7 @@ class TestRunGui(tk.Tk):
         self.force_rate_var.set("Force rate: --")
         self.force_status_var.set(self._force_status("QuantumX: disconnected"))
         self._write_debug_log("FORCE QuantumX disconnected")
+        self._update_connection_summary()
 
     def _force_status(self, prefix):
         return (
@@ -2042,6 +2187,7 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
             return
 
+        self._refresh_ports()
         port = self._selected_colibri_port_device()
         if not port:
             messagebox.showerror("No port selected", "Select the Colibri serial port.")
@@ -2068,6 +2214,7 @@ class TestRunGui(tk.Tk):
         self._set_colibri_controls_enabled(True)
         self._handle_colibri_snapshot(snapshot, prefix=f"Connected to {port}")
         self._write_debug_log(f"COLIBRI connected port={port}")
+        self._update_connection_summary()
 
     def _disconnect_colibri(self):
         if self.colibri:
@@ -2082,6 +2229,7 @@ class TestRunGui(tk.Tk):
         self.colibri_position_var.set("Position: --")
         self.last_colibri_position_mm = None
         self.colibri_status_var.set("Colibri: disconnected")
+        self._update_connection_summary()
 
     def _set_colibri_controls_enabled(self, enabled):
         state = tk.NORMAL if enabled and self.colibri and not self.colibri_busy else tk.DISABLED
@@ -2679,6 +2827,7 @@ class TestRunGui(tk.Tk):
                 self.force_value_var.set(self._format_force_value(self.latest_force_n))
                 if rate_hz is not None:
                     self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
+                self._update_connection_summary()
             elif kind == "force_status":
                 self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
@@ -2692,6 +2841,7 @@ class TestRunGui(tk.Tk):
                     self.force_1_value_var.set("F1: --")
                     self.force_2_value_var.set("F2: --")
                     self.force_value_var.set("Force total: --")
+                self._update_connection_summary()
             else:
                 self._handle_line(value)
         if drained_count:
