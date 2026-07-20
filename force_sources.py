@@ -165,25 +165,31 @@ class UniqueForceAccumulator:
         if sample is None or sample.sample_id in self._seen_ids:
             return False
         self._seen_ids.add(sample.sample_id)
-        if self.done or not sample.valid:
+        if not sample.valid:
             return False
 
-        force_total = sample.force_total_n
+        force_total = sample.force_total_mean_20_n
+        if force_total is None:
+            force_total = sample.force_total_n
         if force_total is None:
             return False
         if abs(force_total) < self.threshold_n:
-            if self.started:
-                self.done = True
             return False
 
         self.started = True
         self.total_sum += force_total
         self.total_count += 1
-        if sample.force_1_n is not None:
-            self.force_1_sum += sample.force_1_n
+        force_1 = sample.force_1_mean_20_n
+        if force_1 is None:
+            force_1 = sample.force_1_n
+        force_2 = sample.force_2_mean_20_n
+        if force_2 is None:
+            force_2 = sample.force_2_n
+        if force_1 is not None:
+            self.force_1_sum += force_1
             self.force_1_count += 1
-        if sample.force_2_n is not None:
-            self.force_2_sum += sample.force_2_n
+        if force_2 is not None:
+            self.force_2_sum += force_2
             self.force_2_count += 1
         return True
 

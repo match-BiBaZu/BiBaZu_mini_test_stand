@@ -4134,6 +4134,10 @@ class TestRunGui(tk.Tk):
         if self.current_impulse is None or not sample.valid:
             return
         self.current_impulse["force_trace"].append(self._force_sample_trace_row(sample))
+        accumulator = self.current_impulse["force_accumulator"]
+        accumulator.add(sample)
+        self.current_impulse["force_threshold_started"] = accumulator.started
+        self.current_impulse["force_threshold_done"] = accumulator.done
 
     def _add_pressure_sample(self, sample, include_statistics=True):
         self.current_impulse["pressure_trace"].append(
@@ -4160,13 +4164,6 @@ class TestRunGui(tk.Tk):
             if regulator_pressure is not None:
                 self.current_impulse["regulator_pressure_sum"] += regulator_pressure
                 self.current_impulse["regulator_pressure_count"] += 1
-
-        with self.force_lock:
-            force_sample = self.latest_force_sample
-        accumulator = self.current_impulse["force_accumulator"]
-        accumulator.add(force_sample)
-        self.current_impulse["force_threshold_started"] = accumulator.started
-        self.current_impulse["force_threshold_done"] = accumulator.done
 
     def _add_flow_sample(self, sample):
         flow = sample["flow"]
