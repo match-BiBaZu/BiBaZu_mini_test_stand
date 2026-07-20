@@ -3,3 +3,7 @@ bin/
 .arduino-cli/downloads/
 .arduino-cli/user/
 __pycache__/
+Data/*
+!Data/Qf4i.csv
+!Data/Rk2i.csv
+!Data/Rl4i.csv
