@@ -38,5 +38,13 @@ namespace QuantumXMonitor
             _sum += value;
             _next = (_next + 1) % _values.Length;
         }
+
+        public void Clear()
+        {
+            Array.Clear(_values, 0, _values.Length);
+            _next = 0;
+            _count = 0;
+            _sum = 0.0;
+        }
     }
 }

@@ -15,14 +15,16 @@ namespace QuantumXMonitor
         private readonly Label _totalValue;
         private readonly Label _statusLabel;
         private readonly Label _windowLabel;
+        private readonly Button _zeroBothButton;
         private readonly Button _reconnectButton;
         private readonly NdjsonForceServer _forceServer;
         private CancellationTokenSource _cancellation;
         private Task _readerTask;
+        private QuantumXReader _reader;
 
         public MonitorForm(bool serverOnly = false)
         {
-            Text = "MX440B Kraftanzeige";
+            Text = "MX440B Force Monitor";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(760, 360);
             Size = new Size(980, 430);
@@ -31,7 +33,7 @@ namespace QuantumXMonitor
 
             var heading = new Label
             {
-                Text = "Kraftmessung – Mittelwert über 100 Messwerte",
+                Text = "Force measurement - average over 100 samples",
                 Dock = DockStyle.Top,
                 Height = 58,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -52,7 +54,7 @@ namespace QuantumXMonitor
 
             _force1Value = CreateValueCard(valuesTable, 0, "Sensor 1");
             _force2Value = CreateValueCard(valuesTable, 1, "Sensor 2");
-            _totalValue = CreateValueCard(valuesTable, 2, "Summe");
+            _totalValue = CreateValueCard(valuesTable, 2, "Total");
 
             var footer = new Panel
             {
@@ -64,7 +66,7 @@ namespace QuantumXMonitor
 
             _statusLabel = new Label
             {
-                Text = "Noch nicht verbunden",
+                Text = "Not connected",
                 AutoSize = false,
                 Location = new Point(18, 10),
                 Size = new Size(610, 24),
@@ -73,7 +75,7 @@ namespace QuantumXMonitor
             };
             _windowLabel = new Label
             {
-                Text = "Mittelwertfenster: 0 / 100",
+                Text = "Averaging window: 0 / 100",
                 AutoSize = false,
                 Location = new Point(18, 38),
                 Size = new Size(610, 22),
@@ -81,17 +83,33 @@ namespace QuantumXMonitor
             };
             _reconnectButton = new Button
             {
-                Text = "Neu verbinden",
+                Text = "Reconnect",
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Size = new Size(150, 38),
                 Location = new Point(ClientSize.Width - 168, 17),
                 Enabled = false
             };
             _reconnectButton.Click += (sender, args) => StartReader();
+            _zeroBothButton = new Button
+            {
+                Text = "Zero both sensors",
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Size = new Size(150, 38),
+                Location = new Point(ClientSize.Width - 326, 17),
+                Enabled = false
+            };
+            _zeroBothButton.Click += (sender, args) => ZeroBothSensors();
             footer.Resize += (sender, args) =>
+            {
                 _reconnectButton.Left = footer.ClientSize.Width - _reconnectButton.Width - 18;
+                _zeroBothButton.Left = _reconnectButton.Left - _zeroBothButton.Width - 8;
+                int labelWidth = Math.Max(200, _zeroBothButton.Left - 36);
+                _statusLabel.Width = labelWidth;
+                _windowLabel.Width = labelWidth;
+            };
             footer.Controls.Add(_statusLabel);
             footer.Controls.Add(_windowLabel);
+            footer.Controls.Add(_zeroBothButton);
             footer.Controls.Add(_reconnectButton);
 
             Controls.Add(valuesTable);
@@ -152,16 +170,22 @@ namespace QuantumXMonitor
             }
 
             _reconnectButton.Enabled = false;
+            _zeroBothButton.Enabled = false;
             _force1Value.Text = "— N";
             _force2Value.Text = "— N";
             _totalValue.Text = "— N";
-            _windowLabel.Text = "Mittelwertfenster: 0 / 100";
-            SetStatus("Verbindung wird aufgebaut …", Color.DarkOrange);
+            _windowLabel.Text = "Averaging window: 0 / 100";
+            SetStatus("Connecting ...", Color.DarkOrange);
 
             _cancellation = new CancellationTokenSource();
             var reader = new QuantumXReader(DeviceIp);
+            _reader = reader;
             long lastUiUpdateTicks = 0;
-            reader.StatusChanged += status => PostToUi(() => SetStatus(status, StatusColor(status)));
+            reader.StatusChanged += status => PostToUi(() =>
+            {
+                SetStatus(status, StatusColor(status));
+                UpdateZeroButton(status);
+            });
             reader.SampleReceived += sample =>
             {
                 _forceServer.Publish(sample);
@@ -182,18 +206,47 @@ namespace QuantumXMonitor
                 }
 
                 string message = task.Exception == null
-                    ? "Messung beendet"
-                    : "Fehler: " + task.Exception.GetBaseException().Message;
+                    ? "Measurement stopped"
+                    : "Error: " + task.Exception.GetBaseException().Message;
                 if (task.Exception != null)
                 {
                     WriteLog(task.Exception.GetBaseException().ToString());
                 }
                 PostToUi(() =>
                 {
+                    _reader = null;
                     SetStatus(message, Color.Firebrick);
+                    _zeroBothButton.Enabled = false;
                     _reconnectButton.Enabled = true;
                 });
             }, TaskScheduler.Default);
+        }
+
+        private void ZeroBothSensors()
+        {
+            QuantumXReader reader = _reader;
+            if (reader == null || !reader.RequestZeroBoth())
+            {
+                return;
+            }
+
+            _zeroBothButton.Enabled = false;
+            SetStatus("Zero requested ...", Color.DarkOrange);
+        }
+
+        private void UpdateZeroButton(string status)
+        {
+            if (status.StartsWith("Connected", StringComparison.OrdinalIgnoreCase) ||
+                status.StartsWith("Fallback mode", StringComparison.OrdinalIgnoreCase) ||
+                status.StartsWith("Zero complete", StringComparison.OrdinalIgnoreCase) ||
+                status.StartsWith("Zero failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _zeroBothButton.Enabled = true;
+            }
+            else if (!status.StartsWith("Overrange", StringComparison.OrdinalIgnoreCase))
+            {
+                _zeroBothButton.Enabled = false;
+            }
         }
 
         private void DisplaySample(FilteredSample sample)
@@ -202,8 +255,8 @@ namespace QuantumXMonitor
             _force2Value.Text = sample.FastForce2N.ToString("0.000") + " N";
             _totalValue.Text = sample.FastForceTotalN.ToString("0.000") + " N";
             _windowLabel.Text =
-                "Mittelwertfenster: " + sample.WindowCount + " / " + sample.WindowSize +
-                "   |   Messrate: " + sample.SampleRateHz.ToString("0") + " Hz";
+                "Averaging window: " + sample.WindowCount + " / " + sample.WindowSize +
+                "   |   Sample rate: " + sample.SampleRateHz.ToString("0") + " Hz";
         }
 
         private void SetStatus(string text, Color color)
@@ -228,12 +281,18 @@ namespace QuantumXMonitor
 
         private static Color StatusColor(string status)
         {
-            if (status.StartsWith("Verbunden", StringComparison.OrdinalIgnoreCase))
+            if (status.StartsWith("Connected", StringComparison.OrdinalIgnoreCase))
             {
                 return Color.ForestGreen;
             }
 
-            if (status.StartsWith("Overrange", StringComparison.OrdinalIgnoreCase))
+            if (status.StartsWith("Zero complete", StringComparison.OrdinalIgnoreCase))
+            {
+                return Color.ForestGreen;
+            }
+
+            if (status.StartsWith("Overrange", StringComparison.OrdinalIgnoreCase) ||
+                status.StartsWith("Zero failed", StringComparison.OrdinalIgnoreCase))
             {
                 return Color.Firebrick;
             }

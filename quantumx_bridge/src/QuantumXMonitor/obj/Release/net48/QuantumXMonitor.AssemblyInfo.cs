@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("QuantumXMonitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0ef64bf74e1f979ea50e9430b300d378e7a57661")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+130057aa39b35e765e9e3902fa7e5a3e609dc55d")]
 [assembly: System.Reflection.AssemblyProductAttribute("QuantumXMonitor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("QuantumXMonitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

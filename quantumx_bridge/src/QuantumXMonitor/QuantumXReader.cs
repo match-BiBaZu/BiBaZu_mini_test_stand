@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Hbm.Api.Common;
 using Hbm.Api.Common.Entities;
+using Hbm.Api.Common.Entities.Channels;
 using Hbm.Api.Common.Exceptions;
 using Hbm.Api.Common.Entities.ConnectionInfos;
 using Hbm.Api.Common.Entities.Problems;
@@ -18,7 +19,9 @@ namespace QuantumXMonitor
     {
         private const int AverageWindowSize = 100;
         private const int FastAverageWindowSize = 20;
+        private const int ZeroBalanceSampleCount = 100;
         private readonly string _ipAddress;
+        private int _zeroBothRequested;
 
         public QuantumXReader(string ipAddress)
         {
@@ -27,6 +30,11 @@ namespace QuantumXMonitor
 
         public event Action<string> StatusChanged;
         public event Action<FilteredSample> SampleReceived;
+
+        public bool RequestZeroBoth()
+        {
+            return Interlocked.Exchange(ref _zeroBothRequested, 1) == 0;
+        }
 
         public void Run(CancellationToken cancellationToken)
         {
@@ -37,35 +45,37 @@ namespace QuantumXMonitor
 
             try
             {
-                OnStatus("Common API wird initialisiert …");
+                OnStatus("Initializing Common API ...");
                 environment = DaqEnvironment.GetInstance();
                 WaitForApiInitialization(cancellationToken);
 
-                OnStatus("MX440B wird gesucht …");
+                OnStatus("Searching for MX440B ...");
                 device = FindDevice(environment, _ipAddress);
 
                 List<Problem> problems;
                 if (!environment.Connect(device, out problems))
                 {
-                    throw new InvalidOperationException(FormatProblems("Verbindung fehlgeschlagen", problems));
+                    throw new InvalidOperationException(FormatProblems("Connection failed", problems));
                 }
 
                 if (!string.Equals(device.Name, "MX440B", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(device.Model, "MX440B", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
-                        "Unerwartetes Gerät: " + device.Model + " / " + device.Name);
+                        "Unexpected device: " + device.Model + " / " + device.Name);
                 }
 
-                Signal signal1 = GetPrimarySignal(device, 1);
-                Signal signal2 = GetPrimarySignal(device, 2);
-                string unit1 = device.GetUnit(device.Connectors[0].Channels[0]);
-                string unit2 = device.GetUnit(device.Connectors[1].Channels[0]);
+                Channel channel1 = GetPrimaryChannel(device, 1);
+                Channel channel2 = GetPrimaryChannel(device, 2);
+                Signal signal1 = GetPrimarySignal(channel1, 1);
+                Signal signal2 = GetPrimarySignal(channel2, 2);
+                string unit1 = device.GetUnit(channel1);
+                string unit2 = device.GetUnit(channel2);
                 if (!string.Equals(unit1, "N", StringComparison.OrdinalIgnoreCase) ||
                     !string.Equals(unit2, "N", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
-                        "Beide Kanäle müssen in N skaliert sein (K1=" + unit1 + ", K2=" + unit2 + ").");
+                        "Both channels must be scaled in N (CH1=" + unit1 + ", CH2=" + unit2 + ").");
                 }
 
                 measurement = new DaqMeasurement();
@@ -80,8 +90,8 @@ namespace QuantumXMonitor
                 {
                     measurement.Dispose();
                     measurement = null;
-                    OnStatus("Ersatzmodus: Einzelwerte – Streaming ist im Netzwerk blockiert");
-                    RunSingleValueLoop(device, signal1, signal2, cancellationToken);
+                    OnStatus("Fallback mode: single values - streaming is blocked by the network");
+                    RunSingleValueLoop(device, channel1, channel2, signal1, signal2, cancellationToken);
                     return;
                 }
 
@@ -89,7 +99,7 @@ namespace QuantumXMonitor
                 daqStarted = true;
 
                 OnStatus(
-                    "Verbunden – Firmware " + device.FirmwareVersion +
+                    "Connected - firmware " + device.FirmwareVersion +
                     ", " + signal1.SampleRate.ToString("0") + " Hz");
 
                 var average1 = new RollingAverage(AverageWindowSize);
@@ -103,6 +113,29 @@ namespace QuantumXMonitor
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
+                    if (TakeZeroBothRequest())
+                    {
+                        OnStatus("Zeroing both sensors ...");
+                        measurement.StopDaq();
+                        daqStarted = false;
+                        try
+                        {
+                            if (ZeroBothChannels(device, channel1, channel2))
+                            {
+                                ClearAverages(
+                                    average1, average2, averageTotal,
+                                    fastAverage1, fastAverage2, fastAverageTotal);
+                            }
+                        }
+                        finally
+                        {
+                            measurement.StartDaq(DataAcquisitionMode.TimestampSynchronized);
+                            daqStarted = true;
+                            measurementTimestampAnchor = null;
+                            utcTimestampAnchorNs = 0;
+                        }
+                    }
+
                     measurement.FillMeasurementValues(true);
 
                     int count1 = signal1.ContinuousMeasurementValues.UpdatedValueCount;
@@ -165,7 +198,7 @@ namespace QuantumXMonitor
 
                     if (overflow)
                     {
-                        OnStatus("Overrange – ungültige Werte werden nicht gemittelt");
+                        OnStatus("Overrange - invalid values are excluded from averaging");
                     }
 
                     cancellationToken.WaitHandle.WaitOne(20);
@@ -211,6 +244,8 @@ namespace QuantumXMonitor
 
         private void RunSingleValueLoop(
             QuantumXDevice device,
+            Channel channel1,
+            Channel channel2,
             Signal signal1,
             Signal signal2,
             CancellationToken cancellationToken)
@@ -227,6 +262,17 @@ namespace QuantumXMonitor
 
             while (!cancellationToken.IsCancellationRequested)
             {
+                if (TakeZeroBothRequest())
+                {
+                    OnStatus("Zeroing both sensors ...");
+                    if (ZeroBothChannels(device, channel1, channel2))
+                    {
+                        ClearAverages(
+                            average1, average2, averageTotal,
+                            fastAverage1, fastAverage2, fastAverageTotal);
+                    }
+                }
+
                 device.ReadSingleMeasurementValue(signals);
                 MeasurementValue value1 = signal1.GetSingleMeasurementValue();
                 MeasurementValue value2 = signal2.GetSingleMeasurementValue();
@@ -268,7 +314,7 @@ namespace QuantumXMonitor
                 }
                 else
                 {
-                    OnStatus("Overrange – ungültige Werte werden nicht gemittelt");
+                    OnStatus("Overrange - invalid values are excluded from averaging");
                 }
 
                 rateTimer.Restart();
@@ -306,27 +352,89 @@ namespace QuantumXMonitor
                 }
             }
 
-            throw new InvalidOperationException("Keine MX440B unter " + expectedIp + " gefunden.");
+            throw new InvalidOperationException("No MX440B found at " + expectedIp + ".");
         }
 
-        private static Signal GetPrimarySignal(QuantumXDevice device, int channelNumber)
+        private static Channel GetPrimaryChannel(QuantumXDevice device, int channelNumber)
         {
             int connectorIndex = channelNumber - 1;
             if (connectorIndex >= device.Connectors.Count ||
                 device.Connectors[connectorIndex].Channels.Count == 0 ||
-                device.Connectors[connectorIndex].Channels[0] == null ||
-                device.Connectors[connectorIndex].Channels[0].Signals.Count == 0)
+                device.Connectors[connectorIndex].Channels[0] == null)
             {
-                throw new InvalidOperationException("Kanal " + channelNumber + " ist nicht verfügbar.");
+                throw new InvalidOperationException("Channel " + channelNumber + " is unavailable.");
             }
 
-            Signal signal = device.Connectors[connectorIndex].Channels[0].Signals[0];
+            return device.Connectors[connectorIndex].Channels[0];
+        }
+
+        private static Signal GetPrimarySignal(Channel channel, int channelNumber)
+        {
+            if (channel.Signals.Count == 0)
+            {
+                throw new InvalidOperationException("Channel " + channelNumber + " has no measurement signal.");
+            }
+
+            Signal signal = channel.Signals[0];
             if (!signal.IsMeasurable)
             {
-                throw new InvalidOperationException("Kanal " + channelNumber + " ist nicht messbar.");
+                throw new InvalidOperationException("Channel " + channelNumber + " is not measurable.");
             }
 
             return signal;
+        }
+
+        private bool TakeZeroBothRequest()
+        {
+            return Interlocked.Exchange(ref _zeroBothRequested, 0) != 0;
+        }
+
+        private bool ZeroBothChannels(QuantumXDevice device, Channel channel1, Channel channel2)
+        {
+            var zero1 = channel1 as IZero;
+            var zero2 = channel2 as IZero;
+            if (zero1 == null || zero2 == null || zero1.Zero == null || zero2.Zero == null)
+            {
+                OnStatus("Zero failed: both channels must support zero balancing.");
+                return false;
+            }
+            if (zero1.Zero.IsZeroBalancingInhibited || zero2.Zero.IsZeroBalancingInhibited)
+            {
+                OnStatus("Zero failed: zero balancing is disabled for at least one channel.");
+                return false;
+            }
+
+            zero1.Zero.Target = 0.0;
+            zero2.Zero.Target = 0.0;
+            try
+            {
+                List<Problem> problems;
+                bool success = device.SetZeroBalance(
+                    new List<Channel> { channel1, channel2 },
+                    out problems,
+                    ZeroBalanceSampleCount);
+                if (!success)
+                {
+                    OnStatus(FormatProblems("Zero failed", problems));
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                OnStatus("Zero failed: " + exception.Message);
+                return false;
+            }
+
+            OnStatus("Zero complete - both sensors set to 0 N");
+            return true;
+        }
+
+        private static void ClearAverages(params RollingAverage[] averages)
+        {
+            foreach (RollingAverage average in averages)
+            {
+                average.Clear();
+            }
         }
 
         private static string FormatProblems(string prefix, IEnumerable<Problem> problems)
