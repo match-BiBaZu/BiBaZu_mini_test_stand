@@ -40,7 +40,7 @@ VALVE_PULSE_DURATION_MS = 100.0
 TEST_IMPULSE_PRETRIGGER_SECONDS = 0.1
 TEST_IMPULSE_PRESSURE_SETTLE_MS = 1000
 TEST_IMPULSE_MAX_CAPTURE_SECONDS = 5.0
-TEST_IMPULSE_MIN_RETURN_STABLE_SECONDS = 0.02
+TEST_IMPULSE_MIN_RETURN_STABLE_SECONDS = 0.10
 TEST_IMPULSE_MIN_RISE_N = 0.02
 TEST_IMPULSE_MIN_SAFETY_TAIL_SECONDS = 0.02
 PRESSURE_SETTLE_SKIP_SAMPLES = 2
@@ -2080,20 +2080,19 @@ class TestRunGui(tk.Tk):
         if sample_time_utc_ns < capture["pulse_start_utc_ns"]:
             return
 
+        force_magnitude = abs(force_total)
         if not capture["rise_detected"]:
-            if force_total >= baseline + capture["rise_threshold_n"]:
+            if force_magnitude >= capture["rise_threshold_n"]:
                 capture["rise_detected"] = True
                 capture["rise_time_utc_ns"] = sample_time_utc_ns
-                capture["peak_force_n"] = force_total
+                capture["peak_force_n"] = force_magnitude
                 self.status_var.set(
-                    f"Force rise detected at {force_total:.4f} N; waiting for return to baseline."
+                    f"Force threshold crossed at {force_total:.4f} N; waiting for final return."
                 )
             return
 
-        capture["peak_force_n"] = max(capture["peak_force_n"], force_total)
-        excursion = max(capture["peak_force_n"] - baseline, 0.0)
-        return_tolerance_n = max(0.01, excursion * 0.10)
-        if force_total <= baseline + return_tolerance_n:
+        capture["peak_force_n"] = max(capture["peak_force_n"], force_magnitude)
+        if force_magnitude < capture["rise_threshold_n"]:
             if capture["return_candidate_utc_ns"] is None:
                 capture["return_candidate_utc_ns"] = sample_time_utc_ns
                 return
@@ -2113,7 +2112,7 @@ class TestRunGui(tk.Tk):
         capture["return_time_utc_ns"] = return_time_utc_ns
         elapsed_seconds = max(
             (return_time_utc_ns - capture["pulse_start_utc_ns"]) / 1e9,
-            VALVE_PULSE_DURATION_MS / 1000.0,
+            0.0,
         )
         safety_tail_seconds = max(
             elapsed_seconds * 0.10,
