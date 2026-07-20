@@ -44,6 +44,10 @@ const float stepperMmPerStep = 0.009985846;
 
 const int pressureFeedforwardPwm[] = {35, 55, 71, 86, 100, 112, 124, 136, 157, 176, 195, 212};
 const float regulatorMaxPressure = 6.0;  // Calibrated 10 V converter output corresponds to 6 bar.
+// Inverse fit from measured regulator feedback at 0.5, 1.5, 2.5, and 3.0 bar:
+// measured pressure = command gain * command pressure + command offset.
+const float regulatorCommandGain = 1.125664;
+const float regulatorCommandOffsetBar = 0.049987;
 const float testPressureStepBar = 0.10;
 const int defaultTestPulsesPerPressure = 10;
 const int maxTestPulsesPerPressure = 100;
@@ -739,7 +743,14 @@ void updateRegulatorControl() {
 
 float feedforwardForPressure(float targetPressure) {
   targetPressure = constrain(targetPressure, 0.0, regulatorMaxPressure);
-  return 255.0 * targetPressure / regulatorMaxPressure;
+  if (targetPressure <= 0.0) {
+    return 0.0;
+  }
+
+  float correctedCommandPressure =
+    (targetPressure - regulatorCommandOffsetBar) / regulatorCommandGain;
+  correctedCommandPressure = constrain(correctedCommandPressure, 0.0, regulatorMaxPressure);
+  return 255.0 * correctedCommandPressure / regulatorMaxPressure;
 }
 
 void updateValvePulse() {

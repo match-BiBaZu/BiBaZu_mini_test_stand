@@ -1,7 +1,9 @@
 {
   "force_scaling": 14.3758,
   "force_impulse_threshold": 0.1,
-  "nozzle_offset_mm": 125.41,
-  "colibri_max_distance_mm": 75.0,
-  "strain_gauge_holder_thickness_mm": 40.75
+  "quantumx_host": "127.0.0.1",
+  "quantumx_port": 5500,
+  "nozzle_offset_mm": 114.8,
+  "colibri_plate_distance_mm": 1.0,
+  "sequence_save_root": ""
 }

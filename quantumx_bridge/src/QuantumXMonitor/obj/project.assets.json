@@ -9,7 +9,7 @@
     ".NETFramework,Version=v4.8": []
   },
   "packageFolders": {
-    "C:\\Users\\CodexSandboxOffline\\.nuget\\packages\\": {}
+    "C:\\Users\\Shieff\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
@@ -17,7 +17,7 @@
       "projectUniqueName": "C:\\Users\\Shieff\\Desktop\\testrun_code\\quantumx_bridge\\src\\QuantumXMonitor\\QuantumXMonitor.csproj",
       "projectName": "QuantumXMonitor",
       "projectPath": "C:\\Users\\Shieff\\Desktop\\testrun_code\\quantumx_bridge\\src\\QuantumXMonitor\\QuantumXMonitor.csproj",
-      "packagesPath": "C:\\Users\\CodexSandboxOffline\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\Shieff\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\Shieff\\Desktop\\testrun_code\\quantumx_bridge\\src\\QuantumXMonitor\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [

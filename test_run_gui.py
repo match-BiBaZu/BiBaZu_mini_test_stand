@@ -38,6 +38,7 @@ FLOW_DELAY_CAPTURE_MS = 500.0
 SAMPLE_INTERVAL_MS = 5.0
 VALVE_PULSE_DURATION_MS = 100.0
 TEST_IMPULSE_PRETRIGGER_SECONDS = 0.1
+TEST_IMPULSE_PRESSURE_SETTLE_MS = 1000
 TEST_IMPULSE_MAX_CAPTURE_SECONDS = 5.0
 TEST_IMPULSE_MIN_RETURN_STABLE_SECONDS = 0.02
 TEST_IMPULSE_MIN_RISE_N = 0.02
@@ -53,7 +54,7 @@ COLIBRI_SLAVE_ADDRESS = 0xFF
 COLIBRI_MM_PER_STEP = 0.005
 COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
-COLIBRI_PLATE_CONTACT_POSITION_MM = 81.4
+COLIBRI_PLATE_CONTACT_POSITION_MM = 80.4
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
@@ -442,6 +443,7 @@ class TestRunGui(tk.Tk):
         self.part_z_offset_var = tk.StringVar(value="Cap height: --")
         self.part_stepper_position_var = tk.StringVar(value="Stepper target: --")
         self.part_colibri_position_var = tk.StringVar(value="Colibri target: --")
+        self.part_colibri_target_mm = None
         self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
         self.nozzle_checkbuttons = []
         self.motor_controls = []
@@ -467,13 +469,13 @@ class TestRunGui(tk.Tk):
         self.increment_dialog_pulse_buttons = []
         self.test_impulse_capture = None
         self.test_impulse_after_id = None
+        self.test_impulse_settle_after_id = None
         self.test_impulse_start_timeout_id = None
 
         self._build_ui()
         for variable in (
             self.use_cap_offsets_var,
             self.nozzle_offset_var,
-            self.colibri_plate_distance_var,
         ):
             variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
@@ -663,13 +665,6 @@ class TestRunGui(tk.Tk):
         self.test_repeats_spinbox.pack(side=tk.LEFT, padx=(4, 2))
         self.stop_button = ttk.Button(controls, text="Stop", command=self._stop_test, state=tk.DISABLED)
         self.stop_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.test_impulse_button = ttk.Button(
-            controls,
-            text="Test impulse + plot",
-            command=self._start_test_impulse,
-            state=tk.DISABLED,
-        )
-        self.test_impulse_button.pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(controls, text="Save CSV", command=self._save_impulse_csv).pack(side=tk.RIGHT, padx=(0, 8))
         self.save_folder_button = ttk.Button(
             controls,
@@ -753,13 +748,13 @@ class TestRunGui(tk.Tk):
             checkbutton.pack(side=tk.LEFT, padx=(8, 0))
             self.nozzle_checkbuttons.append(checkbutton)
 
-        self.manual_pulse_button = ttk.Button(
+        self.test_impulse_button = ttk.Button(
             pulse_controls,
-            text="Manual pulse",
-            command=self._manual_pulse,
+            text="Test impulse / plot",
+            command=self._start_test_impulse,
             state=tk.DISABLED,
         )
-        self.manual_pulse_button.pack(side=tk.LEFT, padx=(18, 0))
+        self.test_impulse_button.pack(side=tk.LEFT, padx=(18, 0))
 
         ttk.Button(
             pulse_controls,
@@ -1034,13 +1029,6 @@ class TestRunGui(tk.Tk):
         )
         self.colibri_absolute_spinbox.pack(side=tk.LEFT, padx=(6, 4))
         ttk.Label(colibri_motion_controls, text="mm").pack(side=tk.LEFT)
-        self.colibri_absolute_button = ttk.Button(
-            colibri_motion_controls,
-            text="Go",
-            command=self._colibri_move_absolute,
-            state=tk.DISABLED,
-        )
-        self.colibri_absolute_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.colibri_stop_button = ttk.Button(
             colibri_motion_controls,
@@ -1059,7 +1047,6 @@ class TestRunGui(tk.Tk):
             self.colibri_reverse_button,
             self.colibri_forward_button,
             self.colibri_absolute_spinbox,
-            self.colibri_absolute_button,
             self.colibri_stop_button,
         ]
 
@@ -1072,17 +1059,6 @@ class TestRunGui(tk.Tk):
             text=f"{COLIBRI_PLATE_CONTACT_POSITION_MM:.1f} mm",
         ).pack(side=tk.LEFT, padx=(6, 0))
 
-        ttk.Label(colibri_geometry_controls, text="Target distance\nto plate").pack(side=tk.LEFT, padx=(18, 0))
-        self.colibri_plate_distance_spinbox = ttk.Spinbox(
-            colibri_geometry_controls,
-            from_=0.0,
-            to=COLIBRI_PLATE_CONTACT_POSITION_MM,
-            increment=0.1,
-            textvariable=self.colibri_plate_distance_var,
-            width=8,
-        )
-        self.colibri_plate_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(colibri_geometry_controls, text="mm").pack(side=tk.LEFT)
         self.part_colibri_move_button = ttk.Button(
             colibri_geometry_controls,
             text="Move Colibri",
@@ -1175,6 +1151,23 @@ class TestRunGui(tk.Tk):
             side=tk.LEFT,
             padx=(12, 0),
         )
+        ttk.Label(part_position_controls, text="Target distance\nto plate").pack(side=tk.LEFT, padx=(12, 0))
+        self.colibri_plate_distance_spinbox = ttk.Spinbox(
+            part_position_controls,
+            from_=0.0,
+            to=COLIBRI_PLATE_CONTACT_POSITION_MM,
+            increment=0.1,
+            textvariable=self.colibri_plate_distance_var,
+            width=8,
+        )
+        self.colibri_plate_distance_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(part_position_controls, text="mm").pack(side=tk.LEFT)
+        self.colibri_subtract_plate_distance_button = ttk.Button(
+            part_position_controls,
+            text="Subtract target distance",
+            command=self._colibri_subtract_plate_distance,
+        )
+        self.colibri_subtract_plate_distance_button.pack(side=tk.LEFT, padx=(8, 0))
 
         ttk.Label(root, textvariable=self.mode_var).pack(fill=tk.X, pady=(10, 0))
         ttk.Label(root, textvariable=self.debug_log_var).pack(fill=tk.X, pady=(4, 0))
@@ -1218,7 +1211,7 @@ class TestRunGui(tk.Tk):
                 return
             button.invoke()
 
-        self.bind("1", lambda event: _trigger_pulse_btn(event, self.manual_pulse_button))
+        self.bind("1", lambda event: _trigger_pulse_btn(event, self.test_impulse_button))
         self.bind("2", lambda event: _trigger_pulse_btn(event, self.increment_pulse_button))
         self.bind("3", lambda event: _trigger_pulse_btn(event, self.decrement_pulse_button))
 
@@ -1936,12 +1929,9 @@ class TestRunGui(tk.Tk):
             f"Sequence {status.replace('_', ' ')}: {saved_count}/{expected_count} impulses saved in {save_root}"
         )
 
-    def _manual_pulse(self):
-        self._start_pulse(increment_direction=0)
-
     def _start_test_impulse(self):
-        test_pressure = self._validated_pressure_step(
-            self.test_start_pressure_var,
+        test_pressure = self._validated_pressure(
+            self.target_pressure_var,
             "test impulse pressure",
         )
         if test_pressure is None:
@@ -1960,7 +1950,9 @@ class TestRunGui(tk.Tk):
             self.stream_var.set(True)
             self._apply_stream_setting()
 
-        self.target_pressure_var.set(test_pressure)
+        if not self._apply_pressure_settings():
+            return
+
         self.test_impulse_capture = {
             "requested_monotonic": time.monotonic(),
             "pulse_start_monotonic": None,
@@ -1981,12 +1973,32 @@ class TestRunGui(tk.Tk):
             "completion_reason": None,
             "valve_open_duration_seconds": VALVE_PULSE_DURATION_MS / 1000.0,
         }
-        self.test_impulse_start_timeout_id = self.after(3000, self._test_impulse_start_timeout)
+        self.pulse_in_progress = True
+        self._set_pulse_buttons_enabled(False)
+        self.test_impulse_settle_after_id = self.after(
+            TEST_IMPULSE_PRESSURE_SETTLE_MS,
+            self._start_test_impulse_after_settle,
+        )
+        self.mode_var.set("Mode: test impulse | pressure settling")
+        self.status_var.set(
+            f"Applying {test_pressure:.2f} bar; pulse starts after "
+            f"{TEST_IMPULSE_PRESSURE_SETTLE_MS / 1000.0:.1f} s."
+        )
 
+    def _start_test_impulse_after_settle(self):
+        self.test_impulse_settle_after_id = None
+        if self.test_impulse_capture is None or not self.serial_port:
+            self.pulse_in_progress = False
+            self._cancel_test_impulse_capture("Test impulse cancelled before the pressure settled.")
+            return
+
+        self.pulse_in_progress = False
         if not self._start_pulse(increment_direction=0):
             self._cancel_test_impulse_capture()
             return
 
+        self.test_impulse_start_timeout_id = self.after(3000, self._test_impulse_start_timeout)
+        test_pressure = self.test_impulse_capture["pressure_bar"]
         self.mode_var.set("Mode: test impulse recording | waiting for valve start")
         self.status_var.set(
             f"Test impulse armed at {test_pressure:.2f} bar; recording ends after force returns to baseline."
@@ -2147,6 +2159,10 @@ class TestRunGui(tk.Tk):
         )
 
     def _cancel_test_impulse_capture(self, status=None):
+        if self.test_impulse_settle_after_id is not None:
+            self.after_cancel(self.test_impulse_settle_after_id)
+            self.test_impulse_settle_after_id = None
+            self.pulse_in_progress = False
         if self.test_impulse_after_id is not None:
             self.after_cancel(self.test_impulse_after_id)
             self.test_impulse_after_id = None
@@ -2205,6 +2221,10 @@ class TestRunGui(tk.Tk):
         capture["metrics"] = self._calculate_impulse_metrics(capture)
         csv_path = self._save_test_impulse_capture(capture)
         self._show_test_impulse_plot(capture, csv_path)
+        self.after_idle(
+            lambda valve_mask=str(capture["nozzle_mask"]):
+                self._show_completed_pulse_flip_angle_prompt(valve_mask)
+        )
         self.mode_var.set("Mode: manual pressure")
         if capture["completion_reason"] == "force_returned":
             self.status_var.set(
@@ -2749,7 +2769,6 @@ class TestRunGui(tk.Tk):
 
     def _set_pulse_buttons_enabled(self, enabled):
         state = tk.NORMAL if enabled and self.serial_port and not self.pulse_in_progress else tk.DISABLED
-        self.manual_pulse_button.configure(state=state)
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
         test_impulse_state = state if self.test_impulse_capture is None else tk.DISABLED
@@ -3598,17 +3617,15 @@ class TestRunGui(tk.Tk):
     def _part_position_values(self):
         offsets = self._selected_part_offsets()
         nozzle_offset = self._part_float_value(self.nozzle_offset_var)
-        plate_distance = self._part_float_value(self.colibri_plate_distance_var)
         if (
             offsets is None
             or nozzle_offset is None
-            or plate_distance is None
         ):
             return None
 
         y_offset, cap_height = offsets
         stepper_position = nozzle_offset + y_offset
-        colibri_position = COLIBRI_PLATE_CONTACT_POSITION_MM - cap_height - plate_distance
+        colibri_position = COLIBRI_PLATE_CONTACT_POSITION_MM - cap_height
         return y_offset, cap_height, stepper_position, colibri_position
 
     def _current_pose_hole_for_csv(self):
@@ -3647,9 +3664,11 @@ class TestRunGui(tk.Tk):
             self.part_z_offset_var.set("Cap height: --")
             self.part_stepper_position_var.set("Stepper target: --")
             self.part_colibri_position_var.set("Colibri target: --")
+            self.part_colibri_target_mm = None
             return
 
         y_offset, cap_height, stepper_position, colibri_position = values
+        self.part_colibri_target_mm = colibri_position
         self.part_y_offset_var.set(f"Y offset: {y_offset:.3f} mm")
         self.part_z_offset_var.set(f"Cap height: {cap_height:.3f} mm")
         self.part_stepper_position_var.set(f"Stepper target: {stepper_position:.3f} mm")
@@ -3661,7 +3680,12 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("No part target", "Load a part CSV and select a pose/hole first.")
             return
 
-        _y_offset, _z_offset, stepper_position, colibri_position = values
+        _y_offset, _z_offset, stepper_position, base_colibri_position = values
+        colibri_position = (
+            base_colibri_position
+            if self.part_colibri_target_mm is None
+            else self.part_colibri_target_mm
+        )
         self.motor_absolute_var.set(round(stepper_position, 3))
         self.colibri_absolute_var.set(round(colibri_position, 3))
         self.status_var.set(
@@ -3674,7 +3698,12 @@ class TestRunGui(tk.Tk):
             messagebox.showerror("No part target", "Load a part CSV and select a pose/hole first.")
             return
 
-        _y_offset, _cap_height, _stepper_position, colibri_position = values
+        _y_offset, _cap_height, _stepper_position, base_colibri_position = values
+        colibri_position = (
+            base_colibri_position
+            if self.part_colibri_target_mm is None
+            else self.part_colibri_target_mm
+        )
         if not 0.0 <= colibri_position <= COLIBRI_TRAVEL_MM:
             messagebox.showerror(
                 "Colibri target outside travel",
@@ -3685,6 +3714,40 @@ class TestRunGui(tk.Tk):
 
         self.colibri_absolute_var.set(round(colibri_position, 3))
         self._colibri_move_absolute()
+
+    def _colibri_subtract_plate_distance(self):
+        plate_distance = self._validated_float(
+            self.colibri_plate_distance_var,
+            "target distance to plate",
+            0.0,
+            COLIBRI_TRAVEL_MM,
+        )
+        if plate_distance is None:
+            return
+        current_target = self.part_colibri_target_mm
+        if current_target is None:
+            messagebox.showerror(
+                "No part target",
+                "Load a part CSV and select a pose/hole before subtracting the target distance.",
+            )
+            return
+
+        target_position = current_target - plate_distance
+        if not 0.0 <= target_position <= COLIBRI_TRAVEL_MM:
+            messagebox.showerror(
+                "Colibri target outside travel",
+                f"Current target {current_target:.3f} mm minus "
+                f"{plate_distance:.3f} mm gives {target_position:.3f} mm. "
+                f"The target must be between 0 and {COLIBRI_TRAVEL_MM:.1f} mm.",
+            )
+            return
+
+        self.part_colibri_target_mm = target_position
+        self.part_colibri_position_var.set(f"Colibri target: {target_position:.3f} mm")
+        self.status_var.set(
+            f"Part Colibri target updated: {current_target:.3f} mm - "
+            f"{plate_distance:.3f} mm = {target_position:.3f} mm."
+        )
 
     def _mm_to_steps(self, distance_mm):
         return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
