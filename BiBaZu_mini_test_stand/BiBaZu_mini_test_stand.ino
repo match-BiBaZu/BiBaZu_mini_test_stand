@@ -21,8 +21,10 @@ const int valveCount = sizeof(valvePins) / sizeof(valvePins[0]);
 const int allValveMask = (1 << valveCount) - 1;
 const int valveOpenSignal = HIGH;
 const int valveClosedSignal = LOW;
-const int valvePulseOpenTicks = 20;  // 20 control ticks at 5 ms = 100 ms.
 const float sampleIntervalMs = 5.0;
+const int defaultValvePulseOpenTicks = 10;  // 10 control ticks at 5 ms = 50 ms.
+const int maxValvePulseOpenTicks = 100;    // Limit configurable pulses to 500 ms.
+int valvePulseOpenTicks = defaultValvePulseOpenTicks;
 const int flowCaptureMinSamples = 8;
 const int flowCaptureQuietSamples = 3;
 float flowCaptureThresholdNlMin = 2.0;
@@ -283,6 +285,8 @@ void processSerialCommand(String command) {
     setTargetPressure(command);
   } else if (command.startsWith("SET_FLOW_THRESHOLD")) {
     setFlowCaptureThreshold(command);
+  } else if (command.startsWith("SET_PULSE_DURATION")) {
+    setPulseDuration(command);
   } else if (command.startsWith("PULSE")) {
     startManualPulse(command);
   } else if (command.startsWith("MOTOR_ENABLE")) {
@@ -431,6 +435,15 @@ void setFlowCaptureThreshold(String command) {
 
   Serial.print("FLOW_THRESHOLD;SET;");
   Serial.println(flowCaptureThresholdNlMin, 3);
+}
+
+void setPulseDuration(String command) {
+  float requestedDurationMs = commandValue(command);
+  int requestedTicks = round(requestedDurationMs / sampleIntervalMs);
+  valvePulseOpenTicks = constrain(requestedTicks, 1, maxValvePulseOpenTicks);
+
+  Serial.print("PULSE_DURATION;SET;");
+  Serial.println(valvePulseOpenTicks * sampleIntervalMs, 3);
 }
 
 void startManualPulse(String command) {

@@ -36,13 +36,13 @@ MAX_LOG_LINES = 400
 MAX_QUEUE_DRAIN_PER_TICK = 250
 FLOW_DELAY_CAPTURE_MS = 500.0
 SAMPLE_INTERVAL_MS = 5.0
-VALVE_PULSE_DURATION_MS = 100.0
+VALVE_PULSE_DURATION_MS = 50.0
+PULSE_DURATION_MIN_MS = 10.0
+PULSE_DURATION_MAX_MS = 500.0
+PULSE_DURATION_STEP_MS = 10.0
 TEST_IMPULSE_PRETRIGGER_SECONDS = 0.1
 TEST_IMPULSE_PRESSURE_SETTLE_MS = 1000
 TEST_IMPULSE_MAX_CAPTURE_SECONDS = 5.0
-TEST_IMPULSE_MIN_RETURN_STABLE_SECONDS = 0.10
-TEST_IMPULSE_MIN_RISE_N = 0.02
-TEST_IMPULSE_MIN_SAFETY_TAIL_SECONDS = 0.02
 PRESSURE_SETTLE_SKIP_SAMPLES = 2
 REGULATOR_MAX_PRESSURE_BAR = 6.0
 TEST_PRESSURE_STEP_BAR = 0.1
@@ -415,6 +415,7 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_var = tk.DoubleVar(value=0.05)
         self.increment_count_var = tk.IntVar(value=0)
         self.flow_threshold_var = tk.DoubleVar(value=2.0)
+        self.pulse_duration_var = tk.DoubleVar(value=VALVE_PULSE_DURATION_MS)
         self.stream_var = tk.BooleanVar(value=True)
         self.motor_enabled_var = tk.BooleanVar(value=False)
         self.motor_distance_var = tk.DoubleVar(value=10.0)
@@ -747,6 +748,27 @@ class TestRunGui(tk.Tk):
             )
             checkbutton.pack(side=tk.LEFT, padx=(8, 0))
             self.nozzle_checkbuttons.append(checkbutton)
+
+        ttk.Label(pulse_controls, text="Impulse duration").pack(side=tk.LEFT, padx=(18, 0))
+        self.pulse_duration_spinbox = ttk.Spinbox(
+            pulse_controls,
+            from_=PULSE_DURATION_MIN_MS,
+            to=PULSE_DURATION_MAX_MS,
+            increment=PULSE_DURATION_STEP_MS,
+            textvariable=self.pulse_duration_var,
+            width=7,
+            state=tk.DISABLED,
+        )
+        self.pulse_duration_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(pulse_controls, text="ms").pack(side=tk.LEFT)
+
+        self.apply_pulse_duration_button = ttk.Button(
+            pulse_controls,
+            text="Apply duration",
+            command=self._apply_pulse_duration_setting,
+            state=tk.DISABLED,
+        )
+        self.apply_pulse_duration_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.test_impulse_button = ttk.Button(
             pulse_controls,
@@ -1675,6 +1697,8 @@ class TestRunGui(tk.Tk):
         self.stream_checkbutton.configure(state=tk.NORMAL)
         self.flow_threshold_spinbox.configure(state=tk.NORMAL)
         self.apply_flow_threshold_button.configure(state=tk.NORMAL)
+        self.pulse_duration_spinbox.configure(state=tk.NORMAL)
+        self.apply_pulse_duration_button.configure(state=tk.NORMAL)
         for checkbutton in self.nozzle_checkbuttons:
             checkbutton.configure(state=tk.NORMAL)
         self.starting_pressure_spinbox.configure(state=tk.NORMAL)
@@ -1688,6 +1712,7 @@ class TestRunGui(tk.Tk):
         self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
         self._apply_pressure_settings()
         self._apply_flow_threshold_setting()
+        self._apply_pulse_duration_setting()
         self._apply_stream_setting()
         self._send("MOTOR_POS")
 
@@ -1791,6 +1816,8 @@ class TestRunGui(tk.Tk):
         self.stream_checkbutton.configure(state=tk.DISABLED)
         self.flow_threshold_spinbox.configure(state=tk.DISABLED)
         self.apply_flow_threshold_button.configure(state=tk.DISABLED)
+        self.pulse_duration_spinbox.configure(state=tk.DISABLED)
+        self.apply_pulse_duration_button.configure(state=tk.DISABLED)
         for checkbutton in self.nozzle_checkbuttons:
             checkbutton.configure(state=tk.DISABLED)
         self.starting_pressure_spinbox.configure(state=tk.DISABLED)
@@ -1886,6 +1913,8 @@ class TestRunGui(tk.Tk):
 
         if not self._apply_flow_threshold_setting():
             return
+        if not self._apply_pulse_duration_setting():
+            return
 
         if self.active_sequence_archive is not None:
             self._finish_sequence_archive("replaced_by_new_sequence")
@@ -1937,15 +1966,6 @@ class TestRunGui(tk.Tk):
         if test_pressure is None:
             return
 
-        with self.force_lock:
-            force_sample = self.latest_force_sample
-        if force_sample is None or not force_sample.valid:
-            messagebox.showerror(
-                "QuantumX not ready",
-                "Connect QuantumX and wait for valid force values before recording a test impulse.",
-            )
-            return
-
         if not self.stream_var.get():
             self.stream_var.set(True)
             self._apply_stream_setting()
@@ -1953,25 +1973,20 @@ class TestRunGui(tk.Tk):
         if not self._apply_pressure_settings():
             return
 
+        pulse_duration_ms = self._validated_pulse_duration()
+        if pulse_duration_ms is None:
+            return
+
         self.test_impulse_capture = {
             "requested_monotonic": time.monotonic(),
             "pulse_start_monotonic": None,
             "pulse_start_utc_ns": None,
             "pressure_samples": [],
-            "force_samples": [],
-            "force_sample_ids": set(),
             "pressure_bar": test_pressure,
             "nozzle_mask": self._selected_nozzle_mask(),
-            "baseline_force_n": None,
-            "rise_threshold_n": max(TEST_IMPULSE_MIN_RISE_N, self.force_impulse_threshold),
-            "rise_detected": False,
-            "rise_time_utc_ns": None,
-            "peak_force_n": None,
-            "return_candidate_utc_ns": None,
-            "return_time_utc_ns": None,
             "plot_end_seconds": None,
             "completion_reason": None,
-            "valve_open_duration_seconds": VALVE_PULSE_DURATION_MS / 1000.0,
+            "valve_open_duration_seconds": pulse_duration_ms / 1000.0,
         }
         self.pulse_in_progress = True
         self._set_pulse_buttons_enabled(False)
@@ -2001,7 +2016,7 @@ class TestRunGui(tk.Tk):
         test_pressure = self.test_impulse_capture["pressure_bar"]
         self.mode_var.set("Mode: test impulse recording | waiting for valve start")
         self.status_var.set(
-            f"Test impulse armed at {test_pressure:.2f} bar; recording ends after force returns to baseline."
+            f"Test impulse armed at {test_pressure:.2f} bar; recording ends with the Arduino flow capture."
         )
 
     def _test_impulse_start_timeout(self):
@@ -2022,16 +2037,6 @@ class TestRunGui(tk.Tk):
         capture["pulse_start_utc_ns"] = (
             time.time_ns() if pulse_start_utc_ns is None else pulse_start_utc_ns
         )
-        baseline_values = [
-            row[7] if row[7] is not None else row[3]
-            for row in capture["force_samples"][-100:]
-            if row[1] <= capture["pulse_start_utc_ns"]
-        ]
-        if baseline_values:
-            capture["baseline_force_n"] = sum(baseline_values) / len(baseline_values)
-        else:
-            with self.force_lock:
-                capture["baseline_force_n"] = self.latest_force_n
         if self.test_impulse_start_timeout_id is not None:
             self.after_cancel(self.test_impulse_start_timeout_id)
             self.test_impulse_start_timeout_id = None
@@ -2039,97 +2044,7 @@ class TestRunGui(tk.Tk):
             round(TEST_IMPULSE_MAX_CAPTURE_SECONDS * 1000),
             self._test_impulse_max_timeout,
         )
-        self.mode_var.set(
-            "Mode: test impulse recording | waiting for force rise and return"
-        )
-
-    def _capture_test_impulse_force(self, sample):
-        capture = self.test_impulse_capture
-        if capture is None or not sample.valid or sample.force_total_n is None:
-            return
-        if sample.sample_id in capture["force_sample_ids"]:
-            return
-        capture["force_sample_ids"].add(sample.sample_id)
-        capture["force_samples"].append(
-            (
-                time.monotonic(),
-                sample.timestamp_utc_ns,
-                sample.sequence,
-                sample.force_total_n,
-                sample.force_1_n,
-                sample.force_2_n,
-                sample.status,
-                sample.force_total_mean_20_n,
-                sample.force_total_raw_n,
-            )
-        )
-        self._update_test_impulse_end_detection(sample)
-
-    def _update_test_impulse_end_detection(self, sample):
-        capture = self.test_impulse_capture
-        if capture is None or capture["pulse_start_utc_ns"] is None:
-            return
-        baseline = capture["baseline_force_n"]
-        force_total = sample.force_total_mean_20_n
-        if force_total is None:
-            force_total = sample.force_total_n
-        if baseline is None or force_total is None:
-            return
-
-        sample_time_utc_ns = sample.timestamp_utc_ns
-        if sample_time_utc_ns < capture["pulse_start_utc_ns"]:
-            return
-
-        force_magnitude = abs(force_total)
-        if not capture["rise_detected"]:
-            if force_magnitude >= capture["rise_threshold_n"]:
-                capture["rise_detected"] = True
-                capture["rise_time_utc_ns"] = sample_time_utc_ns
-                capture["peak_force_n"] = force_magnitude
-                self.status_var.set(
-                    f"Force threshold crossed at {force_total:.4f} N; waiting for final return."
-                )
-            return
-
-        capture["peak_force_n"] = max(capture["peak_force_n"], force_magnitude)
-        if force_magnitude < capture["rise_threshold_n"]:
-            if capture["return_candidate_utc_ns"] is None:
-                capture["return_candidate_utc_ns"] = sample_time_utc_ns
-                return
-            stable_seconds = (
-                sample_time_utc_ns - capture["return_candidate_utc_ns"]
-            ) / 1e9
-            if stable_seconds >= TEST_IMPULSE_MIN_RETURN_STABLE_SECONDS:
-                self._schedule_test_impulse_safety_tail(sample_time_utc_ns)
-        else:
-            capture["return_candidate_utc_ns"] = None
-
-    def _schedule_test_impulse_safety_tail(self, return_time_utc_ns):
-        capture = self.test_impulse_capture
-        if capture is None or capture["return_time_utc_ns"] is not None:
-            return
-
-        capture["return_time_utc_ns"] = return_time_utc_ns
-        elapsed_seconds = max(
-            (return_time_utc_ns - capture["pulse_start_utc_ns"]) / 1e9,
-            0.0,
-        )
-        safety_tail_seconds = max(
-            elapsed_seconds * 0.10,
-            TEST_IMPULSE_MIN_SAFETY_TAIL_SECONDS,
-        )
-        capture["plot_end_seconds"] = elapsed_seconds + safety_tail_seconds
-        capture["completion_reason"] = "force_returned"
-
-        if self.test_impulse_after_id is not None:
-            self.after_cancel(self.test_impulse_after_id)
-        self.test_impulse_after_id = self.after(
-            round(safety_tail_seconds * 1000),
-            self._finish_test_impulse_capture,
-        )
-        self.status_var.set(
-            f"Force returned to baseline; recording {safety_tail_seconds:.3f} s safety tail."
-        )
+        self.mode_var.set("Mode: test impulse recording | waiting for flow capture")
 
     def _test_impulse_max_timeout(self):
         self.test_impulse_after_id = None
@@ -2137,11 +2052,7 @@ class TestRunGui(tk.Tk):
         if capture is None or capture["pulse_start_utc_ns"] is None:
             return
         capture["plot_end_seconds"] = TEST_IMPULSE_MAX_CAPTURE_SECONDS
-        capture["completion_reason"] = (
-            "maximum_time_without_return"
-            if capture["rise_detected"]
-            else "maximum_time_without_rise"
-        )
+        capture["completion_reason"] = "maximum_capture_time"
         self._finish_test_impulse_capture()
 
     def _capture_test_impulse_pressure(self, sample):
@@ -2192,23 +2103,10 @@ class TestRunGui(tk.Tk):
             capture["plot_end_seconds"] = plot_end_seconds
         window_start = pulse_start - TEST_IMPULSE_PRETRIGGER_SECONDS
         window_end = pulse_start + plot_end_seconds
-        pulse_start_utc_ns = capture["pulse_start_utc_ns"]
-        utc_window_start = pulse_start_utc_ns - round(TEST_IMPULSE_PRETRIGGER_SECONDS * 1e9)
-        utc_window_end = pulse_start_utc_ns + round(plot_end_seconds * 1e9)
-        capture["force_samples"] = [
-            row for row in capture["force_samples"] if utc_window_start <= row[1] <= utc_window_end
-        ]
         capture["pressure_samples"] = [
             row for row in capture["pressure_samples"] if window_start <= row[0] <= window_end
         ]
 
-        if not capture["force_samples"]:
-            self.status_var.set("Test impulse finished, but no valid QuantumX samples were recorded.")
-            messagebox.showwarning(
-                "No force samples",
-                "The pulse completed, but the recording contains no valid QuantumX force samples.",
-            )
-            return
         if not capture["pressure_samples"]:
             self.status_var.set("Test impulse finished, but no pressure samples were recorded.")
             messagebox.showwarning(
@@ -2217,7 +2115,7 @@ class TestRunGui(tk.Tk):
             )
             return
 
-        capture["metrics"] = self._calculate_impulse_metrics(capture)
+        capture["metrics"] = self._calculate_test_impulse_pressure_metrics(capture)
         csv_path = self._save_test_impulse_capture(capture)
         self._show_test_impulse_plot(capture, csv_path)
         self.after_idle(
@@ -2225,17 +2123,40 @@ class TestRunGui(tk.Tk):
                 self._show_completed_pulse_flip_angle_prompt(valve_mask)
         )
         self.mode_var.set("Mode: manual pressure")
-        if capture["completion_reason"] == "force_returned":
-            self.status_var.set(
-                f"Test impulse recorded over {plot_end_seconds:.3f} s: "
-                f"{len(capture['force_samples'])} force and "
-                f"{len(capture['pressure_samples'])} pressure samples."
-            )
-        else:
-            self.status_var.set(
-                f"Test impulse reached the {plot_end_seconds:.1f} s safety limit "
-                f"({capture['completion_reason']}); plot and CSV were still created."
-            )
+        self.status_var.set(
+            f"Test impulse recorded over {plot_end_seconds:.3f} s with "
+            f"{len(capture['pressure_samples'])} pressure samples "
+            f"({capture['completion_reason']})."
+        )
+
+    def _calculate_test_impulse_pressure_metrics(self, capture):
+        pulse_start = capture["pulse_start_monotonic"]
+        valve_open_seconds = capture.get(
+            "valve_open_duration_seconds",
+            VALVE_PULSE_DURATION_MS / 1000.0,
+        )
+        pressure_during_open = [
+            row
+            for row in capture.get("pressure_samples", [])
+            if 0.0 <= row[0] - pulse_start <= valve_open_seconds
+        ]
+
+        def pressure_mean(index):
+            values = [row[index] for row in pressure_during_open if row[index] is not None]
+            return statistics.mean(values) if values else None
+
+        target_pressure = pressure_mean(1)
+        actual_pressure = pressure_mean(2)
+        return {
+            "target_pressure_bar": target_pressure,
+            "actual_pressure_bar": actual_pressure,
+            "pressure_before_valve_bar": pressure_mean(3),
+            "actual_pressure_error_bar": (
+                None
+                if target_pressure is None or actual_pressure is None
+                else actual_pressure - target_pressure
+            ),
+        }
 
     def _calculate_impulse_metrics(self, capture):
         pulse_start_utc_ns = capture["pulse_start_utc_ns"]
@@ -2360,42 +2281,14 @@ class TestRunGui(tk.Tk):
 
     def _save_test_impulse_capture(self, capture):
         pulse_start = capture["pulse_start_monotonic"]
-        pulse_start_utc_ns = capture["pulse_start_utc_ns"]
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         data_dir = Path(__file__).with_name("Data")
         path = data_dir / f"test_impulse_{timestamp}.csv"
         events = []
-        for received, utc_ns, sequence, total, force_1, force_2, status, fast_total, raw_total in capture["force_samples"]:
-            events.append(
-                (
-                    (utc_ns - pulse_start_utc_ns) / 1e9,
-                    "force",
-                    utc_ns,
-                    sequence,
-                    total,
-                    force_1,
-                    force_2,
-                    fast_total,
-                    raw_total,
-                    status,
-                    None,
-                    None,
-                    None,
-                )
-            )
         for received, target_pressure, actual_pressure, nozzle_pressure in capture["pressure_samples"]:
             events.append(
                 (
                     received - pulse_start,
-                    "pressure",
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
                     target_pressure,
                     actual_pressure,
                     nozzle_pressure,
@@ -2410,15 +2303,6 @@ class TestRunGui(tk.Tk):
                 writer.writerow(
                     (
                         "time_from_valve_start_s",
-                        "sample_type",
-                        "force_timestamp_utc_ns",
-                        "force_sequence",
-                        "force_total_mean_20_n",
-                        "force_1_mean_20_n",
-                        "force_2_mean_20_n",
-                        "force_total_mean_20_explicit_n",
-                        "force_total_raw_n",
-                        "force_status",
                         "target_pressure_bar",
                         "actual_regulator_pressure_bar",
                         "pressure_before_valve_bar",
@@ -2428,18 +2312,9 @@ class TestRunGui(tk.Tk):
                     writer.writerow(
                         (
                             f"{event[0]:.9f}",
-                            event[1],
-                            "" if event[2] is None else event[2],
-                            "" if event[3] is None else event[3],
-                            "" if event[4] is None else f"{event[4]:.9f}",
-                            "" if event[5] is None else f"{event[5]:.9f}",
-                            "" if event[6] is None else f"{event[6]:.9f}",
-                            "" if event[7] is None else f"{event[7]:.9f}",
-                            "" if event[8] is None else f"{event[8]:.9f}",
-                            "" if event[9] is None else event[9],
-                            "" if event[10] is None else f"{event[10]:.6f}",
-                            "" if event[11] is None else f"{event[11]:.6f}",
-                            "" if event[12] is None else f"{event[12]:.6f}",
+                            "" if event[1] is None else f"{event[1]:.6f}",
+                            "" if event[2] is None else f"{event[2]:.6f}",
+                            "" if event[3] is None else f"{event[3]:.6f}",
                         )
                     )
         except OSError as exc:
@@ -2451,23 +2326,10 @@ class TestRunGui(tk.Tk):
     def _save_test_impulse_metrics(self, data_path, metrics):
         metrics_path = data_path.with_name(f"{data_path.stem}_metrics.csv")
         metric_units = {
-            "baseline_force_n": "N",
-            "baseline_std_n": "N",
-            "peak_force_n": "N",
-            "peak_time_s": "s",
-            "rise_10_90_s": "s",
-            "fall_90_10_s": "s",
-            "fwhm_s": "s",
-            "force_impulse_ns": "Ns",
-            "plateau_mean_n": "N",
-            "plateau_std_n": "N",
             "target_pressure_bar": "bar",
             "actual_pressure_bar": "bar",
             "pressure_before_valve_bar": "bar",
             "actual_pressure_error_bar": "bar",
-            "peak_per_actual_pressure_n_per_bar": "N/bar",
-            "f1_fraction": "fraction",
-            "f2_fraction": "fraction",
         }
         try:
             with open(metrics_path, "w", newline="", encoding="utf-8") as csv_file:
@@ -2483,19 +2345,6 @@ class TestRunGui(tk.Tk):
 
     def _show_test_impulse_plot(self, capture, csv_path):
         pulse_start = capture["pulse_start_monotonic"]
-        pulse_start_utc_ns = capture["pulse_start_utc_ns"]
-        force_points = [
-            (
-                (row[1] - pulse_start_utc_ns) / 1e9,
-                row[7] if len(row) > 7 and row[7] is not None else row[3],
-            )
-            for row in capture["force_samples"]
-        ]
-        raw_force_points = [
-            ((row[1] - pulse_start_utc_ns) / 1e9, row[8])
-            for row in capture["force_samples"]
-            if len(row) > 8 and row[8] is not None
-        ]
         target_points = [
             (row[0] - pulse_start, row[1])
             for row in capture["pressure_samples"]
@@ -2524,16 +2373,14 @@ class TestRunGui(tk.Tk):
             text=(
                 f"Single test impulse | {capture['pressure_bar']:.2f} bar | "
                 f"nozzle mask {capture['nozzle_mask']} | "
-                f"duration {capture['plot_end_seconds']:.3f} s | "
-                f"baseline {capture['baseline_force_n']:.4f} N | "
-                f"force: raw + mean 20"
+                f"duration {capture['plot_end_seconds']:.3f} s"
             ),
         ).pack(side=tk.LEFT)
         ttk.Button(header, text="Close", command=dialog.destroy).pack(side=tk.RIGHT)
 
         plot_body = ttk.Frame(dialog, padding=(12, 4, 12, 6))
         plot_body.pack(fill=tk.BOTH, expand=True)
-        metrics_frame = ttk.LabelFrame(plot_body, text="Impulse metrics", padding=(10, 8), width=245)
+        metrics_frame = ttk.LabelFrame(plot_body, text="Pressure metrics", padding=(10, 8), width=245)
         metrics_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         metrics_frame.pack_propagate(False)
 
@@ -2546,23 +2393,10 @@ class TestRunGui(tk.Tk):
             return f"{value * scale:.{digits}f}{unit}"
 
         metric_rows = (
-            ("Peak force", metric_text("peak_force_n", " N", digits=4)),
-            ("Time to peak", metric_text("peak_time_s", " ms", 1000.0, 1)),
-            ("Rise 10–90 %", metric_text("rise_10_90_s", " ms", 1000.0, 1)),
-            ("Fall 90–10 %", metric_text("fall_90_10_s", " ms", 1000.0, 1)),
-            ("FWHM", metric_text("fwhm_s", " ms", 1000.0, 1)),
-            ("Force impulse", metric_text("force_impulse_ns", " Ns", digits=5)),
-            ("Plateau mean", metric_text("plateau_mean_n", " N", digits=4)),
-            ("Plateau σ", metric_text("plateau_std_n", " N", digits=4)),
             ("Target pressure", metric_text("target_pressure_bar", " bar", digits=3)),
             ("Actual pressure", metric_text("actual_pressure_bar", " bar", digits=3)),
             ("Before valve", metric_text("pressure_before_valve_bar", " bar", digits=3)),
             ("Pressure error", metric_text("actual_pressure_error_bar", " bar", digits=3)),
-            ("Peak / actual p", metric_text("peak_per_actual_pressure_n_per_bar", " N/bar", digits=3)),
-            ("F1 / F2 share", (
-                "--" if metrics.get("f1_fraction") is None
-                else f"{metrics['f1_fraction'] * 100:.1f} / {metrics['f2_fraction'] * 100:.1f} %"
-            )),
         )
         for row_index, (label, value) in enumerate(metric_rows):
             ttk.Label(metrics_frame, text=label).grid(row=row_index, column=0, sticky=tk.W, pady=3)
@@ -2588,17 +2422,7 @@ class TestRunGui(tk.Tk):
             x_min = -TEST_IMPULSE_PRETRIGGER_SECONDS
             x_max = capture["plot_end_seconds"]
 
-            force_values = [point[1] for point in raw_force_points + force_points]
             pressure_values = [point[1] for point in target_points + actual_points + nozzle_pressure_points]
-
-            force_min = min(0.0, min(force_values))
-            force_max = max(0.0, max(force_values))
-            if math.isclose(force_min, force_max):
-                force_min -= 0.05
-                force_max += 0.05
-            force_pad = (force_max - force_min) * 0.08
-            force_min -= force_pad
-            force_max += force_pad
 
             pressure_min = min(0.0, min(pressure_values)) if pressure_values else 0.0
             pressure_max = max(0.1, max(pressure_values)) if pressure_values else 1.0
@@ -2606,9 +2430,6 @@ class TestRunGui(tk.Tk):
 
             def x_coord(value):
                 return left + (value - x_min) / (x_max - x_min) * plot_width
-
-            def force_y(value):
-                return bottom - (value - force_min) / (force_max - force_min) * plot_height
 
             def pressure_y(value):
                 return bottom - (value - pressure_min) / (pressure_max - pressure_min) * plot_height
@@ -2626,10 +2447,8 @@ class TestRunGui(tk.Tk):
                 fraction = tick / 5
                 y = top + fraction * plot_height
                 canvas.create_line(left, y, right, y, fill="#dddddd")
-                force_tick = force_max - fraction * (force_max - force_min)
                 pressure_tick = pressure_max - fraction * (pressure_max - pressure_min)
-                canvas.create_text(left - 8, y, text=f"{force_tick:.3f}", anchor=tk.E)
-                canvas.create_text(right + 8, y, text=f"{pressure_tick:.3f}", anchor=tk.W)
+                canvas.create_text(left - 8, y, text=f"{pressure_tick:.3f}", anchor=tk.E)
 
             for tick in range(12):
                 fraction = tick / 11
@@ -2641,8 +2460,7 @@ class TestRunGui(tk.Tk):
 
             canvas.create_rectangle(left, top, right, bottom, outline="#444444")
             canvas.create_text((left + right) / 2, height - 16, text="Time from valve start [s]")
-            canvas.create_text(20, (top + bottom) / 2, text="Force [N]", angle=90)
-            canvas.create_text(width - 20, (top + bottom) / 2, text="Pressure [bar]", angle=270)
+            canvas.create_text(20, (top + bottom) / 2, text="Pressure [bar]", angle=90)
             canvas.create_text(
                 (x_coord(0.0) + x_coord(capture["valve_open_duration_seconds"])) / 2,
                 top + 10,
@@ -2664,16 +2482,12 @@ class TestRunGui(tk.Tk):
                         dash=dash,
                     )
 
-            draw_series(raw_force_points, force_y, "#a9d9b8", width_px=1)
-            draw_series(force_points, force_y, "#198754", width_px=2)
             draw_series(target_points, pressure_y, "#e67e22", width_px=2, dash=(8, 4))
             draw_series(actual_points, pressure_y, "#0d6efd", width_px=2)
             draw_series(nozzle_pressure_points, pressure_y, "#7b2cbf", width_px=2)
 
             legend_y = 18
             legends = (
-                ("#a9d9b8", "Force raw", None),
-                ("#198754", "Force total (mean 20)", None),
                 ("#e67e22", "Target pressure", (8, 4)),
                 ("#0d6efd", "Actual regulator pressure", None),
                 ("#7b2cbf", "Pressure before valve", None),
@@ -2707,6 +2521,8 @@ class TestRunGui(tk.Tk):
         if not self._apply_pressure_settings():
             return False
         if not self._apply_flow_threshold_setting():
+            return False
+        if not self._apply_pulse_duration_setting():
             return False
 
         self.pulse_in_progress = True
@@ -2770,6 +2586,8 @@ class TestRunGui(tk.Tk):
         state = tk.NORMAL if enabled and self.serial_port and not self.pulse_in_progress else tk.DISABLED
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
+        self.pulse_duration_spinbox.configure(state=state)
+        self.apply_pulse_duration_button.configure(state=state)
         test_impulse_state = state if self.test_impulse_capture is None else tk.DISABLED
         self.test_impulse_button.configure(state=test_impulse_state)
         self._update_increment_dialog_state()
@@ -2808,6 +2626,27 @@ class TestRunGui(tk.Tk):
         self.flow_threshold_var.set(round(flow_threshold, 3))
         self._write_debug_log(f"GUI set Flow Detection Threshold={flow_threshold:.3f} l/min")
         self._send(f"SET_FLOW_THRESHOLD:{flow_threshold:.3f}")
+        return True
+
+    def _validated_pulse_duration(self):
+        try:
+            duration_ms = float(self.pulse_duration_var.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Invalid impulse duration", "Enter a numeric impulse duration in milliseconds.")
+            return None
+
+        duration_ms = min(max(duration_ms, PULSE_DURATION_MIN_MS), PULSE_DURATION_MAX_MS)
+        duration_ms = round(duration_ms / SAMPLE_INTERVAL_MS) * SAMPLE_INTERVAL_MS
+        self.pulse_duration_var.set(round(duration_ms, 3))
+        return duration_ms
+
+    def _apply_pulse_duration_setting(self):
+        duration_ms = self._validated_pulse_duration()
+        if duration_ms is None:
+            return False
+
+        self._write_debug_log(f"GUI set impulse duration={duration_ms:.3f} ms")
+        self._send(f"SET_PULSE_DURATION:{duration_ms:.3f}")
         return True
 
     def _validated_pressure(self, variable, label):
@@ -3873,7 +3712,6 @@ class TestRunGui(tk.Tk):
                     self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
             elif kind == "quantumx_force_sample":
                 rate_hz = self._store_quantumx_sample(value)
-                self._capture_test_impulse_force(value)
                 self._capture_normal_impulse_force(value)
                 now_monotonic = time.monotonic()
                 if now_monotonic - self.last_force_ui_update_monotonic >= 0.05:
@@ -3892,10 +3730,6 @@ class TestRunGui(tk.Tk):
                 self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
                 if "stale" in value.lower() or "disconnected" in value.lower():
-                    if self.test_impulse_capture is not None:
-                        self._cancel_test_impulse_capture(
-                            "Test impulse recording cancelled because QuantumX data became unavailable."
-                        )
                     with self.force_lock:
                         self.latest_force_sample = None
                         self.latest_force_1_n = None
@@ -3945,6 +3779,10 @@ class TestRunGui(tk.Tk):
 
         if parts[0] == "FLOW_THRESHOLD":
             self._handle_flow_threshold_line(parts)
+            return
+
+        if parts[0] == "PULSE_DURATION":
+            self._handle_pulse_duration_line(parts)
             return
 
         if not parts or not parts[0].isdigit():
@@ -4330,6 +4168,10 @@ class TestRunGui(tk.Tk):
         if len(parts) >= 3 and parts[1] == "SET":
             self.status_var.set(f"Flow Detection Threshold set to {parts[2]} l/min")
 
+    def _handle_pulse_duration_line(self, parts):
+        if len(parts) >= 3 and parts[1] == "SET":
+            self.status_var.set(f"Impulse duration set to {parts[2]} ms")
+
     def _handle_pulse_line(self, parts):
         if len(parts) >= 3 and parts[1] == "ERROR":
             if self.test_impulse_capture is not None:
@@ -4391,6 +4233,9 @@ class TestRunGui(tk.Tk):
         max_flow = self._pulse_field_float(parts, "MAX_FLOW")
         volume_l = self._pulse_field_float(parts, "VOLUME_L")
 
+        if self.test_impulse_capture is not None:
+            self._complete_test_impulse_from_flow_done(parts)
+
         if self.current_impulse:
             if flow_sample_count is not None:
                 self.current_impulse["flow_sample_count"] = int(round(flow_sample_count))
@@ -4410,6 +4255,31 @@ class TestRunGui(tk.Tk):
                 self.impulse_rows[-1][17] = self._format_csv_number(volume_l, digits=6)
             if flow_sample_count is not None:
                 self.impulse_rows[-1][24] = int(round(flow_sample_count))
+
+    def _complete_test_impulse_from_flow_done(self, parts):
+        capture = self.test_impulse_capture
+        if capture is None or capture["pulse_start_monotonic"] is None:
+            return
+
+        flow_duration_ms = self._pulse_field_float(parts, "DURATION_MS")
+        if flow_duration_ms is None:
+            flow_duration_seconds = max(
+                (self.current_line_received_monotonic or time.monotonic())
+                - capture["pulse_start_monotonic"],
+                0.0,
+            )
+        else:
+            flow_duration_seconds = flow_duration_ms / 1000.0
+
+        capture["plot_end_seconds"] = min(
+            max(flow_duration_seconds, capture["valve_open_duration_seconds"]),
+            TEST_IMPULSE_MAX_CAPTURE_SECONDS,
+        )
+        capture["completion_reason"] = "flow_capture_complete"
+        if self.test_impulse_after_id is not None:
+            self.after_cancel(self.test_impulse_after_id)
+            self.test_impulse_after_id = None
+        self.after_idle(self._finish_test_impulse_capture)
 
     def _pulse_field_float(self, parts, field_name):
         if field_name not in parts:
@@ -4715,7 +4585,7 @@ class TestRunGui(tk.Tk):
             ("saved impulse count", len(archive["overview_records"]), ""),
             ("nozzle mask", archive["nozzle_mask"], ""),
             ("selected nozzles", selected_nozzles, ""),
-            ("nominal valve pulse duration", VALVE_PULSE_DURATION_MS, "ms"),
+            ("configured valve pulse duration", self.pulse_duration_var.get(), "ms"),
             ("Arduino sample interval", SAMPLE_INTERVAL_MS, "ms"),
             ("flow detection threshold", self.flow_threshold_var.get(), "l/min"),
             ("force standard filter", 20, "samples, rolling mean"),
