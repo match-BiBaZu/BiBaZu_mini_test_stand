@@ -15,6 +15,15 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from force_sources import ForceSample, QuantumXTcpClient, UniqueForceAccumulator
+from platform_calibration import (
+    CalibrationError,
+    PlatformCalibration,
+    fit_platform_calibration,
+    measurement_from_samples,
+    preserve_uncalibrated_sample,
+    utc_now_iso,
+    validate_weight_list,
+)
 
 try:
     import serial
@@ -56,6 +65,17 @@ COLIBRI_STEPS_PER_MM = 1.0 / COLIBRI_MM_PER_STEP
 COLIBRI_TRAVEL_MM = 75.0
 COLIBRI_PLATE_CONTACT_POSITION_MM = 80.4
 COLIBRI_REFERENCE_CURRENT_PERCENT = 20
+COLIBRI_TOUCH_FORCE_N = 0.1
+COLIBRI_TOUCH_HARD_LIMIT_N = 0.2
+COLIBRI_TOUCH_STEP_MM = 0.005
+COLIBRI_TOUCH_RETRACT_MM = 0.05
+COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM = 1.0
+COLIBRI_TOUCH_MAX_APPROACH_MM = 5.0
+COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
+COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
+COLIBRI_TOUCH_MIN_BASELINE_SAMPLES = 10
+COLIBRI_TOUCH_MAX_BASELINE_ABS_N = 0.05
+COLIBRI_TOUCH_MAX_BASELINE_STD_N = 0.01
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
 FORCE_RATE_WINDOW_SECONDS = 2.0
@@ -71,6 +91,7 @@ GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
 QUANTUMX_HOST = "127.0.0.1"
 QUANTUMX_PORT = 5500
+MX440B_DEVICE_IP = "192.168.10.20"
 QUANTUMX_FORCE_1_CHANNEL = 3
 QUANTUMX_FORCE_2_CHANNEL = 4
 QUANTUMX_FORCE_1_NAME = "TAL221 A"
@@ -367,6 +388,15 @@ class TestRunGui(tk.Tk):
         )
         self.force_rate_times = deque(maxlen=2000)
         self.force_sample_history = deque(maxlen=12000)
+        self.platform_calibration = None
+        self.platform_calibration_path = None
+        self.calibration_zero_refreshed = False
+        self.calibration_dirty = False
+        self.calibration_dialog = None
+        self.calibration_weight_rows = []
+        self.calibration_session = None
+        self.calibration_capture = None
+        self.calibration_after_ids = set()
         self.last_force_ui_update_monotonic = 0.0
         self.rows = []
         self.impulse_rows = []
@@ -381,6 +411,13 @@ class TestRunGui(tk.Tk):
         self.closing = False
         self.colibri = None
         self.colibri_busy = False
+        self.colibri_touch_dialog = None
+        self.colibri_touch_cancel_event = None
+        self.colibri_touch_running = False
+        self.colibri_touch_max_approach_var = tk.DoubleVar(
+            value=COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM
+        )
+        self.colibri_touch_status_var = tk.StringVar(value="Touch-off: idle")
         self.debug_log_file = None
         self.debug_log_path = None
         self.debug_log_lock = threading.Lock()
@@ -413,6 +450,7 @@ class TestRunGui(tk.Tk):
             value=f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): --"
         )
         self.force_rate_var = tk.StringVar(value="Force rate: --")
+        self.calibration_status_var = tk.StringVar(value="Calibration: disabled")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.german_csv_format_var = tk.BooleanVar(value=True)
         self.target_pressure_var = tk.DoubleVar(value=0.50)
@@ -482,6 +520,7 @@ class TestRunGui(tk.Tk):
         self.test_impulse_start_timeout_id = None
 
         self._build_ui()
+        self._auto_load_platform_calibration()
         for variable in (
             self.use_cap_offsets_var,
             self.nozzle_offset_var,
@@ -571,6 +610,9 @@ class TestRunGui(tk.Tk):
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
                 "sequence_save_root": "" if self.sequence_save_root is None else str(self.sequence_save_root),
+                "platform_calibration_profile": (
+                    "" if self.platform_calibration_path is None else str(self.platform_calibration_path)
+                ),
             }
         except (tk.TclError, ValueError) as exc:
             messagebox.showerror("Preset save failed", f"One of the preset values is not numeric: {exc}")
@@ -584,6 +626,616 @@ class TestRunGui(tk.Tk):
             return False
 
         return True
+
+    def _calibration_busy(self):
+        return bool(
+            self.active_sequence_archive is not None
+            or self.current_impulse is not None
+            or self.test_impulse_capture is not None
+            or self.pulse_in_progress
+            or self.calibration_session is not None
+            or self.colibri_touch_running
+        )
+
+    def _update_calibration_status(self):
+        profile = self.platform_calibration
+        if profile is None:
+            text = "Calibration: disabled"
+        else:
+            suffix = "zero refreshed" if self.calibration_zero_refreshed else "zero not refreshed"
+            if self.calibration_dirty:
+                suffix += ", unsaved"
+            text = f"Calibration: {profile.name} | gain {profile.gain:.6f} | {suffix}"
+        self.calibration_status_var.set(text)
+
+    def _validate_calibration_profile_for_this_setup(self, profile):
+        if profile.device_ip != MX440B_DEVICE_IP:
+            raise CalibrationError(
+                f"Profile device IP {profile.device_ip!r} does not match {MX440B_DEVICE_IP}."
+            )
+        expected = (
+            ("force_1", QUANTUMX_FORCE_1_CHANNEL, QUANTUMX_FORCE_1_NAME),
+            ("force_2", QUANTUMX_FORCE_2_CHANNEL, QUANTUMX_FORCE_2_NAME),
+        )
+        if len(profile.channels) != 2:
+            raise CalibrationError("The profile must contain exactly two channels.")
+        for channel, (logical_name, mx_channel, sensor_name) in zip(profile.channels, expected):
+            if channel.get("logical_name") != logical_name or int(channel.get("mx_channel", -1)) != mx_channel:
+                raise CalibrationError(
+                    f"Profile channel assignment does not match {sensor_name} on MX channel {mx_channel}."
+                )
+
+    def _auto_load_platform_calibration(self):
+        saved_path = str(self.user_presets.get("platform_calibration_profile", "")).strip()
+        if not saved_path:
+            self._update_calibration_status()
+            return
+        try:
+            profile = PlatformCalibration.load(saved_path)
+            self._validate_calibration_profile_for_this_setup(profile)
+        except CalibrationError as exc:
+            self.calibration_status_var.set(f"Calibration load failed: {exc}")
+            self._write_debug_log(f"CALIBRATION auto-load failed path={saved_path}: {exc}")
+            return
+        self.platform_calibration = profile
+        self.platform_calibration_path = Path(saved_path)
+        self.calibration_zero_refreshed = False
+        self.calibration_dirty = False
+        self._update_calibration_status()
+
+    def _remember_calibration_profile_path(self):
+        self.user_presets["platform_calibration_profile"] = (
+            "" if self.platform_calibration_path is None else str(self.platform_calibration_path)
+        )
+        self._save_user_presets()
+
+    def _open_calibration_menu(self):
+        if self.calibration_dialog is not None and self.calibration_dialog.winfo_exists():
+            self.calibration_dialog.lift()
+            self.calibration_dialog.focus_force()
+            return
+
+        dialog = tk.Toplevel(self)
+        self.calibration_dialog = dialog
+        dialog.title("TAL221 platform calibration")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+        dialog.protocol("WM_DELETE_WINDOW", self._close_calibration_menu)
+
+        ttk.Label(
+            dialog,
+            text=(
+                "Calibrate the complete mounted platform. Each non-zero weight is measured "
+                "at three freely chosen positions. Software zeroing does not remove the "
+                "mechanical platform load. Maximum additional mass: 400 g."
+            ),
+            wraplength=620,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, padx=14, pady=(14, 8))
+        ttk.Label(dialog, textvariable=self.calibration_status_var, wraplength=620).pack(
+            fill=tk.X, padx=14, pady=(0, 8)
+        )
+
+        weights = ttk.LabelFrame(dialog, text="Calibration weights", padding=8)
+        weights.pack(fill=tk.BOTH, expand=True, padx=14, pady=6)
+        ttk.Label(weights, text="0 g (fixed empty-platform point)").grid(
+            row=0, column=0, columnspan=3, sticky=tk.W, pady=3
+        )
+        self.calibration_weights_frame = ttk.Frame(weights)
+        self.calibration_weights_frame.grid(row=1, column=0, columnspan=3, sticky=tk.EW)
+        self.calibration_weight_rows = []
+        self._add_calibration_weight_row("50,15")
+        self._add_calibration_weight_row("200,52")
+        ttk.Button(weights, text="Add weight", command=self._add_calibration_weight_row).grid(
+            row=2, column=0, sticky=tk.W, pady=(8, 0)
+        )
+
+        actions = ttk.Frame(dialog)
+        actions.pack(fill=tk.X, padx=14, pady=(8, 14))
+        self.calibration_action_buttons = []
+        for text, command in (
+            ("Start calibration", self._start_platform_calibration),
+            ("Zero empty platform", self._start_empty_platform_zero),
+            ("Save", self._save_platform_calibration),
+            ("Save as...", lambda: self._save_platform_calibration(save_as=True)),
+            ("Load...", self._load_platform_calibration),
+            ("Disable calibration", self._disable_platform_calibration),
+        ):
+            button = ttk.Button(actions, text=text, command=command)
+            button.pack(side=tk.LEFT, padx=(0, 6))
+            self.calibration_action_buttons.append(button)
+        ttk.Button(actions, text="Close", command=self._close_calibration_menu).pack(side=tk.RIGHT)
+
+    def _close_calibration_menu(self):
+        if self.calibration_session is not None:
+            messagebox.showinfo(
+                "Calibration in progress",
+                "Finish or cancel the current calibration step first.",
+                parent=self.calibration_dialog,
+            )
+            return
+        if self.calibration_dialog is not None:
+            self.calibration_dialog.destroy()
+        self.calibration_dialog = None
+        self.calibration_action_buttons = []
+        self.calibration_weight_rows = []
+
+    def _add_calibration_weight_row(self, initial=""):
+        row = ttk.Frame(self.calibration_weights_frame)
+        row.pack(fill=tk.X, pady=2)
+        variable = tk.StringVar(value=str(initial))
+        ttk.Entry(row, textvariable=variable, width=12).pack(side=tk.LEFT)
+        ttk.Label(row, text="g").pack(side=tk.LEFT, padx=(5, 10))
+        ttk.Button(
+            row,
+            text="Remove",
+            command=lambda: self._remove_calibration_weight_row(row, variable),
+        ).pack(side=tk.LEFT)
+        self.calibration_weight_rows.append((row, variable))
+
+    def _remove_calibration_weight_row(self, row, variable):
+        self.calibration_weight_rows = [
+            item for item in self.calibration_weight_rows if item != (row, variable)
+        ]
+        row.destroy()
+
+    def _set_calibration_menu_enabled(self, enabled):
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for button in getattr(self, "calibration_action_buttons", []):
+            if button.winfo_exists():
+                button.configure(state=state)
+
+    def _set_calibration_run_lock(self, locked):
+        if hasattr(self, "calibration_button"):
+            self.calibration_button.configure(state=tk.DISABLED if locked else tk.NORMAL)
+        if self.calibration_session is None:
+            self._set_calibration_menu_enabled(not locked)
+
+    def _start_platform_calibration(self):
+        if self._calibration_busy():
+            messagebox.showwarning(
+                "Calibration unavailable",
+                "Calibration, loading, and zeroing are disabled during an impulse or test sequence.",
+                parent=self.calibration_dialog,
+            )
+            return
+        if self.calibration_dirty and not messagebox.askyesno(
+            "Replace unsaved calibration?",
+            "A successful new calibration will replace the current unsaved changes. Continue?",
+            parent=self.calibration_dialog,
+        ):
+            return
+        try:
+            weights = validate_weight_list(
+                variable.get() for _, variable in self.calibration_weight_rows
+            )
+        except CalibrationError as exc:
+            messagebox.showerror("Invalid calibration weights", str(exc), parent=self.calibration_dialog)
+            return
+        tasks = [(0.0, 1)]
+        tasks.extend((weight, placement) for weight in weights[1:] for placement in range(1, 4))
+        self._begin_calibration_wizard("calibration", tasks)
+
+    def _start_empty_platform_zero(self):
+        if self._calibration_busy():
+            messagebox.showwarning(
+                "Zero unavailable",
+                "Zeroing is disabled during an impulse or test sequence.",
+                parent=self.calibration_dialog,
+            )
+            return
+        if self.platform_calibration is None:
+            messagebox.showerror(
+                "No active calibration",
+                "Load or create a calibration profile before zeroing the empty platform.",
+                parent=self.calibration_dialog,
+            )
+            return
+        self._begin_calibration_wizard("zero", [(0.0, 1)])
+
+    def _begin_calibration_wizard(self, mode, tasks):
+        if self.latest_force_sample is None or self.latest_force_status != "ok":
+            messagebox.showerror(
+                "QuantumX unavailable",
+                "Connect QuantumX and wait for two valid TAL221 channel values.",
+                parent=self.calibration_dialog,
+            )
+            return
+        wizard = tk.Toplevel(self)
+        wizard.title("Empty platform zero" if mode == "zero" else "Guided platform calibration")
+        wizard.transient(self)
+        wizard.resizable(False, False)
+        instruction_var = tk.StringVar()
+        progress_var = tk.StringVar()
+        result_var = tk.StringVar(value="Press Done when the platform is ready.")
+        ttk.Label(wizard, textvariable=instruction_var, wraplength=540, justify=tk.LEFT).pack(
+            fill=tk.X, padx=18, pady=(18, 8)
+        )
+        ttk.Label(wizard, textvariable=progress_var).pack(fill=tk.X, padx=18, pady=4)
+        ttk.Label(wizard, textvariable=result_var, wraplength=540).pack(
+            fill=tk.X, padx=18, pady=4
+        )
+        buttons = ttk.Frame(wizard)
+        buttons.pack(fill=tk.X, padx=18, pady=(12, 18))
+        done_button = ttk.Button(buttons, text="Done", command=self._calibration_point_done)
+        done_button.pack(side=tk.LEFT)
+        ttk.Button(buttons, text="Cancel", command=self._cancel_calibration_session).pack(
+            side=tk.RIGHT
+        )
+        wizard.protocol("WM_DELETE_WINDOW", self._cancel_calibration_session)
+        self.calibration_session = {
+            "mode": mode,
+            "tasks": list(tasks),
+            "index": 0,
+            "measurements": [],
+            "wizard": wizard,
+            "instruction_var": instruction_var,
+            "progress_var": progress_var,
+            "result_var": result_var,
+            "done_button": done_button,
+        }
+        self._set_calibration_menu_enabled(False)
+        self._show_current_calibration_task()
+
+    def _show_current_calibration_task(self):
+        session = self.calibration_session
+        if session is None:
+            return
+        weight, placement = session["tasks"][session["index"]]
+        if weight == 0.0:
+            instruction = "Remove all added weights. Leave the complete platform empty."
+        else:
+            instruction = (
+                f"Place {weight:g} g freely on the platform "
+                f"(position {placement} of 3). Reposition it for every repetition."
+            )
+        session["instruction_var"].set(instruction)
+        session["progress_var"].set(
+            f"Point {session['index'] + 1} of {len(session['tasks'])}"
+        )
+        session["result_var"].set("Press Done when the platform is ready.")
+        session["done_button"].configure(state=tk.NORMAL)
+
+    def _schedule_calibration_after(self, delay_ms, callback):
+        holder = {}
+
+        def run():
+            after_id = holder.get("id")
+            if after_id is not None:
+                self.calibration_after_ids.discard(after_id)
+            callback()
+
+        holder["id"] = self.after(delay_ms, run)
+        self.calibration_after_ids.add(holder["id"])
+
+    def _calibration_point_done(self):
+        session = self.calibration_session
+        if session is None:
+            return
+        session["done_button"].configure(state=tk.DISABLED)
+        session["result_var"].set("Settling for 1.0 s...")
+        self._schedule_calibration_after(1000, self._begin_calibration_capture)
+
+    def _begin_calibration_capture(self):
+        session = self.calibration_session
+        if session is None:
+            return
+        self.calibration_capture = {
+            "samples": {},
+            "ends_monotonic": time.monotonic() + 1.0,
+            "invalid_status": None,
+        }
+        session["result_var"].set("Acquiring unique unfiltered QuantumX samples for 1.0 s...")
+        self._schedule_calibration_after(1000, self._finish_calibration_capture)
+
+    def _collect_calibration_sample(self, sample):
+        capture = self.calibration_capture
+        if capture is None or time.monotonic() > capture["ends_monotonic"]:
+            return
+        if sample.status != "ok":
+            capture["invalid_status"] = sample.status
+            return
+        if (
+            sample.valid
+            and sample.status == "ok"
+            and sample.force_1_raw_n is not None
+            and sample.force_2_raw_n is not None
+        ):
+            capture["samples"][sample.sample_id] = sample
+
+    def _finish_calibration_capture(self):
+        session = self.calibration_session
+        capture = self.calibration_capture
+        self.calibration_capture = None
+        if session is None or capture is None:
+            return
+        weight, placement = session["tasks"][session["index"]]
+        try:
+            if capture.get("invalid_status"):
+                raise CalibrationError(
+                    f"QuantumX reported {capture['invalid_status']} during acquisition."
+                )
+            measurement = measurement_from_samples(weight, placement, capture["samples"].values())
+        except CalibrationError as exc:
+            session["result_var"].set(f"Point rejected: {exc} Correct the problem and press Done to retry.")
+            session["done_button"].configure(state=tk.NORMAL)
+            return
+        session["measurements"].append(measurement)
+        session["result_var"].set(
+            f"Accepted {measurement.sample_count} samples: "
+            f"mean {measurement.total_mean_n:.5f} N, sigma {measurement.total_std_n:.5f} N."
+        )
+        session["index"] += 1
+        if session["index"] < len(session["tasks"]):
+            self._schedule_calibration_after(600, self._show_current_calibration_task)
+            return
+        if session["mode"] == "zero":
+            profile = self.platform_calibration.with_tare(
+                measurement.force_1_mean_n,
+                measurement.force_2_mean_n,
+                utc_now_iso(),
+            )
+            self.platform_calibration = profile
+            self.calibration_zero_refreshed = True
+            self.calibration_dirty = True
+            self._finish_calibration_session()
+            self._update_calibration_status()
+            messagebox.showinfo(
+                "Empty platform zero complete",
+                f"New tare:\n{QUANTUMX_FORCE_1_NAME}: {profile.tare_1_n:.6f} N\n"
+                f"{QUANTUMX_FORCE_2_NAME}: {profile.tare_2_n:.6f} N\n\n"
+                "The active profile is modified. Press Save to store this tare permanently.",
+                parent=self.calibration_dialog,
+            )
+            return
+        try:
+            candidate = fit_platform_calibration(
+                session["measurements"],
+                name="Platform calibration",
+                device_ip=MX440B_DEVICE_IP,
+                channels=(
+                    {
+                        "logical_name": "force_1",
+                        "mx_channel": QUANTUMX_FORCE_1_CHANNEL,
+                        "sensor": QUANTUMX_FORCE_1_NAME,
+                        "mx_profile": "TAL221_A_500g",
+                    },
+                    {
+                        "logical_name": "force_2",
+                        "mx_channel": QUANTUMX_FORCE_2_CHANNEL,
+                        "sensor": QUANTUMX_FORCE_2_NAME,
+                        "mx_profile": "TAL221_B_500g",
+                    },
+                ),
+            )
+        except CalibrationError as exc:
+            self._finish_calibration_session()
+            messagebox.showerror("Calibration calculation failed", str(exc), parent=self.calibration_dialog)
+            return
+        self._finish_calibration_session()
+        self._show_calibration_result(candidate)
+
+    def _cancel_calibration_session(self):
+        for after_id in list(self.calibration_after_ids):
+            try:
+                self.after_cancel(after_id)
+            except tk.TclError:
+                pass
+        self.calibration_after_ids.clear()
+        self.calibration_capture = None
+        self._finish_calibration_session()
+
+    def _finish_calibration_session(self):
+        session = self.calibration_session
+        self.calibration_session = None
+        if session is not None and session["wizard"].winfo_exists():
+            session["wizard"].destroy()
+        self._set_calibration_menu_enabled(True)
+
+    def _show_calibration_result(self, candidate):
+        result = tk.Toplevel(self)
+        result.title("Calibration result")
+        result.transient(self)
+        quality = candidate.quality
+        summary = (
+            f"Gain: {candidate.gain:.8f}\n"
+            f"Tare {QUANTUMX_FORCE_1_NAME}: {candidate.tare_1_n:.6f} N\n"
+            f"Tare {QUANTUMX_FORCE_2_NAME}: {candidate.tare_2_n:.6f} N\n"
+            f"RMSE: {quality.get('rmse_n', 0.0):.6f} N\n"
+            f"Maximum residual: {quality.get('max_abs_error_n', 0.0):.6f} N\n"
+            f"R squared: {quality.get('r_squared')!s}\n"
+            f"Maximum position spread: {quality.get('max_position_spread_n', 0.0):.6f} N"
+        )
+        ttk.Label(result, text=summary, justify=tk.LEFT).pack(fill=tk.X, padx=14, pady=12)
+        columns = ("weight", "placement", "samples", "source", "sigma", "expected", "residual")
+        table = ttk.Treeview(result, columns=columns, show="headings", height=8)
+        for column, heading, width in zip(
+            columns,
+            ("Weight g", "Position", "Samples", "Source total N", "Sigma N", "Expected N", "Residual N"),
+            (80, 70, 70, 110, 90, 100, 100),
+        ):
+            table.heading(column, text=heading)
+            table.column(column, width=width, anchor=tk.E)
+        tare_total = candidate.tare_1_n + candidate.tare_2_n
+        for measurement in candidate.measurements:
+            expected = measurement.expected_force_n
+            residual = (
+                candidate.gain * (measurement.total_mean_n - tare_total) - expected
+                if measurement.weight_g > 0.0
+                else 0.0
+            )
+            table.insert(
+                "",
+                tk.END,
+                values=(
+                    f"{measurement.weight_g:.3f}",
+                    measurement.placement_index,
+                    measurement.sample_count,
+                    f"{measurement.total_mean_n:.6f}",
+                    f"{measurement.total_std_n:.6f}",
+                    f"{expected:.6f}",
+                    f"{residual:.6f}",
+                ),
+            )
+        table.pack(fill=tk.BOTH, expand=True, padx=14)
+        warnings = quality.get("warnings", [])
+        ttk.Label(
+            result,
+            text=("Warnings:\n- " + "\n- ".join(warnings)) if warnings else "Quality checks: no warnings.",
+            foreground="#a14b00" if warnings else "#176b2c",
+            justify=tk.LEFT,
+            wraplength=720,
+        ).pack(fill=tk.X, padx=14, pady=10)
+        actions = ttk.Frame(result)
+        actions.pack(fill=tk.X, padx=14, pady=(0, 14))
+        ttk.Button(
+            actions,
+            text="Activate",
+            command=lambda: self._activate_calibration_candidate(candidate, result, False),
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            actions,
+            text="Save as and activate...",
+            command=lambda: self._activate_calibration_candidate(candidate, result, True),
+        ).pack(side=tk.LEFT, padx=6)
+        ttk.Button(actions, text="Discard", command=result.destroy).pack(side=tk.RIGHT)
+
+    def _activate_calibration_candidate(self, candidate, result_dialog, save_as):
+        warnings = candidate.quality.get("warnings", [])
+        if warnings and not messagebox.askyesno(
+            "Calibration quality warning",
+            "The profile has quality warnings:\n\n- "
+            + "\n- ".join(warnings)
+            + "\n\nActivate it anyway?",
+            parent=result_dialog,
+        ):
+            return
+        previous_state = (
+            self.platform_calibration,
+            self.platform_calibration_path,
+            self.calibration_zero_refreshed,
+            self.calibration_dirty,
+        )
+        self.platform_calibration = candidate
+        self.platform_calibration_path = None
+        self.calibration_zero_refreshed = True
+        self.calibration_dirty = True
+        self._update_calibration_status()
+        if save_as and not self._save_platform_calibration(save_as=True):
+            (
+                self.platform_calibration,
+                self.platform_calibration_path,
+                self.calibration_zero_refreshed,
+                self.calibration_dirty,
+            ) = previous_state
+            self._update_calibration_status()
+            return
+        result_dialog.destroy()
+
+    def _save_platform_calibration(self, save_as=False):
+        profile = self.platform_calibration
+        if profile is None:
+            messagebox.showerror("No calibration", "There is no active calibration profile.")
+            return False
+        warnings = profile.quality.get("warnings", [])
+        if warnings and not messagebox.askyesno(
+            "Save calibration with warnings",
+            "This profile has quality warnings. Save it anyway?",
+            parent=self.calibration_dialog,
+        ):
+            return False
+        path = self.platform_calibration_path
+        if save_as or path is None:
+            chosen = filedialog.asksaveasfilename(
+                title="Save platform calibration",
+                defaultextension=".json",
+                filetypes=(("Calibration profiles", "*.json"), ("All files", "*.*")),
+                initialfile=f"platform_calibration_{dt.datetime.now():%Y%m%d_%H%M%S}.json",
+                parent=self.calibration_dialog,
+            )
+            if not chosen:
+                return False
+            path = Path(chosen)
+        try:
+            profile.save(path)
+        except CalibrationError as exc:
+            messagebox.showerror("Calibration save failed", str(exc), parent=self.calibration_dialog)
+            return False
+        self.platform_calibration_path = path
+        self.calibration_dirty = False
+        self._update_calibration_status()
+        self._remember_calibration_profile_path()
+        return True
+
+    def _load_platform_calibration(self):
+        if self._calibration_busy():
+            messagebox.showwarning(
+                "Load unavailable",
+                "Loading is disabled during an impulse or test sequence.",
+                parent=self.calibration_dialog,
+            )
+            return
+        if self.calibration_dirty and not messagebox.askyesno(
+            "Discard unsaved calibration changes?",
+            "The active calibration has unsaved changes. Load another profile and discard them?",
+            parent=self.calibration_dialog,
+        ):
+            return
+        chosen = filedialog.askopenfilename(
+            title="Load platform calibration",
+            filetypes=(("Calibration profiles", "*.json"), ("All files", "*.*")),
+            parent=self.calibration_dialog,
+        )
+        if not chosen:
+            return
+        try:
+            profile = PlatformCalibration.load(chosen)
+            self._validate_calibration_profile_for_this_setup(profile)
+        except CalibrationError as exc:
+            messagebox.showerror("Calibration load failed", str(exc), parent=self.calibration_dialog)
+            return
+        self.platform_calibration = profile
+        self.platform_calibration_path = Path(chosen)
+        self.calibration_zero_refreshed = False
+        self.calibration_dirty = False
+        self._update_calibration_status()
+        self._remember_calibration_profile_path()
+
+    def _disable_platform_calibration(self):
+        if self._calibration_busy():
+            messagebox.showwarning(
+                "Calibration unavailable",
+                "Calibration cannot be disabled during an impulse or test sequence.",
+                parent=self.calibration_dialog,
+            )
+            return
+        if self.calibration_dirty and not messagebox.askyesno(
+            "Discard unsaved calibration changes?",
+            "Disable calibration and discard the unsaved active changes?",
+            parent=self.calibration_dialog,
+        ):
+            return
+        self.platform_calibration = None
+        self.platform_calibration_path = None
+        self.calibration_zero_refreshed = False
+        self.calibration_dirty = False
+        self._update_calibration_status()
+        self._remember_calibration_profile_path()
+
+    def _confirm_force_calibration_ready(self, operation):
+        if self.platform_calibration is not None and self.calibration_zero_refreshed:
+            return True
+        if self.platform_calibration is None:
+            reason = "No platform calibration is active."
+        else:
+            reason = (
+                "The saved reference tare is active, but the empty-platform zero has not "
+                "been refreshed during the current QuantumX connection."
+            )
+        return messagebox.askyesno(
+            "Force calibration warning",
+            f"{reason}\n\nStart {operation} anyway?",
+        )
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=12)
@@ -1097,6 +1749,14 @@ class TestRunGui(tk.Tk):
         )
         self.part_colibri_move_button.pack(side=tk.LEFT, padx=(12, 0))
         self.colibri_controls.append(self.part_colibri_move_button)
+        self.colibri_touch_button = ttk.Button(
+            colibri_geometry_controls,
+            text="Force touch-off...",
+            command=self._open_colibri_touch_dialog,
+            state=tk.DISABLED,
+        )
+        self.colibri_touch_button.pack(side=tk.LEFT, padx=(12, 0))
+        self.colibri_controls.append(self.colibri_touch_button)
 
         force_controls = ttk.Frame(hardware_notebook, padding=(8, 6))
         hardware_notebook.add(force_controls, text="TAL221 sensors / QuantumX")
@@ -1118,6 +1778,15 @@ class TestRunGui(tk.Tk):
         )
         self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
+        self.calibration_button = ttk.Button(
+            force_controls,
+            text="Calibration...",
+            command=self._open_calibration_menu,
+        )
+        self.calibration_button.pack(side=tk.LEFT, padx=(14, 0))
+        ttk.Label(force_controls, textvariable=self.calibration_status_var).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
         ttk.Label(force_controls, textvariable=self.force_1_value_var).pack(side=tk.LEFT, padx=(18, 0))
         ttk.Label(force_controls, textvariable=self.force_2_value_var).pack(side=tk.LEFT, padx=(10, 0))
         ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(10, 0))
@@ -1892,20 +2561,35 @@ class TestRunGui(tk.Tk):
             "nozzle_mask": nozzle_mask,
             "german_csv": bool(self.german_csv_format_var.get()),
             "overview_records": [],
+            "calibration_profile": (
+                None if self.platform_calibration is None else self.platform_calibration.to_dict()
+            ),
+            "calibration_profile_path": (
+                "" if self.platform_calibration_path is None else str(self.platform_calibration_path)
+            ),
+            "calibration_zero_refreshed": bool(self.calibration_zero_refreshed),
         }
         try:
             root.mkdir(parents=True, exist_ok=True)
             impulse_dir.mkdir(parents=False, exist_ok=False)
             self.active_sequence_archive = archive
+            self._set_calibration_run_lock(True)
             self._write_sequence_metadata()
             self._write_sequence_overview(rows=[])
         except OSError as exc:
             self.active_sequence_archive = None
+            self._set_calibration_run_lock(False)
             messagebox.showerror("Sequence folder failed", f"Could not create the sequence files:\n{exc}")
             return False
         return True
 
     def _start_test(self):
+        if self.colibri_touch_running:
+            messagebox.showwarning("Touch-off in progress", "Stop the force touch-off first.")
+            return
+        if self.calibration_session is not None:
+            messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
+            return
         start_pressure = self._validated_pressure_step(self.test_start_pressure_var, "test start pressure")
         end_pressure = self._validated_pressure_step(self.test_end_pressure_var, "test end pressure")
         repeats = self._validated_repeats()
@@ -1917,6 +2601,8 @@ class TestRunGui(tk.Tk):
         mask = self._selected_nozzle_mask()
         if mask == 0:
             messagebox.showerror("No nozzle selected", "Select at least one nozzle for the test.")
+            return
+        if not self._confirm_force_calibration_ready("the test sequence"):
             return
 
         if not self._apply_flow_threshold_setting():
@@ -1967,11 +2653,22 @@ class TestRunGui(tk.Tk):
         )
 
     def _start_test_impulse(self):
+        if self.colibri_touch_running:
+            messagebox.showwarning("Touch-off in progress", "Stop the force touch-off first.")
+            return
+        if self.calibration_session is not None:
+            messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
+            return
         test_pressure = self._validated_pressure(
             self.target_pressure_var,
             "test impulse pressure",
         )
         if test_pressure is None:
+            return
+        pulse_duration_ms = self._validated_pulse_duration()
+        if pulse_duration_ms is None:
+            return
+        if not self._confirm_force_calibration_ready("the test impulse"):
             return
 
         if not self.stream_var.get():
@@ -1979,10 +2676,6 @@ class TestRunGui(tk.Tk):
             self._apply_stream_setting()
 
         if not self._apply_pressure_settings():
-            return
-
-        pulse_duration_ms = self._validated_pulse_duration()
-        if pulse_duration_ms is None:
             return
 
         self.test_impulse_capture = {
@@ -1996,6 +2689,7 @@ class TestRunGui(tk.Tk):
             "completion_reason": None,
             "valve_open_duration_seconds": pulse_duration_ms / 1000.0,
         }
+        self._set_calibration_run_lock(True)
         self.pulse_in_progress = True
         self._set_pulse_buttons_enabled(False)
         self.test_impulse_settle_after_id = self.after(
@@ -2089,6 +2783,7 @@ class TestRunGui(tk.Tk):
             self.test_impulse_start_timeout_id = None
         self.test_impulse_capture = None
         self._set_pulse_buttons_enabled(True)
+        self._set_calibration_run_lock(False)
         if status:
             self.status_var.set(status)
 
@@ -2099,6 +2794,7 @@ class TestRunGui(tk.Tk):
             return
         self.test_impulse_capture = None
         self._set_pulse_buttons_enabled(True)
+        self._set_calibration_run_lock(False)
 
         pulse_start = capture["pulse_start_monotonic"]
         if pulse_start is None:
@@ -2114,6 +2810,17 @@ class TestRunGui(tk.Tk):
         capture["pressure_samples"] = [
             row for row in capture["pressure_samples"] if window_start <= row[0] <= window_end
         ]
+        pulse_start_utc_ns = capture["pulse_start_utc_ns"]
+        force_window_start_utc_ns = pulse_start_utc_ns - round(TEST_IMPULSE_PRETRIGGER_SECONDS * 1e9)
+        force_window_end_utc_ns = pulse_start_utc_ns + round(plot_end_seconds * 1e9)
+        with self.force_lock:
+            force_history = list(self.force_sample_history)
+        capture["force_samples"] = [
+            self._force_sample_trace_row(sample)
+            for sample in force_history
+            if force_window_start_utc_ns <= sample.timestamp_utc_ns <= force_window_end_utc_ns
+            and sample.valid
+        ]
 
         if not capture["pressure_samples"]:
             self.status_var.set("Test impulse finished, but no pressure samples were recorded.")
@@ -2123,7 +2830,8 @@ class TestRunGui(tk.Tk):
             )
             return
 
-        capture["metrics"] = self._calculate_test_impulse_pressure_metrics(capture)
+        capture["metrics"] = self._calculate_impulse_metrics(capture)
+        capture["metrics"].update(self._calculate_test_impulse_pressure_metrics(capture))
         csv_path = self._save_test_impulse_capture(capture)
         self._show_test_impulse_plot(capture, csv_path)
         self.after_idle(
@@ -2289,6 +2997,7 @@ class TestRunGui(tk.Tk):
 
     def _save_test_impulse_capture(self, capture):
         pulse_start = capture["pulse_start_monotonic"]
+        pulse_start_utc_ns = capture["pulse_start_utc_ns"]
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         data_dir = Path(__file__).with_name("Data")
         path = data_dir / f"test_impulse_{timestamp}.csv"
@@ -2297,9 +3006,35 @@ class TestRunGui(tk.Tk):
             events.append(
                 (
                     received - pulse_start,
+                    "pressure",
+                    *(None for _ in range(14)),
                     target_pressure,
                     actual_pressure,
                     nozzle_pressure,
+                )
+            )
+        for row in capture.get("force_samples", []):
+            events.append(
+                (
+                    (row[1] - pulse_start_utc_ns) / 1e9,
+                    "force",
+                    row[7] if row[7] is not None else row[3],
+                    row[4],
+                    row[5],
+                    row[8],
+                    row[9],
+                    row[10],
+                    row[11],
+                    row[12],
+                    row[13],
+                    row[14],
+                    row[15],
+                    row[16],
+                    row[17],
+                    row[18],
+                    None,
+                    None,
+                    None,
                 )
             )
         events.sort(key=lambda row: row[0])
@@ -2311,6 +3046,21 @@ class TestRunGui(tk.Tk):
                 writer.writerow(
                     (
                         "time_from_valve_start_s",
+                        "sample_type",
+                        "force_total_mean_20_n",
+                        "force_1_n",
+                        "force_2_n",
+                        "force_total_raw_n",
+                        "source_force_total_n",
+                        "source_force_1_n",
+                        "source_force_2_n",
+                        "source_force_total_mean_20_n",
+                        "source_force_1_mean_20_n",
+                        "source_force_2_mean_20_n",
+                        "source_force_total_raw_n",
+                        "source_force_1_raw_n",
+                        "source_force_2_raw_n",
+                        "calibration_profile_id",
                         "target_pressure_bar",
                         "actual_regulator_pressure_bar",
                         "pressure_before_valve_bar",
@@ -2318,12 +3068,13 @@ class TestRunGui(tk.Tk):
                 )
                 for event in events:
                     writer.writerow(
-                        (
-                            f"{event[0]:.9f}",
-                            "" if event[1] is None else f"{event[1]:.6f}",
-                            "" if event[2] is None else f"{event[2]:.6f}",
-                            "" if event[3] is None else f"{event[3]:.6f}",
-                        )
+                        [f"{event[0]:.9f}", event[1]]
+                        + [
+                            "" if value is None else f"{value:.9f}"
+                            if isinstance(value, (int, float))
+                            else str(value)
+                            for value in event[2:]
+                        ]
                     )
         except OSError as exc:
             messagebox.showwarning("Test impulse CSV", f"The plot is available, but CSV saving failed:\n{exc}")
@@ -2334,10 +3085,23 @@ class TestRunGui(tk.Tk):
     def _save_test_impulse_metrics(self, data_path, metrics):
         metrics_path = data_path.with_name(f"{data_path.stem}_metrics.csv")
         metric_units = {
+            "baseline_force_n": "N",
+            "baseline_std_n": "N",
+            "peak_force_n": "N",
+            "peak_time_s": "s",
+            "rise_10_90_s": "s",
+            "fall_90_10_s": "s",
+            "fwhm_s": "s",
+            "force_impulse_ns": "Ns",
+            "plateau_mean_n": "N",
+            "plateau_std_n": "N",
             "target_pressure_bar": "bar",
             "actual_pressure_bar": "bar",
             "pressure_before_valve_bar": "bar",
             "actual_pressure_error_bar": "bar",
+            "peak_per_actual_pressure_n_per_bar": "N/bar",
+            "f1_fraction": "fraction",
+            "f2_fraction": "fraction",
         }
         try:
             with open(metrics_path, "w", newline="", encoding="utf-8") as csv_file:
@@ -2346,6 +3110,13 @@ class TestRunGui(tk.Tk):
                 for name, unit in metric_units.items():
                     value = metrics.get(name)
                     writer.writerow((name, "" if value is None else f"{value:.12g}", unit))
+                writer.writerow(
+                    (
+                        "calibration_profile_id",
+                        "" if self.platform_calibration is None else self.platform_calibration.profile_id,
+                        "",
+                    )
+                )
         except OSError as exc:
             messagebox.showwarning("Test impulse metrics", f"Metrics CSV saving failed:\n{exc}")
             return None
@@ -2368,6 +3139,19 @@ class TestRunGui(tk.Tk):
             for row in capture["pressure_samples"]
             if row[3] is not None
         ]
+        force_mean_20_points = [
+            (
+                (row[1] - capture["pulse_start_utc_ns"]) / 1e9,
+                row[7] if row[7] is not None else row[3],
+            )
+            for row in capture.get("force_samples", [])
+            if (row[7] if row[7] is not None else row[3]) is not None
+        ]
+        force_raw_points = [
+            ((row[1] - capture["pulse_start_utc_ns"]) / 1e9, row[8])
+            for row in capture.get("force_samples", [])
+            if row[8] is not None
+        ]
 
         dialog = tk.Toplevel(self)
         dialog.title("Test impulse plot")
@@ -2388,7 +3172,7 @@ class TestRunGui(tk.Tk):
 
         plot_body = ttk.Frame(dialog, padding=(12, 4, 12, 6))
         plot_body.pack(fill=tk.BOTH, expand=True)
-        metrics_frame = ttk.LabelFrame(plot_body, text="Pressure metrics", padding=(10, 8), width=245)
+        metrics_frame = ttk.LabelFrame(plot_body, text="Impulse metrics", padding=(10, 8), width=245)
         metrics_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         metrics_frame.pack_propagate(False)
 
@@ -2401,10 +3185,21 @@ class TestRunGui(tk.Tk):
             return f"{value * scale:.{digits}f}{unit}"
 
         metric_rows = (
+            ("Peak force", metric_text("peak_force_n", " N", digits=4)),
+            ("Time to peak", metric_text("peak_time_s", " ms", scale=1000.0, digits=1)),
+            ("Rise 10-90 %", metric_text("rise_10_90_s", " ms", scale=1000.0, digits=1)),
+            ("Fall 90-10 %", metric_text("fall_90_10_s", " ms", scale=1000.0, digits=1)),
+            ("FWHM", metric_text("fwhm_s", " ms", scale=1000.0, digits=1)),
+            ("Force impulse", metric_text("force_impulse_ns", " Ns", digits=5)),
+            ("Plateau mean", metric_text("plateau_mean_n", " N", digits=4)),
+            ("Plateau sigma", metric_text("plateau_std_n", " N", digits=4)),
             ("Target pressure", metric_text("target_pressure_bar", " bar", digits=3)),
             ("Actual pressure", metric_text("actual_pressure_bar", " bar", digits=3)),
             ("Before valve", metric_text("pressure_before_valve_bar", " bar", digits=3)),
             ("Pressure error", metric_text("actual_pressure_error_bar", " bar", digits=3)),
+            ("Peak / actual p", metric_text("peak_per_actual_pressure_n_per_bar", " N/bar", digits=3)),
+            ("F1 share", metric_text("f1_fraction", " %", scale=100.0, digits=1)),
+            ("F2 share", metric_text("f2_fraction", " %", scale=100.0, digits=1)),
         )
         for row_index, (label, value) in enumerate(metric_rows):
             ttk.Label(metrics_frame, text=label).grid(row=row_index, column=0, sticky=tk.W, pady=3)
@@ -2435,12 +3230,21 @@ class TestRunGui(tk.Tk):
             pressure_min = min(0.0, min(pressure_values)) if pressure_values else 0.0
             pressure_max = max(0.1, max(pressure_values)) if pressure_values else 1.0
             pressure_max += max((pressure_max - pressure_min) * 0.08, 0.02)
+            force_values = [point[1] for point in force_mean_20_points + force_raw_points]
+            force_min = min(force_values) if force_values else 0.0
+            force_max = max(force_values) if force_values else 1.0
+            force_padding = max((force_max - force_min) * 0.08, 0.005)
+            force_min -= force_padding
+            force_max += force_padding
 
             def x_coord(value):
                 return left + (value - x_min) / (x_max - x_min) * plot_width
 
             def pressure_y(value):
                 return bottom - (value - pressure_min) / (pressure_max - pressure_min) * plot_height
+
+            def force_y(value):
+                return bottom - (value - force_min) / (force_max - force_min) * plot_height
 
             canvas.create_rectangle(
                 x_coord(0.0),
@@ -2456,7 +3260,9 @@ class TestRunGui(tk.Tk):
                 y = top + fraction * plot_height
                 canvas.create_line(left, y, right, y, fill="#dddddd")
                 pressure_tick = pressure_max - fraction * (pressure_max - pressure_min)
-                canvas.create_text(left - 8, y, text=f"{pressure_tick:.3f}", anchor=tk.E)
+                force_tick = force_max - fraction * (force_max - force_min)
+                canvas.create_text(left - 8, y, text=f"{force_tick:.3f}", anchor=tk.E)
+                canvas.create_text(right + 8, y, text=f"{pressure_tick:.3f}", anchor=tk.W)
 
             for tick in range(12):
                 fraction = tick / 11
@@ -2468,7 +3274,8 @@ class TestRunGui(tk.Tk):
 
             canvas.create_rectangle(left, top, right, bottom, outline="#444444")
             canvas.create_text((left + right) / 2, height - 16, text="Time from valve start [s]")
-            canvas.create_text(20, (top + bottom) / 2, text="Pressure [bar]", angle=90)
+            canvas.create_text(20, (top + bottom) / 2, text="Force [N]", angle=90)
+            canvas.create_text(width - 20, (top + bottom) / 2, text="Pressure [bar]", angle=270)
             canvas.create_text(
                 (x_coord(0.0) + x_coord(capture["valve_open_duration_seconds"])) / 2,
                 top + 10,
@@ -2490,12 +3297,16 @@ class TestRunGui(tk.Tk):
                         dash=dash,
                     )
 
+            draw_series(force_raw_points, force_y, "#9ad8ad", width_px=1)
+            draw_series(force_mean_20_points, force_y, "#198754", width_px=3)
             draw_series(target_points, pressure_y, "#e67e22", width_px=2, dash=(8, 4))
             draw_series(actual_points, pressure_y, "#0d6efd", width_px=2)
             draw_series(nozzle_pressure_points, pressure_y, "#7b2cbf", width_px=2)
 
             legend_y = 18
             legends = (
+                ("#9ad8ad", "Force raw", None),
+                ("#198754", "Force mean 20", None),
                 ("#e67e22", "Target pressure", (8, 4)),
                 ("#0d6efd", "Actual regulator pressure", None),
                 ("#7b2cbf", "Pressure before valve", None),
@@ -2504,7 +3315,7 @@ class TestRunGui(tk.Tk):
             for color, label, dash in legends:
                 canvas.create_line(legend_x, legend_y, legend_x + 28, legend_y, fill=color, width=3, dash=dash)
                 canvas.create_text(legend_x + 34, legend_y, text=label, anchor=tk.W)
-                legend_x += 170
+                legend_x += 155
 
         canvas.bind("<Configure>", redraw)
         dialog.transient(self)
@@ -2964,6 +3775,12 @@ class TestRunGui(tk.Tk):
             return force_n, self._force_rate_hz_locked()
 
     def _store_quantumx_sample(self, sample):
+        source_sample = preserve_uncalibrated_sample(sample)
+        self._collect_calibration_sample(source_sample)
+        if self.platform_calibration is not None:
+            sample = self.platform_calibration.apply(source_sample)
+        else:
+            sample = source_sample
         now = time.time()
         with self.force_lock:
             self.latest_force_sample = sample
@@ -2977,7 +3794,7 @@ class TestRunGui(tk.Tk):
             self.force_sample_history.append(sample)
             while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
                 self.force_rate_times.popleft()
-            return self._force_rate_hz_locked()
+            return sample, self._force_rate_hz_locked()
 
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
@@ -2999,6 +3816,16 @@ class TestRunGui(tk.Tk):
             "" if sample is None else str(sample.timestamp_utc_ns),
             "" if sample is None else str(sample.sequence),
             "disconnected" if sample is None else sample.status,
+            "" if sample is None or sample.uncalibrated_force_total_n is None else f"{sample.uncalibrated_force_total_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_total_raw_n is None else f"{sample.uncalibrated_force_total_raw_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_1_n is None else f"{sample.uncalibrated_force_1_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_2_n is None else f"{sample.uncalibrated_force_2_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_total_mean_20_n is None else f"{sample.uncalibrated_force_total_mean_20_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_1_mean_20_n is None else f"{sample.uncalibrated_force_1_mean_20_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_2_mean_20_n is None else f"{sample.uncalibrated_force_2_mean_20_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_1_raw_n is None else f"{sample.uncalibrated_force_1_raw_n:.4f}",
+            "" if sample is None or sample.uncalibrated_force_2_raw_n is None else f"{sample.uncalibrated_force_2_raw_n:.4f}",
+            "" if sample is None or sample.calibration_profile_id is None else sample.calibration_profile_id,
         )
 
     def _extract_force_values(self, buffer):
@@ -3077,6 +3904,10 @@ class TestRunGui(tk.Tk):
         self._update_connection_summary()
 
     def _disconnect_colibri(self):
+        if self.colibri_touch_cancel_event is not None:
+            self.colibri_touch_cancel_event.set()
+        self.colibri_touch_running = False
+        self.colibri_touch_cancel_event = None
         if self.colibri:
             self._write_debug_log("COLIBRI disconnect")
             self.colibri.close()
@@ -3089,6 +3920,8 @@ class TestRunGui(tk.Tk):
         self.colibri_position_var.set("Position: --")
         self.last_colibri_position_mm = None
         self.colibri_status_var.set("Colibri: disconnected")
+        self.colibri_touch_status_var.set("Touch-off: Colibri disconnected")
+        self._update_colibri_touch_controls()
         self._update_connection_summary()
 
     def _set_colibri_controls_enabled(self, enabled):
@@ -3097,6 +3930,522 @@ class TestRunGui(tk.Tk):
             control.configure(state=state)
         if self.colibri:
             self.colibri_stop_button.configure(state=tk.NORMAL)
+        self._update_colibri_touch_controls()
+
+    def _open_colibri_touch_dialog(self):
+        if self.colibri_touch_dialog is not None and self.colibri_touch_dialog.winfo_exists():
+            self.colibri_touch_dialog.lift()
+            self.colibri_touch_dialog.focus_force()
+            return
+        dialog = tk.Toplevel(self)
+        self.colibri_touch_dialog = dialog
+        dialog.title("Force touch-off safety test")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+        dialog.protocol("WM_DELETE_WINDOW", self._close_colibri_touch_dialog)
+
+        ttk.Label(
+            dialog,
+            text=(
+                "Separate hand test: the Colibri moves in the POSITIVE direction in "
+                f"{COLIBRI_TOUCH_STEP_MM:.3f} mm steps. Press the platform gently by hand. "
+                f"At |F total| >= {COLIBRI_TOUCH_FORCE_N:.3f} N it stops and retracts "
+                f"{COLIBRI_TOUCH_RETRACT_MM:.3f} mm in the NEGATIVE direction."
+            ),
+            wraplength=590,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, padx=16, pady=(16, 8))
+        ttk.Label(
+            dialog,
+            text=(
+                "The test aborts on stale/invalid force data, Colibri errors, timeout, "
+                "travel limit, excessive baseline noise, or the configured approach limit."
+            ),
+            wraplength=590,
+            foreground="#9a4d00",
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, padx=16, pady=(0, 10))
+
+        settings = ttk.Frame(dialog)
+        settings.pack(fill=tk.X, padx=16)
+        ttk.Label(settings, text="Maximum positive approach").pack(side=tk.LEFT)
+        ttk.Spinbox(
+            settings,
+            from_=COLIBRI_TOUCH_STEP_MM,
+            to=COLIBRI_TOUCH_MAX_APPROACH_MM,
+            increment=0.05,
+            textvariable=self.colibri_touch_max_approach_var,
+            width=8,
+        ).pack(side=tk.LEFT, padx=(8, 4))
+        ttk.Label(settings, text="mm").pack(side=tk.LEFT)
+
+        ttk.Label(dialog, textvariable=self.colibri_touch_status_var, wraplength=590).pack(
+            fill=tk.X, padx=16, pady=(12, 8)
+        )
+        buttons = ttk.Frame(dialog)
+        buttons.pack(fill=tk.X, padx=16, pady=(4, 16))
+        self.colibri_touch_start_button = ttk.Button(
+            buttons,
+            text="Start hand test",
+            command=self._start_colibri_force_touch,
+        )
+        self.colibri_touch_start_button.pack(side=tk.LEFT)
+        self.colibri_touch_stop_button = ttk.Button(
+            buttons,
+            text="Stop and cancel",
+            command=self._cancel_colibri_force_touch,
+            state=tk.DISABLED,
+        )
+        self.colibri_touch_stop_button.pack(side=tk.LEFT, padx=8)
+        ttk.Button(buttons, text="Close", command=self._close_colibri_touch_dialog).pack(
+            side=tk.RIGHT
+        )
+        self._update_colibri_touch_controls()
+
+    def _close_colibri_touch_dialog(self):
+        if self.colibri_touch_running:
+            messagebox.showwarning(
+                "Touch-off running",
+                "Stop the force touch-off before closing this window.",
+                parent=self.colibri_touch_dialog,
+            )
+            return
+        if self.colibri_touch_dialog is not None:
+            self.colibri_touch_dialog.destroy()
+        self.colibri_touch_dialog = None
+
+    def _update_colibri_touch_controls(self):
+        dialog_open = (
+            self.colibri_touch_dialog is not None
+            and self.colibri_touch_dialog.winfo_exists()
+        )
+        if not dialog_open:
+            return
+        can_start = bool(
+            self.colibri
+            and not self.colibri_busy
+            and not self.colibri_touch_running
+        )
+        self.colibri_touch_start_button.configure(
+            state=tk.NORMAL if can_start else tk.DISABLED
+        )
+        self.colibri_touch_stop_button.configure(
+            state=tk.NORMAL if self.colibri_touch_running else tk.DISABLED
+        )
+
+    def _touch_force_value(self, sample):
+        if sample is None or not sample.valid or sample.status != "ok":
+            return None
+        value = sample.force_total_mean_20_n
+        return sample.force_total_n if value is None else value
+
+    def _current_touch_force_sample(self):
+        with self.force_lock:
+            sample = self.latest_force_sample
+            received_time = self.latest_force_time
+        if sample is None or received_time is None:
+            raise RuntimeError("No QuantumX force sample is available.")
+        age_seconds = time.time() - received_time
+        if age_seconds > COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS:
+            raise RuntimeError(
+                f"QuantumX force data is stale ({age_seconds:.3f} s old)."
+            )
+        force_n = self._touch_force_value(sample)
+        if force_n is None:
+            raise RuntimeError(f"QuantumX force sample is invalid ({sample.status}).")
+        return sample, float(force_n)
+
+    def _start_colibri_force_touch(self):
+        if not self.colibri:
+            messagebox.showerror("Colibri disconnected", "Connect the Colibri axis first.")
+            return
+        if self.colibri_busy or self.colibri_touch_running:
+            messagebox.showinfo("Colibri busy", "The Colibri axis is already moving.")
+            return
+        if (
+            self.active_sequence_archive is not None
+            or self.test_impulse_capture is not None
+            or self.current_impulse is not None
+            or self.pulse_in_progress
+            or self.calibration_session is not None
+        ):
+            messagebox.showerror(
+                "Touch-off unavailable",
+                "Finish the active impulse, sequence, or calibration first.",
+                parent=self.colibri_touch_dialog,
+            )
+            return
+        if self.platform_calibration is None or not self.calibration_zero_refreshed:
+            messagebox.showerror(
+                "Fresh platform zero required",
+                "Load or create the platform calibration and run Zero empty platform "
+                "during the current QuantumX connection before this safety test.",
+                parent=self.colibri_touch_dialog,
+            )
+            return
+        max_approach_mm = self._validated_float(
+            self.colibri_touch_max_approach_var,
+            "maximum touch-off approach",
+            COLIBRI_TOUCH_STEP_MM,
+            COLIBRI_TOUCH_MAX_APPROACH_MM,
+        )
+        if max_approach_mm is None:
+            return
+        try:
+            _sample, initial_force_n = self._current_touch_force_sample()
+        except RuntimeError as exc:
+            messagebox.showerror("Force data unavailable", str(exc), parent=self.colibri_touch_dialog)
+            return
+        if abs(initial_force_n) > COLIBRI_TOUCH_MAX_BASELINE_ABS_N:
+            messagebox.showerror(
+                "Platform is not unloaded",
+                f"Current total force is {initial_force_n:.4f} N. It must be within "
+                f"+/-{COLIBRI_TOUCH_MAX_BASELINE_ABS_N:.3f} N before starting.",
+                parent=self.colibri_touch_dialog,
+            )
+            return
+        if not messagebox.askyesno(
+            "Start force touch-off hand test?",
+            (
+                "Confirm all of the following:\n\n"
+                "- POSITIVE Colibri motion points toward the component.\n"
+                "- NEGATIVE motion moves safely away.\n"
+                "- Nothing rigid is currently below the platform.\n"
+                "- You will press the platform gently by hand to trigger the stop.\n\n"
+                f"Contact threshold: {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
+                f"Step size: {COLIBRI_TOUCH_STEP_MM:.3f} mm\n"
+                f"Maximum approach: {max_approach_mm:.3f} mm\n"
+                f"Automatic retract: {COLIBRI_TOUCH_RETRACT_MM:.3f} mm"
+            ),
+            parent=self.colibri_touch_dialog,
+        ):
+            return
+
+        self.colibri_touch_cancel_event = threading.Event()
+        self.colibri_touch_running = True
+        self.colibri_touch_status_var.set("Touch-off: acquiring unloaded baseline...")
+        self._update_colibri_touch_controls()
+
+        def task():
+            return self._perform_colibri_force_touch(max_approach_mm)
+
+        self._run_colibri_task("Force touch-off hand test", task)
+
+    def _cancel_colibri_force_touch(self):
+        event = self.colibri_touch_cancel_event
+        if not self.colibri_touch_running or event is None:
+            return
+        event.set()
+        self.colibri_touch_status_var.set("Touch-off: stop requested...")
+
+        def stop_worker():
+            try:
+                if self.colibri:
+                    self.colibri.stop()
+            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
+                self.messages.put(("colibri_error", f"Touch-off stop failed: {exc}"))
+
+        threading.Thread(target=stop_worker, daemon=True).start()
+
+    def _acquire_touch_baseline(self):
+        deadline = time.monotonic() + COLIBRI_TOUCH_BASELINE_SECONDS
+        values_by_id = {}
+        while time.monotonic() < deadline:
+            cancel_event = self.colibri_touch_cancel_event
+            if cancel_event is None or cancel_event.is_set():
+                return None
+            sample, force_n = self._current_touch_force_sample()
+            values_by_id[sample.sample_id] = force_n
+            time.sleep(0.005)
+        values = list(values_by_id.values())
+        if len(values) < COLIBRI_TOUCH_MIN_BASELINE_SAMPLES:
+            raise RuntimeError(
+                f"Only {len(values)} unique force samples were received during baseline acquisition."
+            )
+        baseline_mean = statistics.mean(values)
+        baseline_std = statistics.stdev(values) if len(values) > 1 else 0.0
+        if abs(baseline_mean) > COLIBRI_TOUCH_MAX_BASELINE_ABS_N:
+            raise RuntimeError(
+                f"Unloaded baseline {baseline_mean:.4f} N exceeds "
+                f"+/-{COLIBRI_TOUCH_MAX_BASELINE_ABS_N:.3f} N."
+            )
+        if baseline_std > COLIBRI_TOUCH_MAX_BASELINE_STD_N:
+            raise RuntimeError(
+                f"Baseline noise {baseline_std:.4f} N exceeds "
+                f"{COLIBRI_TOUCH_MAX_BASELINE_STD_N:.3f} N."
+            )
+        return baseline_mean, baseline_std, len(values)
+
+    def _perform_colibri_force_touch(self, max_approach_mm):
+        trace = []
+        trace_path = None
+        baseline_mean = None
+        baseline_std = None
+        contact_force_n = None
+        try:
+            snapshot = self._read_colibri_snapshot()
+            status = snapshot["status"]
+            if status["error_byte"]:
+                raise RuntimeError(
+                    f"Colibri reports error 0x{status['error_byte']:02X}."
+                )
+            if not status["referenced"]:
+                raise RuntimeError("Colibri must be referenced before force touch-off.")
+            if status["moving"]:
+                raise RuntimeError("Colibri is already moving.")
+            start_steps = snapshot["position_steps"]
+            max_approach_steps = max(
+                1, self._colibri_mm_to_steps(max_approach_mm)
+            )
+            positive_travel_limit_steps = self._colibri_mm_to_steps(COLIBRI_TRAVEL_MM)
+            if start_steps + max_approach_steps > positive_travel_limit_steps:
+                raise RuntimeError(
+                    "Configured touch-off approach would exceed the positive Colibri travel limit."
+                )
+
+            self.colibri.set_remote()
+            self.colibri.enable()
+            baseline = self._acquire_touch_baseline()
+            if baseline is None:
+                self.colibri.stop()
+                return self._read_colibri_snapshot()
+            baseline_mean, baseline_std, baseline_count = baseline
+            self.messages.put(
+                (
+                    "touch_off_progress",
+                    f"Baseline {baseline_mean:.4f} N, sigma {baseline_std:.4f} N "
+                    f"from {baseline_count} samples. Approaching...",
+                )
+            )
+
+            contact_snapshot = None
+            step_count = 0
+            while step_count < max_approach_steps:
+                cancel_event = self.colibri_touch_cancel_event
+                if cancel_event is None or cancel_event.is_set():
+                    self.colibri.stop()
+                    result = self._read_colibri_snapshot()
+                    trace_path = (
+                        self._write_colibri_touch_trace(
+                            trace,
+                            baseline_mean,
+                            baseline_std,
+                            None,
+                        )
+                        if trace
+                        else None
+                    )
+                    message = "Touch-off cancelled and stopped."
+                    if trace_path is not None:
+                        message += f" Trace: {trace_path}"
+                    self.messages.put(("touch_off_progress", message))
+                    return result
+
+                _sample, force_n = self._current_touch_force_sample()
+                if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                    contact_snapshot = self._read_colibri_snapshot()
+                    contact_force_n = force_n
+                    if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                        self.messages.put(
+                            (
+                                "touch_off_progress",
+                                f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                            )
+                        )
+                    break
+
+                current_steps = self.colibri.position_steps()
+                target_steps = current_steps + 1
+                self.colibri.move_relative_steps(1)
+                snapshot = self._wait_for_colibri_move(
+                    target_steps,
+                    timeout_seconds=2.0,
+                    tolerance_steps=1,
+                )
+                step_count += 1
+                _sample, force_n = self._current_touch_force_sample()
+                trace.append(
+                    (
+                        time.time_ns(),
+                        step_count,
+                        snapshot["position_mm"],
+                        force_n,
+                        "approach",
+                    )
+                )
+                if step_count == 1 or step_count % 10 == 0:
+                    self.messages.put(
+                        (
+                            "touch_off_progress",
+                            f"Approach {step_count * COLIBRI_TOUCH_STEP_MM:.3f} / "
+                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
+                        )
+                    )
+                if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                    contact_snapshot = snapshot
+                    contact_force_n = force_n
+                    if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                        self.messages.put(
+                            (
+                                "touch_off_progress",
+                                f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                            )
+                        )
+                    break
+
+            if contact_snapshot is None:
+                self.colibri.stop()
+                stopped_snapshot = self._read_colibri_snapshot()
+                return_steps = stopped_snapshot["position_steps"] - start_steps
+                if return_steps > 0:
+                    self.messages.put(
+                        (
+                            "touch_off_progress",
+                            "No contact detected; returning to the touch-off start position...",
+                        )
+                    )
+                    self.colibri.move_relative_steps(-return_steps)
+                    stopped_snapshot = self._wait_for_colibri_move(
+                        start_steps,
+                        timeout_seconds=10.0,
+                        tolerance_steps=2,
+                    )
+                    _sample, return_force_n = self._current_touch_force_sample()
+                    trace.append(
+                        (
+                            time.time_ns(),
+                            step_count,
+                            stopped_snapshot["position_mm"],
+                            return_force_n,
+                            "no_contact_return",
+                        )
+                    )
+                raise RuntimeError(
+                    f"No contact detected within {max_approach_mm:.3f} mm; "
+                    "the axis returned to the start position."
+                )
+
+            self.colibri.stop()
+            trace.append(
+                (
+                    time.time_ns(),
+                    step_count,
+                    contact_snapshot["position_mm"],
+                    contact_force_n,
+                    "contact",
+                )
+            )
+            retract_steps = max(
+                1, self._colibri_mm_to_steps(COLIBRI_TOUCH_RETRACT_MM)
+            )
+            retract_target_steps = contact_snapshot["position_steps"] - retract_steps
+            self.messages.put(
+                (
+                    "touch_off_progress",
+                    f"Contact {contact_force_n:.4f} N at "
+                    f"{contact_snapshot['position_mm']:.3f} mm. Retracting...",
+                )
+            )
+            self.colibri.move_relative_steps(-retract_steps)
+            final_snapshot = self._wait_for_colibri_move(
+                retract_target_steps,
+                timeout_seconds=5.0,
+                tolerance_steps=2,
+            )
+            _sample, final_force_n = self._current_touch_force_sample()
+            trace.append(
+                (
+                    time.time_ns(),
+                    step_count,
+                    final_snapshot["position_mm"],
+                    final_force_n,
+                    "retracted",
+                )
+            )
+            trace_path = self._write_colibri_touch_trace(
+                trace,
+                baseline_mean,
+                baseline_std,
+                contact_force_n,
+            )
+            self.messages.put(
+                (
+                    "touch_off_result",
+                    {
+                        "contact_force_n": contact_force_n,
+                        "contact_position_mm": contact_snapshot["position_mm"],
+                        "final_force_n": final_force_n,
+                        "final_position_mm": final_snapshot["position_mm"],
+                        "trace_path": trace_path,
+                    },
+                )
+            )
+            return final_snapshot
+        except Exception:
+            try:
+                if self.colibri:
+                    self.colibri.stop()
+            except Exception:
+                pass
+            if trace and trace_path is None:
+                try:
+                    self._write_colibri_touch_trace(
+                        trace,
+                        baseline_mean,
+                        baseline_std,
+                        contact_force_n,
+                    )
+                except OSError:
+                    pass
+            raise
+
+    def _write_colibri_touch_trace(
+        self,
+        trace,
+        baseline_mean_n,
+        baseline_std_n,
+        contact_force_n,
+    ):
+        data_dir = Path(__file__).with_name("Data")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        path = data_dir / f"force_touch_off_{timestamp}.csv"
+        with open(path, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(
+                (
+                    "timestamp_utc_ns",
+                    "approach_step",
+                    "colibri_position_mm",
+                    "calibrated_force_total_mean_20_n",
+                    "phase",
+                    "baseline_mean_n",
+                    "baseline_std_n",
+                    "contact_threshold_n",
+                    "contact_force_n",
+                    "calibration_profile_id",
+                )
+            )
+            for timestamp_utc_ns, step, position_mm, force_n, phase in trace:
+                writer.writerow(
+                    (
+                        timestamp_utc_ns,
+                        step,
+                        f"{position_mm:.6f}",
+                        f"{force_n:.9f}",
+                        phase,
+                        "" if baseline_mean_n is None else f"{baseline_mean_n:.9f}",
+                        "" if baseline_std_n is None else f"{baseline_std_n:.9f}",
+                        f"{COLIBRI_TOUCH_FORCE_N:.9f}",
+                        "" if contact_force_n is None else f"{contact_force_n:.9f}",
+                        (
+                            ""
+                            if self.platform_calibration is None
+                            else self.platform_calibration.profile_id
+                        ),
+                    )
+                )
+        return path
 
     def _colibri_refresh_status(self):
         self._run_colibri_task("Read Colibri status", self._read_colibri_snapshot)
@@ -3193,6 +4542,10 @@ class TestRunGui(tk.Tk):
         self._run_colibri_task(f"Colibri absolute move {position_mm:.3f} mm", task)
 
     def _colibri_stop(self):
+        if self.colibri_touch_running:
+            self._cancel_colibri_force_touch()
+            return
+
         def task():
             self.colibri.stop()
             time.sleep(0.05)
@@ -3712,9 +5065,42 @@ class TestRunGui(tk.Tk):
                 self._write_debug_log(f"GUI COLIBRI error {value}")
                 self.colibri_status_var.set(f"Colibri: {value}")
                 self.status_var.set(value)
+                if self.colibri_touch_running:
+                    self.colibri_touch_status_var.set(f"Touch-off failed: {value}")
             elif kind == "colibri_done":
                 self.colibri_busy = False
+                if self.colibri_touch_running:
+                    self.colibri_touch_running = False
+                    self.colibri_touch_cancel_event = None
                 self._set_colibri_controls_enabled(True)
+                self._update_colibri_touch_controls()
+            elif kind == "touch_off_progress":
+                self.colibri_touch_status_var.set(f"Touch-off: {value}")
+                self.status_var.set(value)
+            elif kind == "touch_off_result":
+                trace_path = value.get("trace_path")
+                result_text = (
+                    f"Contact detected at {value['contact_force_n']:.4f} N and "
+                    f"{value['contact_position_mm']:.3f} mm.\n\n"
+                    f"Retracted to {value['final_position_mm']:.3f} mm "
+                    f"({value['final_force_n']:.4f} N)."
+                )
+                if trace_path is not None:
+                    result_text += f"\n\nTrace: {trace_path}"
+                self.colibri_touch_status_var.set(
+                    f"Touch-off complete: contact {value['contact_force_n']:.4f} N, "
+                    f"retracted to {value['final_position_mm']:.3f} mm"
+                )
+                messagebox.showinfo(
+                    "Force touch-off complete",
+                    result_text,
+                    parent=(
+                        self.colibri_touch_dialog
+                        if self.colibri_touch_dialog is not None
+                        and self.colibri_touch_dialog.winfo_exists()
+                        else self
+                    ),
+                )
             elif kind == "force_value":
                 if isinstance(value, tuple):
                     force_n, rate_hz = value
@@ -3724,7 +5110,7 @@ class TestRunGui(tk.Tk):
                 if rate_hz is not None:
                     self.force_rate_var.set(f"Force rate: {rate_hz:.0f} Hz")
             elif kind == "quantumx_force_sample":
-                rate_hz = self._store_quantumx_sample(value)
+                value, rate_hz = self._store_quantumx_sample(value)
                 self._capture_normal_impulse_force(value)
                 now_monotonic = time.monotonic()
                 if now_monotonic - self.last_force_ui_update_monotonic >= 0.05:
@@ -3748,7 +5134,16 @@ class TestRunGui(tk.Tk):
             elif kind == "force_status":
                 self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
+                if self.calibration_capture is not None:
+                    lowered_status = value.lower()
+                    for status_name in ("overrange", "stale", "disconnected", "invalid_channel"):
+                        if status_name in lowered_status:
+                            self.calibration_capture["invalid_status"] = status_name
+                            break
                 if "stale" in value.lower() or "disconnected" in value.lower():
+                    if "disconnected" in value.lower():
+                        self.calibration_zero_refreshed = False
+                        self._update_calibration_status()
                     with self.force_lock:
                         self.latest_force_sample = None
                         self.latest_force_1_n = None
@@ -3988,6 +5383,16 @@ class TestRunGui(tk.Tk):
             sample.status,
             sample.force_total_mean_20_n,
             sample.force_total_raw_n,
+            sample.uncalibrated_force_total_n,
+            sample.uncalibrated_force_1_n,
+            sample.uncalibrated_force_2_n,
+            sample.uncalibrated_force_total_mean_20_n,
+            sample.uncalibrated_force_1_mean_20_n,
+            sample.uncalibrated_force_2_mean_20_n,
+            sample.uncalibrated_force_total_raw_n,
+            sample.uncalibrated_force_1_raw_n,
+            sample.uncalibrated_force_2_raw_n,
+            sample.calibration_profile_id,
         )
 
     def _capture_normal_impulse_force(self, sample):
@@ -4566,6 +5971,7 @@ class TestRunGui(tk.Tk):
             "recorded at local",
             "timeseries file",
             "summary file",
+            "calibration profile id",
             *self._impulse_csv_headers(),
         ]
         delimiter = ";" if archive["german_csv"] else ","
@@ -4581,7 +5987,7 @@ class TestRunGui(tk.Tk):
         selected_nozzles = ",".join(
             str(index + 1) for index in range(4) if archive["nozzle_mask"] & (1 << index)
         )
-        return [
+        rows = [
             ("sequence id", archive["session_id"], "stable identifier used in all sequence CSV files"),
             ("status", archive["status"], ""),
             ("started local", archive["started_local"].isoformat(timespec="milliseconds"), ""),
@@ -4639,6 +6045,33 @@ class TestRunGui(tk.Tk):
             ("part hole", self.part_hole_var.get(), ""),
             ("German CSV format", archive["german_csv"], "semicolon delimiter and decimal comma"),
         ]
+        profile = archive.get("calibration_profile")
+        if profile is None:
+            calibration_rows = [
+                ("calibration active", False, ""),
+                ("calibration zero refreshed", False, ""),
+            ]
+        else:
+            quality = profile.get("quality", {})
+            calibration_rows = [
+                ("calibration active", True, ""),
+                ("calibration profile name", profile.get("name", ""), ""),
+                ("calibration profile id", profile.get("profile_id", ""), ""),
+                ("calibration profile path", archive.get("calibration_profile_path", ""), ""),
+                ("calibration created utc", profile.get("created_utc", ""), ""),
+                ("calibration gain", profile.get("gain", ""), ""),
+                ("calibration tare 1", profile.get("tare_1_n", ""), "N, MX source scale"),
+                ("calibration tare 2", profile.get("tare_2_n", ""), "N, MX source scale"),
+                ("calibration last zero utc", profile.get("zeroed_utc", ""), ""),
+                ("calibration zero refreshed", archive.get("calibration_zero_refreshed", False), ""),
+                ("calibration RMSE", quality.get("rmse_n", ""), "N"),
+                ("calibration maximum residual", quality.get("max_abs_error_n", ""), "N"),
+                ("calibration R squared", quality.get("r_squared", ""), ""),
+                ("calibration maximum position spread", quality.get("max_position_spread_n", ""), "N"),
+                ("calibration warnings", " | ".join(quality.get("warnings", [])), ""),
+            ]
+        rows[24:24] = calibration_rows
+        return rows
 
     def _write_sequence_metadata(self):
         archive = self.active_sequence_archive
@@ -4695,6 +6128,16 @@ class TestRunGui(tk.Tk):
                     row[5],
                     raw_total,
                     row[6],
+                    row[9] if len(row) > 9 else None,
+                    row[10] if len(row) > 10 else None,
+                    row[11] if len(row) > 11 else None,
+                    row[12] if len(row) > 12 else None,
+                    row[13] if len(row) > 13 else None,
+                    row[14] if len(row) > 14 else None,
+                    row[15] if len(row) > 15 else None,
+                    row[16] if len(row) > 16 else None,
+                    row[17] if len(row) > 17 else None,
+                    row[18] if len(row) > 18 else None,
                     None,
                     None,
                     None,
@@ -4706,6 +6149,16 @@ class TestRunGui(tk.Tk):
                     received - pulse_start_monotonic,
                     *common,
                     "pressure",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -4734,6 +6187,16 @@ class TestRunGui(tk.Tk):
             "force 2 mean 20 n",
             "force total raw n",
             "force status",
+            "source force total n",
+            "source force 1 n",
+            "source force 2 n",
+            "source force total mean 20 n",
+            "source force 1 mean 20 n",
+            "source force 2 mean 20 n",
+            "source force total raw n",
+            "source force 1 raw n",
+            "source force 2 raw n",
+            "calibration profile id",
             "target regulator pressure bar",
             "actual regulator pressure bar",
             "pressure before valve bar",
@@ -4751,6 +6214,21 @@ class TestRunGui(tk.Tk):
             ("impulse id", impulse_id, ""),
             ("recorded at local", dt.datetime.now().astimezone().isoformat(timespec="milliseconds"), ""),
         ]
+        calibration_profile = archive.get("calibration_profile")
+        summary_rows.extend(
+            (
+                (
+                    "calibration profile id",
+                    "" if calibration_profile is None else calibration_profile.get("profile_id", ""),
+                    "",
+                ),
+                (
+                    "calibration profile name",
+                    "" if calibration_profile is None else calibration_profile.get("name", ""),
+                    "",
+                ),
+            )
+        )
         summary_rows.extend(
             (header, value, "") for header, value in zip(self._impulse_csv_headers(), row)
         )
@@ -4799,6 +6277,11 @@ class TestRunGui(tk.Tk):
                     recorded_at,
                     str(timeseries_path.relative_to(archive["root"])),
                     str(summary_path.relative_to(archive["root"])),
+                    (
+                        ""
+                        if archive.get("calibration_profile") is None
+                        else archive["calibration_profile"].get("profile_id", "")
+                    ),
                     *row,
                 ]
             )
@@ -4825,6 +6308,7 @@ class TestRunGui(tk.Tk):
             f"impulses={len(archive['overview_records'])}"
         )
         self.active_sequence_archive = None
+        self._set_calibration_run_lock(False)
 
     def _finalize_stale_impulse_before_save(self):
         if not self.current_impulse:
@@ -4852,6 +6336,16 @@ class TestRunGui(tk.Tk):
                 "force timestamp utc ns",
                 "force sequence",
                 "force status",
+                "source force total",
+                "source raw force total",
+                "source force 1",
+                "source force 2",
+                "source force total mean 20",
+                "source force 1 mean 20",
+                "source force 2 mean 20",
+                "source raw force 1",
+                "source raw force 2",
+                "calibration profile id",
             ])
             writer.writerows(self._csv_output_row(row) for row in self.rows)
 

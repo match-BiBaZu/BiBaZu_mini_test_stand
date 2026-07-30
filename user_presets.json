@@ -5,5 +5,6 @@
   "quantumx_port": 5500,
   "nozzle_offset_mm": 114.8,
   "colibri_plate_distance_mm": 1.0,
-  "sequence_save_root": ""
+  "sequence_save_root": "",
+  "platform_calibration_profile": "C:\\Users\\Shieff\\Downloads\\platform_calibration_20260730_200608.json"
 }

@@ -43,6 +43,17 @@ class ForceSample:
     raw_force: float | None = None
     raw_1_mv_v: float | None = None
     raw_2_mv_v: float | None = None
+    uncalibrated_force_1_n: float | None = None
+    uncalibrated_force_2_n: float | None = None
+    uncalibrated_force_total_n: float | None = None
+    uncalibrated_force_1_mean_20_n: float | None = None
+    uncalibrated_force_2_mean_20_n: float | None = None
+    uncalibrated_force_total_mean_20_n: float | None = None
+    uncalibrated_force_1_raw_n: float | None = None
+    uncalibrated_force_2_raw_n: float | None = None
+    uncalibrated_force_total_raw_n: float | None = None
+    calibration_profile_id: str | None = None
+    calibration_zeroed_utc: str | None = None
 
     @property
     def sample_id(self) -> tuple[str, int, int]:
