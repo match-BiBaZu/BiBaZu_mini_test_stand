@@ -76,6 +76,10 @@ COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
 COLIBRI_TOUCH_MIN_BASELINE_SAMPLES = 10
 COLIBRI_TOUCH_MAX_BASELINE_ABS_N = 0.05
 COLIBRI_TOUCH_MAX_BASELINE_STD_N = 0.01
+COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS = 0.005
+COLIBRI_TOUCH_CONTINUOUS_POSITION_POLL_SECONDS = 0.05
+COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS = 60.0
+COLIBRI_FORCE_SAFETY_LIMIT_N = 1.0
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
 FORCE_RATE_WINDOW_SECONDS = 2.0
@@ -327,10 +331,14 @@ class ColibriController:
 
     def _decode_status(self, status_byte, system_status_byte, error_byte):
         return {
+            "status_byte": status_byte,
             "moving": bool(status_byte & 0x01),
             "software_limit": bool(status_byte & 0x02),
             "ready": bool(status_byte & 0x08),
-            "referenced": bool(status_byte & 0x10),
+            # The reference flag is carried in the system-status byte. During
+            # a reference run the controller reports 0x60 and changes to 0x70
+            # after setting the reference position to zero.
+            "referenced": bool(system_status_byte & 0x10),
             "remote": bool(status_byte & 0x20),
             "enabled": bool(status_byte & 0x40),
             "password": bool(status_byte & 0x80),
@@ -411,12 +419,16 @@ class TestRunGui(tk.Tk):
         self.closing = False
         self.colibri = None
         self.colibri_busy = False
+        self.colibri_motion_state_lock = threading.Lock()
+        self.colibri_motion_direction = 0
+        self.colibri_force_safety_stop_pending = False
         self.colibri_touch_dialog = None
         self.colibri_touch_cancel_event = None
         self.colibri_touch_running = False
         self.colibri_touch_max_approach_var = tk.DoubleVar(
             value=COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM
         )
+        self.colibri_touch_continuous_var = tk.BooleanVar(value=False)
         self.colibri_touch_status_var = tk.StringVar(value="Touch-off: idle")
         self.debug_log_file = None
         self.debug_log_path = None
@@ -3612,7 +3624,7 @@ class TestRunGui(tk.Tk):
         self.force_client = QuantumXTcpClient(
             host,
             port,
-            on_sample=lambda sample: self.messages.put(("quantumx_force_sample", sample)),
+            on_sample=self._on_quantumx_force_sample,
             on_status=lambda status: self.messages.put(("force_status", status)),
         )
         self.force_client.start()
@@ -3621,6 +3633,14 @@ class TestRunGui(tk.Tk):
         self.status_var.set("Connecting to QuantumX force bridge")
         self._write_debug_log(f"FORCE QuantumX connecting endpoint={host}:{port}")
         self._update_connection_summary()
+
+    def _on_quantumx_force_sample(self, sample):
+        # This callback runs in the force-client thread. Checking the source
+        # sample here avoids waiting for the Tk message queue before issuing an
+        # emergency stop. The calibrated sample is checked again when the GUI
+        # stores it.
+        self._enforce_colibri_force_safety(sample, source="QuantumX source")
+        self.messages.put(("quantumx_force_sample", sample))
 
     def _ensure_quantumx_monitor(self, host, port):
         try:
@@ -3642,6 +3662,9 @@ class TestRunGui(tk.Tk):
 
     def _disconnect_force_sensor(self):
         self._write_debug_log("FORCE QuantumX disconnect requested")
+        self._stop_positive_colibri_if_force_monitor_unavailable(
+            "QuantumX force monitoring disconnected"
+        )
         if self.force_client:
             self.force_client.stop()
         self.force_client = None
@@ -3672,8 +3695,120 @@ class TestRunGui(tk.Tk):
         return (
             f"{prefix} | total = {QUANTUMX_FORCE_1_NAME} + {QUANTUMX_FORCE_2_NAME} "
             f"(CH{QUANTUMX_FORCE_1_CHANNEL} + CH{QUANTUMX_FORCE_2_CHANNEL}) | 20-value mean | "
-            f"impulse threshold {self.force_impulse_threshold:.4g} N"
+            f"impulse threshold {self.force_impulse_threshold:.4g} N | "
+            f"Colibri + safety {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N"
         )
+
+    def _colibri_safety_force_value(self, sample):
+        if sample is None or not sample.valid or sample.status != "ok":
+            return None
+        values = (
+            sample.force_total_n,
+            sample.force_total_mean_20_n,
+            sample.force_total_raw_n,
+        )
+        finite_values = [
+            float(value)
+            for value in values
+            if value is not None and math.isfinite(float(value))
+        ]
+        if not finite_values:
+            return None
+        return max(finite_values, key=abs)
+
+    def _require_positive_colibri_motion_safe(self):
+        with self.force_lock:
+            sample = self.latest_force_sample
+            received_time = self.latest_force_time
+        if sample is None or received_time is None:
+            raise RuntimeError(
+                "Positive Colibri motion is blocked: no QuantumX force value is available."
+            )
+        age_seconds = time.time() - received_time
+        if age_seconds > COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS:
+            raise RuntimeError(
+                "Positive Colibri motion is blocked: QuantumX force data is stale "
+                f"({age_seconds:.3f} s old)."
+            )
+        force_n = self._colibri_safety_force_value(sample)
+        if force_n is None:
+            raise RuntimeError(
+                "Positive Colibri motion is blocked: the QuantumX force value is invalid."
+            )
+        if abs(force_n) >= COLIBRI_FORCE_SAFETY_LIMIT_N:
+            raise RuntimeError(
+                "Positive Colibri motion is blocked at "
+                f"{force_n:.4f} N (limit {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N)."
+            )
+        return force_n
+
+    def _set_colibri_motion_direction(self, direction):
+        direction = 1 if direction > 0 else -1 if direction < 0 else 0
+        if direction > 0:
+            # Publish the positive direction before checking the force so a
+            # concurrent force callback cannot slip through the start race.
+            with self.colibri_motion_state_lock:
+                self.colibri_motion_direction = direction
+            try:
+                self._require_positive_colibri_motion_safe()
+            except Exception:
+                self._clear_colibri_motion_direction(expected_direction=direction)
+                raise
+        else:
+            with self.colibri_motion_state_lock:
+                self.colibri_motion_direction = direction
+
+    def _clear_colibri_motion_direction(self, expected_direction=None):
+        with self.colibri_motion_state_lock:
+            if (
+                expected_direction is None
+                or self.colibri_motion_direction == expected_direction
+            ):
+                self.colibri_motion_direction = 0
+
+    def _enforce_colibri_force_safety(self, sample, source):
+        force_n = self._colibri_safety_force_value(sample)
+        if force_n is None or abs(force_n) < COLIBRI_FORCE_SAFETY_LIMIT_N:
+            return
+        self._trigger_colibri_force_safety_stop(
+            f"{source} measured {force_n:.4f} N "
+            f"(limit {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N)"
+        )
+
+    def _stop_positive_colibri_if_force_monitor_unavailable(self, reason):
+        self._trigger_colibri_force_safety_stop(reason)
+
+    def _trigger_colibri_force_safety_stop(self, reason):
+        with self.colibri_motion_state_lock:
+            if (
+                self.colibri_motion_direction <= 0
+                or self.colibri_force_safety_stop_pending
+            ):
+                return
+            self.colibri_motion_direction = 0
+            self.colibri_force_safety_stop_pending = True
+
+        cancel_event = self.colibri_touch_cancel_event
+        if cancel_event is not None:
+            cancel_event.set()
+        message = f"COLIBRI FORCE SAFETY STOP: {reason}"
+        self._write_debug_log(message)
+        self.messages.put(("colibri_force_safety_stop", reason))
+
+        def stop_worker():
+            try:
+                if self.colibri:
+                    self.colibri.stop()
+            except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
+                self._write_debug_log(f"{message}; stop command failed: {exc}")
+                self.messages.put(
+                    ("colibri_error", f"Force safety stop command failed: {exc}")
+                )
+            finally:
+                with self.colibri_motion_state_lock:
+                    self.colibri_force_safety_stop_pending = False
+
+        threading.Thread(target=stop_worker, daemon=True).start()
 
     def _format_force_value(self, force_value):
         return "Force total: --" if force_value is None else f"Force total: {force_value:.4f} N"
@@ -3794,7 +3929,9 @@ class TestRunGui(tk.Tk):
             self.force_sample_history.append(sample)
             while self.force_rate_times and now - self.force_rate_times[0] > FORCE_RATE_WINDOW_SECONDS:
                 self.force_rate_times.popleft()
-            return sample, self._force_rate_hz_locked()
+            rate_hz = self._force_rate_hz_locked()
+        self._enforce_colibri_force_safety(sample, source="calibrated QuantumX")
+        return sample, rate_hz
 
     def _force_rate_hz_locked(self):
         if len(self.force_rate_times) < 2:
@@ -3913,6 +4050,7 @@ class TestRunGui(tk.Tk):
             self.colibri.close()
         self.colibri = None
         self.colibri_busy = False
+        self._clear_colibri_motion_direction()
         self.colibri_enabled_var.set(False)
         self.colibri_connect_button.configure(text="Connect")
         self.colibri_port_combo.configure(state="readonly")
@@ -3947,8 +4085,9 @@ class TestRunGui(tk.Tk):
         ttk.Label(
             dialog,
             text=(
-                "Separate hand test: the Colibri moves in the POSITIVE direction in "
-                f"{COLIBRI_TOUCH_STEP_MM:.3f} mm steps. Press the platform gently by hand. "
+                "Separate hand test: the Colibri moves in the POSITIVE direction. "
+                f"The default mode uses {COLIBRI_TOUCH_STEP_MM:.3f} mm steps. "
+                "Press the platform gently by hand. "
                 f"At |F total| >= {COLIBRI_TOUCH_FORCE_N:.3f} N it stops and retracts "
                 f"{COLIBRI_TOUCH_RETRACT_MM:.3f} mm in the NEGATIVE direction."
             ),
@@ -3978,6 +4117,24 @@ class TestRunGui(tk.Tk):
             width=8,
         ).pack(side=tk.LEFT, padx=(8, 4))
         ttk.Label(settings, text="mm").pack(side=tk.LEFT)
+
+        continuous_row = ttk.Frame(dialog)
+        continuous_row.pack(fill=tk.X, padx=16, pady=(10, 0))
+        ttk.Checkbutton(
+            continuous_row,
+            text="Continuous approach (experimental; uses configured Colibri speed)",
+            variable=self.colibri_touch_continuous_var,
+        ).pack(anchor=tk.W)
+        ttk.Label(
+            continuous_row,
+            text=(
+                "Use only for the free hand test until the configured drive speed and "
+                "stopping distance have been verified."
+            ),
+            foreground="#9a4d00",
+            wraplength=570,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, padx=(22, 0), pady=(2, 0))
 
         ttk.Label(dialog, textvariable=self.colibri_touch_status_var, wraplength=590).pack(
             fill=tk.X, padx=16, pady=(12, 8)
@@ -4091,6 +4248,7 @@ class TestRunGui(tk.Tk):
         )
         if max_approach_mm is None:
             return
+        continuous_approach = bool(self.colibri_touch_continuous_var.get())
         try:
             _sample, initial_force_n = self._current_touch_force_sample()
         except RuntimeError as exc:
@@ -4113,9 +4271,16 @@ class TestRunGui(tk.Tk):
                 "- Nothing rigid is currently below the platform.\n"
                 "- You will press the platform gently by hand to trigger the stop.\n\n"
                 f"Contact threshold: {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
-                f"Step size: {COLIBRI_TOUCH_STEP_MM:.3f} mm\n"
+                f"Approach mode: {'CONTINUOUS / EXPERIMENTAL' if continuous_approach else f'{COLIBRI_TOUCH_STEP_MM:.3f} mm steps'}\n"
                 f"Maximum approach: {max_approach_mm:.3f} mm\n"
                 f"Automatic retract: {COLIBRI_TOUCH_RETRACT_MM:.3f} mm"
+                + (
+                    "\n\nThe continuous mode uses the speed currently configured in "
+                    "the Colibri controller. Keep the mechanism clear and trigger it "
+                    "by hand before testing against a component."
+                    if continuous_approach
+                    else ""
+                )
             ),
             parent=self.colibri_touch_dialog,
         ):
@@ -4127,9 +4292,13 @@ class TestRunGui(tk.Tk):
         self._update_colibri_touch_controls()
 
         def task():
-            return self._perform_colibri_force_touch(max_approach_mm)
+            return self._perform_colibri_force_touch(
+                max_approach_mm,
+                continuous_approach=continuous_approach,
+            )
 
-        self._run_colibri_task("Force touch-off hand test", task)
+        mode_label = "continuous" if continuous_approach else "stepped"
+        self._run_colibri_task(f"Force touch-off hand test ({mode_label})", task)
 
     def _cancel_colibri_force_touch(self):
         event = self.colibri_touch_cancel_event
@@ -4176,7 +4345,7 @@ class TestRunGui(tk.Tk):
             )
         return baseline_mean, baseline_std, len(values)
 
-    def _perform_colibri_force_touch(self, max_approach_mm):
+    def _perform_colibri_force_touch(self, max_approach_mm, continuous_approach=False):
         trace = []
         trace_path = None
         baseline_mean = None
@@ -4220,11 +4389,19 @@ class TestRunGui(tk.Tk):
 
             contact_snapshot = None
             step_count = 0
-            while step_count < max_approach_steps:
-                cancel_event = self.colibri_touch_cancel_event
-                if cancel_event is None or cancel_event.is_set():
-                    self.colibri.stop()
-                    result = self._read_colibri_snapshot()
+            if continuous_approach:
+                (
+                    contact_snapshot,
+                    contact_force_n,
+                    step_count,
+                    cancelled_snapshot,
+                ) = self._perform_continuous_touch_approach(
+                    start_steps,
+                    max_approach_steps,
+                    max_approach_mm,
+                    trace,
+                )
+                if cancelled_snapshot is not None:
                     trace_path = (
                         self._write_colibri_touch_trace(
                             trace,
@@ -4239,59 +4416,86 @@ class TestRunGui(tk.Tk):
                     if trace_path is not None:
                         message += f" Trace: {trace_path}"
                     self.messages.put(("touch_off_progress", message))
-                    return result
-
-                _sample, force_n = self._current_touch_force_sample()
-                if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
-                    contact_snapshot = self._read_colibri_snapshot()
-                    contact_force_n = force_n
-                    if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
-                        self.messages.put(
-                            (
-                                "touch_off_progress",
-                                f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                    return cancelled_snapshot
+            else:
+                while step_count < max_approach_steps:
+                    cancel_event = self.colibri_touch_cancel_event
+                    if cancel_event is None or cancel_event.is_set():
+                        self.colibri.stop()
+                        result = self._read_colibri_snapshot()
+                        trace_path = (
+                            self._write_colibri_touch_trace(
+                                trace,
+                                baseline_mean,
+                                baseline_std,
+                                None,
                             )
+                            if trace
+                            else None
                         )
-                    break
+                        message = "Touch-off cancelled and stopped."
+                        if trace_path is not None:
+                            message += f" Trace: {trace_path}"
+                        self.messages.put(("touch_off_progress", message))
+                        return result
 
-                current_steps = self.colibri.position_steps()
-                target_steps = current_steps + 1
-                self.colibri.move_relative_steps(1)
-                snapshot = self._wait_for_colibri_move(
-                    target_steps,
-                    timeout_seconds=2.0,
-                    tolerance_steps=1,
-                )
-                step_count += 1
-                _sample, force_n = self._current_touch_force_sample()
-                trace.append(
-                    (
-                        time.time_ns(),
-                        step_count,
-                        snapshot["position_mm"],
-                        force_n,
-                        "approach",
-                    )
-                )
-                if step_count == 1 or step_count % 10 == 0:
-                    self.messages.put(
+                    _sample, force_n = self._current_touch_force_sample()
+                    if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                        contact_snapshot = self._read_colibri_snapshot()
+                        contact_force_n = force_n
+                        if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                            self.messages.put(
+                                (
+                                    "touch_off_progress",
+                                    f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                                )
+                            )
+                        break
+
+                    current_steps = self.colibri.position_steps()
+                    target_steps = current_steps + 1
+                    self._set_colibri_motion_direction(1)
+                    try:
+                        self.colibri.move_relative_steps(1)
+                        snapshot = self._wait_for_colibri_move(
+                            target_steps,
+                            timeout_seconds=2.0,
+                            tolerance_steps=1,
+                        )
+                    finally:
+                        self._clear_colibri_motion_direction(
+                            expected_direction=1
+                        )
+                    step_count += 1
+                    _sample, force_n = self._current_touch_force_sample()
+                    trace.append(
                         (
-                            "touch_off_progress",
-                            f"Approach {step_count * COLIBRI_TOUCH_STEP_MM:.3f} / "
-                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
+                            time.time_ns(),
+                            step_count,
+                            snapshot["position_mm"],
+                            force_n,
+                            "approach",
                         )
                     )
-                if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
-                    contact_snapshot = snapshot
-                    contact_force_n = force_n
-                    if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                    if step_count == 1 or step_count % 10 == 0:
                         self.messages.put(
                             (
                                 "touch_off_progress",
-                                f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                                f"Approach {step_count * COLIBRI_TOUCH_STEP_MM:.3f} / "
+                                f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
                             )
                         )
-                    break
+                    if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                        contact_snapshot = snapshot
+                        contact_force_n = force_n
+                        if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                            self.messages.put(
+                                (
+                                    "touch_off_progress",
+                                    f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                                )
+                            )
+                        break
 
             if contact_snapshot is None:
                 self.colibri.stop()
@@ -4304,12 +4508,18 @@ class TestRunGui(tk.Tk):
                             "No contact detected; returning to the touch-off start position...",
                         )
                     )
-                    self.colibri.move_relative_steps(-return_steps)
-                    stopped_snapshot = self._wait_for_colibri_move(
-                        start_steps,
-                        timeout_seconds=10.0,
-                        tolerance_steps=2,
-                    )
+                    self._set_colibri_motion_direction(-1)
+                    try:
+                        self.colibri.move_relative_steps(-return_steps)
+                        stopped_snapshot = self._wait_for_colibri_move(
+                            start_steps,
+                            timeout_seconds=10.0,
+                            tolerance_steps=2,
+                        )
+                    finally:
+                        self._clear_colibri_motion_direction(
+                            expected_direction=-1
+                        )
                     _sample, return_force_n = self._current_touch_force_sample()
                     trace.append(
                         (
@@ -4346,12 +4556,16 @@ class TestRunGui(tk.Tk):
                     f"{contact_snapshot['position_mm']:.3f} mm. Retracting...",
                 )
             )
-            self.colibri.move_relative_steps(-retract_steps)
-            final_snapshot = self._wait_for_colibri_move(
-                retract_target_steps,
-                timeout_seconds=5.0,
-                tolerance_steps=2,
-            )
+            self._set_colibri_motion_direction(-1)
+            try:
+                self.colibri.move_relative_steps(-retract_steps)
+                final_snapshot = self._wait_for_colibri_move(
+                    retract_target_steps,
+                    timeout_seconds=5.0,
+                    tolerance_steps=2,
+                )
+            finally:
+                self._clear_colibri_motion_direction(expected_direction=-1)
             _sample, final_force_n = self._current_touch_force_sample()
             trace.append(
                 (
@@ -4382,6 +4596,7 @@ class TestRunGui(tk.Tk):
             )
             return final_snapshot
         except Exception:
+            self._clear_colibri_motion_direction()
             try:
                 if self.colibri:
                     self.colibri.stop()
@@ -4398,6 +4613,111 @@ class TestRunGui(tk.Tk):
                 except OSError:
                     pass
             raise
+
+    def _perform_continuous_touch_approach(
+        self,
+        start_steps,
+        max_approach_steps,
+        max_approach_mm,
+        trace,
+    ):
+        target_steps = start_steps + max_approach_steps
+        deadline = time.monotonic() + COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS
+        next_position_poll = 0.0
+        last_position_steps = start_steps
+        last_sample_id = None
+        sample_count = 0
+
+        self._write_debug_log(
+            "COLIBRI touch continuous start "
+            f"start_mm={self._colibri_steps_to_mm(start_steps):.3f} "
+            f"target_mm={self._colibri_steps_to_mm(target_steps):.3f} "
+            f"max_approach_mm={max_approach_mm:.3f}"
+        )
+        self._set_colibri_motion_direction(1)
+        try:
+            self.colibri.move_relative_steps(max_approach_steps)
+
+            while time.monotonic() < deadline:
+                cancel_event = self.colibri_touch_cancel_event
+                if cancel_event is None or cancel_event.is_set():
+                    self.colibri.stop()
+                    return None, None, sample_count, self._read_colibri_snapshot()
+
+                sample, force_n = self._current_touch_force_sample()
+                raw_force_n = (
+                    None
+                    if sample.force_total_n is None
+                    else float(sample.force_total_n)
+                )
+                if sample.sample_id != last_sample_id:
+                    sample_count += 1
+                    trace.append(
+                        (
+                            time.time_ns(),
+                            sample_count,
+                            self._colibri_steps_to_mm(last_position_steps),
+                            force_n,
+                            "continuous_approach",
+                        )
+                    )
+                    last_sample_id = sample.sample_id
+
+                contact_detected = abs(force_n) >= COLIBRI_TOUCH_FORCE_N
+                hard_limit_detected = (
+                    raw_force_n is not None
+                    and abs(raw_force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N
+                )
+                if contact_detected or hard_limit_detected:
+                    # Stop before requesting any further status or position data.
+                    self.colibri.stop()
+                    contact_snapshot = self._read_colibri_snapshot()
+                    contact_force_n = force_n
+                    self._write_debug_log(
+                        "COLIBRI touch continuous contact "
+                        f"filtered_force_n={force_n:.6f} "
+                        f"raw_force_n={raw_force_n} "
+                        f"position_mm={contact_snapshot['position_mm']:.3f}"
+                    )
+                    if hard_limit_detected:
+                        self.messages.put(
+                            (
+                                "touch_off_progress",
+                                "Hard raw-force limit exceeded "
+                                f"({raw_force_n:.4f} N); retracting immediately.",
+                            )
+                        )
+                    return contact_snapshot, contact_force_n, sample_count, None
+
+                now = time.monotonic()
+                if now >= next_position_poll:
+                    last_position_steps = self.colibri.position_steps()
+                    travelled_mm = self._colibri_steps_to_mm(
+                        last_position_steps - start_steps
+                    )
+                    self.messages.put(
+                        (
+                            "touch_off_progress",
+                            f"Continuous approach {travelled_mm:.3f} / "
+                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
+                        )
+                    )
+                    if last_position_steps >= target_steps - 1:
+                        self.colibri.stop()
+                        return None, None, sample_count, None
+                    next_position_poll = (
+                        now + COLIBRI_TOUCH_CONTINUOUS_POSITION_POLL_SECONDS
+                    )
+
+                time.sleep(COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS)
+        finally:
+            self._clear_colibri_motion_direction(expected_direction=1)
+
+        self.colibri.stop()
+        raise TimeoutError(
+            "Continuous touch-off approach timed out after "
+            f"{COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS:.1f} s."
+        )
 
     def _write_colibri_touch_trace(
         self,
@@ -4479,8 +4799,12 @@ class TestRunGui(tk.Tk):
                 "COLIBRI configured reference type=2 (Drehueberwachung negativ), "
                 f"reference_current={COLIBRI_REFERENCE_CURRENT_PERCENT}%"
             )
-            self.colibri.reference()
-            return self._wait_for_colibri_reference()
+            self._set_colibri_motion_direction(-1)
+            try:
+                self.colibri.reference()
+                return self._wait_for_colibri_reference()
+            finally:
+                self._clear_colibri_motion_direction(expected_direction=-1)
 
         self._run_colibri_task("Start Colibri negative reference run", task)
 
@@ -4517,8 +4841,14 @@ class TestRunGui(tk.Tk):
             self.colibri.enable()
             start_steps = self.colibri.position_steps()
             target_steps = start_steps + signed_steps
-            self.colibri.move_relative_steps(signed_steps)
-            return self._wait_for_colibri_move(target_steps)
+            self._set_colibri_motion_direction(direction)
+            try:
+                self.colibri.move_relative_steps(signed_steps)
+                return self._wait_for_colibri_move(target_steps)
+            finally:
+                self._clear_colibri_motion_direction(
+                    expected_direction=direction
+                )
 
         self._run_colibri_task(f"Colibri jog {direction * distance_mm:.3f} mm", task)
 
@@ -4536,8 +4866,22 @@ class TestRunGui(tk.Tk):
         def task():
             self.colibri.set_remote()
             self.colibri.enable()
-            self.colibri.move_absolute_steps(target_steps)
-            return self._wait_for_colibri_move(target_steps)
+            current_steps = self.colibri.position_steps()
+            direction = (
+                1
+                if target_steps > current_steps
+                else -1
+                if target_steps < current_steps
+                else 0
+            )
+            self._set_colibri_motion_direction(direction)
+            try:
+                self.colibri.move_absolute_steps(target_steps)
+                return self._wait_for_colibri_move(target_steps)
+            finally:
+                self._clear_colibri_motion_direction(
+                    expected_direction=direction
+                )
 
         self._run_colibri_task(f"Colibri absolute move {position_mm:.3f} mm", task)
 
@@ -4547,9 +4891,12 @@ class TestRunGui(tk.Tk):
             return
 
         def task():
-            self.colibri.stop()
-            time.sleep(0.05)
-            return self._read_colibri_snapshot()
+            try:
+                self.colibri.stop()
+                time.sleep(0.05)
+                return self._read_colibri_snapshot()
+            finally:
+                self._clear_colibri_motion_direction()
 
         self._run_colibri_task("Stop Colibri", task, allow_while_busy=True)
 
@@ -4592,18 +4939,31 @@ class TestRunGui(tk.Tk):
         }
 
     def _wait_for_colibri_reference(self, timeout_seconds=30.0):
+        start_time = time.time()
         deadline = time.time() + timeout_seconds
         last_snapshot = None
+        previous_position_steps = None
         time.sleep(0.2)
 
         while time.time() < deadline:
             snapshot = self._read_colibri_snapshot()
             last_snapshot = snapshot
             status = snapshot["status"]
+            position_steps = snapshot["position_steps"]
+            position_delta_steps = (
+                None
+                if previous_position_steps is None
+                else position_steps - previous_position_steps
+            )
             self._write_debug_log(
                 "COLIBRI reference poll "
+                f"elapsed_s={time.time() - start_time:.3f} "
                 f"position_mm={snapshot['position_mm']:.3f} moving={status['moving']} "
-                f"referenced={status['referenced']} error_byte=0x{status['error_byte']:02X}"
+                f"position_delta_steps={position_delta_steps} "
+                f"referenced={status['referenced']} "
+                f"status_byte=0x{status['status_byte']:02X} "
+                f"system_status_byte=0x{status['system_status_byte']:02X} "
+                f"error_byte=0x{status['error_byte']:02X}"
             )
 
             if status["error_byte"]:
@@ -4612,14 +4972,20 @@ class TestRunGui(tk.Tk):
                 )
             if status["referenced"] and not status["moving"]:
                 return snapshot
-            if not status["moving"] and last_snapshot is not None and time.time() > deadline - timeout_seconds + 0.7:
-                break
+            previous_position_steps = position_steps
             time.sleep(0.2)
 
         if last_snapshot is None:
             raise TimeoutError("No reference status received from Colibri")
         if not last_snapshot["status"]["referenced"]:
-            raise ColibriProtocolError("Reference run ended without referenced status bit")
+            status = last_snapshot["status"]
+            raise ColibriProtocolError(
+                "Reference status timeout after "
+                f"{timeout_seconds:.1f} s at {last_snapshot['position_mm']:.3f} mm "
+                f"(status=0x{status['status_byte']:02X}, "
+                f"system=0x{status['system_status_byte']:02X}, "
+                f"error=0x{status['error_byte']:02X})"
+            )
         return last_snapshot
 
     def _wait_for_colibri_move(self, target_steps, timeout_seconds=20.0, tolerance_steps=5):
@@ -5067,6 +5433,15 @@ class TestRunGui(tk.Tk):
                 self.status_var.set(value)
                 if self.colibri_touch_running:
                     self.colibri_touch_status_var.set(f"Touch-off failed: {value}")
+            elif kind == "colibri_force_safety_stop":
+                message = f"Positive Colibri motion stopped: {value}"
+                self.colibri_status_var.set(f"Colibri: FORCE SAFETY STOP | {value}")
+                self.status_var.set(message)
+                if self.colibri_touch_running:
+                    self.colibri_touch_status_var.set(
+                        f"Touch-off safety stop: {value}"
+                    )
+                messagebox.showwarning("Colibri force safety stop", message)
             elif kind == "colibri_done":
                 self.colibri_busy = False
                 if self.colibri_touch_running:
@@ -5134,8 +5509,20 @@ class TestRunGui(tk.Tk):
             elif kind == "force_status":
                 self.force_status_var.set(self._force_status(value))
                 self.status_var.set(value)
+                lowered_status = value.lower()
+                if any(
+                    status_name in lowered_status
+                    for status_name in (
+                        "overrange",
+                        "stale",
+                        "disconnected",
+                        "invalid_channel",
+                    )
+                ):
+                    self._stop_positive_colibri_if_force_monitor_unavailable(
+                        f"force monitoring reported: {value}"
+                    )
                 if self.calibration_capture is not None:
-                    lowered_status = value.lower()
                     for status_name in ("overrange", "stale", "disconnected", "invalid_channel"):
                         if status_name in lowered_status:
                             self.calibration_capture["invalid_status"] = status_name
