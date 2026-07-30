@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfSensorTdlRelation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <SensorTdlRelation>
+    <Template>Bridge=Bridge Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[V/V]=Physical Measurand</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>Impedance=%SensorImped</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplNom</Parameter>
+      <Parameter>[0.1]=%ExciteAmplMin</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplMax</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>SensorType=%BridgeType</Parameter>
+        <Enumerations>
+          <Enumeration>Full=Full</Enumeration>
+          <Enumeration>Half=Half</Enumeration>
+          <Enumeration>Quarter=Quarter</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Counter=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[kImp]=Physical Measurand</SelectCase>
+      <SelectCase>[Count]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>[1]=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>[1]=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Contact to Gnd]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>IndexS2F4Enable=%MDEF_DiscSigConfig</Parameter>
+        <Enumerations>
+          <Enumeration>=single</Enumeration>
+          <Enumeration>S2Enable=double 90 degree</Enumeration>
+          <Enumeration>IndexEnable|S2Enable=double phase plus zero index</Enumeration>
+          <Enumeration>IndexEnable=single phase plus zero index</Enumeration>
+          <Enumeration>S2Enable|F4Enable=double 90 degree quad freq</Enumeration>
+          <Enumeration>IndexEnable|S2Enable|F4Enable=double phase plus zero index quad freq</Enumeration>
+          <Enumeration>S2EnableStatic=double static</Enumeration>
+          <Enumeration>IndexEnable|S2EnableStatic=double static plus zero index</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Current=Current Loop Output Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[A]=Physical Measurand</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+      <SelectCase>Supply=Loop powered versus external powered</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>Supply=%LoopSupplyMax</Parameter>
+      <Parameter>Supply=%LoopSupplyMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[DC]=%ExciteType</Parameter>
+      <Parameter>[1]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Frequency=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[Hz]=Physical Measurand</SelectCase>
+      <SelectCase>[Frequency]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Contact to Gnd]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>IndexS2F4Enable=%MDEF_DiscSigConfig</Parameter>
+        <Enumerations>
+          <Enumeration>=single</Enumeration>
+          <Enumeration>S2Enable=double 90 degree</Enumeration>
+          <Enumeration>IndexEnable|S2Enable=double phase plus zero index</Enumeration>
+          <Enumeration>IndexEnable=single phase plus zero index</Enumeration>
+          <Enumeration>S2Enable|F4Enable=double 90 degree quad freq</Enumeration>
+          <Enumeration>IndexEnable|S2Enable|F4Enable=double phase plus zero index quad freq</Enumeration>
+          <Enumeration>S2EnableStatic=double static</Enumeration>
+          <Enumeration>IndexEnable|S2EnableStatic=double static plus zero index</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>IEPE=Accelerometer and Force Transducer</Template>
+    <SelectCases>
+      <SelectCase>[Accelerometer]=Transducer Type</SelectCase>
+      <SelectCase>[No Extended Functionality]=Extended Functionality (Programmable Sensitivity)</SelectCase>
+      <SelectCase>[No Transfer Function Specified]=Transfer Function</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>Sensitivity=%Sens@Ref</Parameter>
+      <Parameter>[0.4]=%TF_HP_S</Parameter>
+      <Parameter>[8]=%Weight</Parameter>
+      <Parameter>[100]=%Reffreq</Parameter>
+      <Parameter>[22]=%RefTemp</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[x]=%Direction</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[Positive]=%Sign</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>IndBridge=HBM Inductive Displacement Transducer</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[mm]=Units of displacement</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplNom</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplMax</Parameter>
+      <Parameter>ExcitationFreq=%ExciteFreqNom</Parameter>
+      <Parameter>ExcitationFreq=%ExciteFreqMin</Parameter>
+      <Parameter>ExcitationFreq=%ExciteFreqMax</Parameter>
+      <Parameter>Impedance=%SensorImped</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>SensorType=%BridgeType</Parameter>
+        <Enumerations>
+          <Enumeration>Quarter=Quarter</Enumeration>
+          <Enumeration>Half=Half</Enumeration>
+          <Enumeration>Full=Full</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>IndCounter=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[kImp]=Physical Measurand</SelectCase>
+      <SelectCase>[Count]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>[1]=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>[1]=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Bipolar]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>IndFrequency=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[Hz]=Physical Measurand</SelectCase>
+      <SelectCase>[Frequency]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Bipolar]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>IndexS2F4Enable=%MDEF_DiscSigConfig</Parameter>
+        <Enumerations>
+          <Enumeration>=single</Enumeration>
+          <Enumeration>S2Enable=double 90 degree</Enumeration>
+          <Enumeration>IndexEnable|S2Enable=double phase plus zero index</Enumeration>
+          <Enumeration>IndexEnable=single phase plus zero index</Enumeration>
+          <Enumeration>S2Enable|F4Enable=double 90 degree quad freq</Enumeration>
+          <Enumeration>IndexEnable|S2Enable|F4Enable=double phase plus zero index quad freq</Enumeration>
+          <Enumeration>S2EnableStatic=double static</Enumeration>
+          <Enumeration>IndexEnable|S2EnableStatic=double static plus zero index</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>IRIG=</Template>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>LVDT=AC Linear/Rotary Variable Differential Transformer (LVDT/RVDT)</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[mm]=Units of Displacement</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Potentiometer=Potentiometric Voltage Divider</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[V/V]=Physical Measurand</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>Impedance=%SensorImped</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[DC]=%ExciteType</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Pressure=HBM Pressure</Template>
+    <Parameters>
+      <Parameter>MaxElectrical=%MDEF_MaxPressure</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>SensorType=%MDEF_PressureType</Parameter>
+        <Enumerations>
+          <Enumeration>absolute=absolute</Enumeration>
+          <Enumeration>relative=relative</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>PT=Resistive Temperature Detector</Template>
+    <SelectCases>
+      <SelectCase>SensorType=R0 resistance</SelectCase>
+      <SelectCase>[alpha=.003851]=RTDCurve</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>SensorType=%RTDCoef_R0</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>PWM=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[%]=Physical Measurand</SelectCase>
+      <SelectCase>[Duty cycle]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>[1]=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>[1]=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Contact to Gnd]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>PulseWidth=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[sec]=Physical Measurand</SelectCase>
+      <SelectCase>[Off time]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Contact to Gnd]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Period=HBM Frequency/Pulse Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[sec]=Physical Measurand</SelectCase>
+      <SelectCase>[Period]=Pulse Measurement Type</SelectCase>
+      <SelectCase>[SINGLE Precision]=Full Scale Electrical Value precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>[5]=%DiscSigAmpl</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[0.0001]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[Contact to Gnd]=%DiscSigType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>[DC]=%ExciteType</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Resistor=Resistance Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[V]=Physical Measurand</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[DC]=%ExciteType</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>SSI=</Template>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Straingage=Strain Gage</Template>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>kFactor=%GageFactor</Parameter>
+      <Parameter>Impedance=%SensorImped</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplNom</Parameter>
+      <Parameter>ExcitationAmpl=%ExciteAmplMax</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>BridgeFactor=%GageType</Parameter>
+        <Enumerations>
+          <Enumeration>1=Single element</Enumeration>
+          <Enumeration>2=Two elements same sign</Enumeration>
+          <Enumeration>2=Two elements opposite sign</Enumeration>
+          <Enumeration>2=Four element Poisson same sign</Enumeration>
+          <Enumeration>2=Four element Poisson opposite sign</Enumeration>
+          <Enumeration>2=Four element dual chevron</Enumeration>
+          <Enumeration>4=Four uniaxial elements</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+      <EnumParameter>
+        <Parameter>SensorType=%BridgeType</Parameter>
+        <Enumerations>
+          <Enumeration>Full=Full</Enumeration>
+          <Enumeration>Half=Half</Enumeration>
+          <Enumeration>Quarter=Quarter</Enumeration>
+        </Enumerations>
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Thermocouple=Thermocouple</Template>
+    <Parameters>
+      <Parameter>[-0.025]=%MinElecVal</Parameter>
+      <Parameter>[0.1]=%MaxElecVal</Parameter>
+      <Parameter>[-270]=%MinPhysVal</Parameter>
+      <Parameter>[1372]=%MaxPhysVal</Parameter>
+      <Parameter>Impedance=%SensorImped</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>SensorType=%TCType</Parameter>
+        <Enumerations>
+          <Enumeration>B=B</Enumeration>
+          <Enumeration>E=E</Enumeration>
+          <Enumeration>J=J</Enumeration>
+          <Enumeration>K=K</Enumeration>
+          <Enumeration>N=N</Enumeration>
+          <Enumeration>R=R</Enumeration>
+          <Enumeration>S=S</Enumeration>
+          <Enumeration>T=T</Enumeration>
+          <Enumeration>UNKNOWN=non-standard</Enumeration>
+          <Enumeration>C=C</Enumeration>
+          <!--<Enumeration>D=D</Enumeration>
+          <Enumeration>G=G</Enumeration>
+          <Enumeration>L=L</Enumeration>
+          <Enumeration>U=U</Enumeration>
+          <Enumeration>A=A</Enumeration>-->
+        </Enumerations>
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+  <SensorTdlRelation>
+    <Template>Voltage=High Level Voltage Output Sensor</Template>
+    <SelectCases>
+      <SelectCase>PhysUnit[V]=Physical Measurand</SelectCase>
+      <SelectCase>[Full precision]=Full Scale Electrical Value Precision</SelectCase>
+      <SelectCase>Supply=Excitation/Power Requirements</SelectCase>
+    </SelectCases>
+    <Parameters>
+      <Parameter>[0]=%MinElecVal</Parameter>
+      <Parameter>MaxElectrical=%MaxElecVal</Parameter>
+      <Parameter>[0]=%MinPhysVal</Parameter>
+      <Parameter>MaxElectrical=%MaxPhysVal</Parameter>
+      <Parameter>Supply=%ExciteAmplMin</Parameter>
+      <Parameter>Supply=%ExciteAmplMax</Parameter>
+      <Parameter>Supply=%ExciteAmplNom</Parameter>
+      <Parameter>[DC]=%ExciteType</Parameter>
+      <Parameter>[1]=%ExciteCurrentDraw</Parameter>
+      <Parameter>CalDate=%CalDate</Parameter>
+      <Parameter>CalInitials=%CalInitials</Parameter>
+      <Parameter>CalPeriod=%CalPeriod</Parameter>
+      <Parameter>LocationId=%MeasID</Parameter>
+    </Parameters>
+    <EnumParameters>
+      <EnumParameter>
+        <Parameter>[DC]=%ACDCCoupling</Parameter>
+        <Enumerations />
+      </EnumParameter>
+    </EnumParameters>
+  </SensorTdlRelation>
+</ArrayOfSensorTdlRelation>

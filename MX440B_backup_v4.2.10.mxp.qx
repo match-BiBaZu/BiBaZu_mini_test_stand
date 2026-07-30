@@ -14,7 +14,8 @@
             <SubMask>255.255.0.0</SubMask>
             <Description>ethernet backplane side</Description>
           </eth0>
-          <GateWay>0.0.0.0</GateWay>
+          <GateWay>
+          </GateWay>
           <TcpPort>5001</TcpPort>
         </Network>
       </Communication>
@@ -45,18 +46,13 @@
         <Platform>
           <SerialNumber>42496716514</SerialNumber>
           <!-- 0009E5006EE2 -->
-          <FirmwareVersion>4.2.10.0</FirmwareVersion>
-          <FirmwareRepository>
-          </FirmwareRepository>
-          <FirmwareCommitId>
-          </FirmwareCommitId>
-          <FirmwareCommitDate>
-          </FirmwareCommitDate>
-          <FirmwareCommitState>
-          </FirmwareCommitState>
-          <FPGAVersion>10</FPGAVersion>
-          <BootloaderVersion>
-          </BootloaderVersion>
+          <FirmwareVersion>4.50.8.0</FirmwareVersion>
+          <FirmwareRepository>XXXXXXXXXXXXXXXXXX@gitlab.hbkworld.com/quantumx/quantumx.git</FirmwareRepository>
+          <FirmwareCommitId>8bd29aed</FirmwareCommitId>
+          <FirmwareCommitDate>2025-08-18 16:38:27 +0200</FirmwareCommitDate>
+          <FirmwareCommitState>clean</FirmwareCommitState>
+          <FPGAVersion>4.19.3.40.1</FPGAVersion>
+          <BootloaderVersion>0.997</BootloaderVersion>
           <HardwareRevision>2.20</HardwareRevision>
           <HardwareIdentification>801226947002</HardwareIdentification>
           <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
@@ -69,32 +65,32 @@
           <HardwareRevision>3.00</HardwareRevision>
           <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
           <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-          <CtrlApplVersion>04.00</CtrlApplVersion>
-          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+          <CtrlApplVersion>04.20</CtrlApplVersion>
+          <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
         </AnalogIn>
         <AnalogIn address="2">
           <SerialNumber>CNT</SerialNumber>
           <HardwareRevision>3.00</HardwareRevision>
           <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
           <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-          <CtrlApplVersion>04.00</CtrlApplVersion>
-          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+          <CtrlApplVersion>04.20</CtrlApplVersion>
+          <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
         </AnalogIn>
         <AnalogIn address="3">
           <SerialNumber>CNT</SerialNumber>
           <HardwareRevision>3.00</HardwareRevision>
           <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
           <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-          <CtrlApplVersion>04.00</CtrlApplVersion>
-          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+          <CtrlApplVersion>04.20</CtrlApplVersion>
+          <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
         </AnalogIn>
         <AnalogIn address="4">
           <SerialNumber>CNT</SerialNumber>
           <HardwareRevision>3.00</HardwareRevision>
           <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
           <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-          <CtrlApplVersion>04.00</CtrlApplVersion>
-          <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+          <CtrlApplVersion>04.20</CtrlApplVersion>
+          <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
         </AnalogIn>
       </System>
       <Connector1>
@@ -107,6 +103,7 @@
               <UnitId>1900</UnitId>
               <!-- N -->
               <UserText>N</UserText>
+              <FollowSensor>1</FollowSensor>
               <Factor>1</Factor>
               <Offset>0</Offset>
             </OutputUnit>
@@ -139,6 +136,14 @@
               <Sensortype choice="Bridge">
                 <Bridge>
                   <MaxElectrical>12.5</MaxElectrical>
+                  <ElecRange>
+                    <Min>-12.5</Min>
+                    <Max>12.5</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-51.594263</Min>
+                    <Max>51.594263</Max>
+                  </PhysRange>
                   <ExciteAmpl>1</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <Impedance>350</Impedance>
@@ -156,6 +161,12 @@
                   </DriftCompensation>
                 </Bridge>
               </Sensortype>
+              <Overload>
+                <Mode choice="ChannelInvalid">
+                  <ChannelInvalid>
+                  </ChannelInvalid>
+                </Mode>
+              </Overload>
               <Scaling>
                 <Scalingtype choice="ZeroSpan">
                   <ZeroSpan>
@@ -196,7 +207,7 @@
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
+              <OriginOfName>1</OriginOfName>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
@@ -214,7 +225,7 @@
               <SignalFormat>4</SignalFormat>
             </SyncSignal>
             <ZeroOffset>
-              <Offset>9.296161</Offset>
+              <Offset>0</Offset>
               <Target>0</Target>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
@@ -239,6 +250,7 @@
               <UnitId>1900</UnitId>
               <!-- N -->
               <UserText>N</UserText>
+              <FollowSensor>1</FollowSensor>
               <Factor>1</Factor>
               <Offset>0</Offset>
             </OutputUnit>
@@ -270,6 +282,14 @@
               <Sensortype choice="Bridge">
                 <Bridge>
                   <MaxElectrical>5</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.93138</Min>
+                    <Max>0.93138</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-2</Min>
+                    <Max>2</Max>
+                  </PhysRange>
                   <ExciteAmpl>2.5</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <Impedance>350</Impedance>
@@ -287,11 +307,17 @@
                   </DriftCompensation>
                 </Bridge>
               </Sensortype>
+              <Overload>
+                <Mode choice="SensorInvalid">
+                  <SensorInvalid>
+                  </SensorInvalid>
+                </Mode>
+              </Overload>
               <Scaling>
                 <Scalingtype choice="ZeroSpan">
                   <ZeroSpan>
                     <ElecZero>0</ElecZero>
-                    <ElecSpan>0.95666</ElecSpan>
+                    <ElecSpan>0.93138</ElecSpan>
                     <PhysSpan>2</PhysSpan>
                   </ZeroSpan>
                 </Scalingtype>
@@ -344,7 +370,7 @@
               <SignalFormat>4</SignalFormat>
             </SyncSignal>
             <ZeroOffset>
-              <Offset>0.07511056</Offset>
+              <Offset>0</Offset>
               <Target>0</Target>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
@@ -372,29 +398,26 @@
           <AnalogInChannel>
             <ChannelName>
             </ChannelName>
-            <OriginOfName>0</OriginOfName>
+            <OriginOfName>1</OriginOfName>
             <SpeedMode>0</SpeedMode>
             <OutputUnit>
-              <UnitId>1901</UnitId>
-              <!-- kN -->
-              <UserText>kN</UserText>
+              <UnitId>1900</UnitId>
+              <!-- N -->
+              <UserText>N</UserText>
+              <FollowSensor>1</FollowSensor>
               <Factor>1</Factor>
               <Offset>0</Offset>
             </OutputUnit>
             <Sensor>
               <Identification>
-                <SensorName>
-                </SensorName>
-                <SensorId>
-                </SensorId>
+                <SensorName>TAL221_A_500g</SensorName>
+                <SensorId>462335926724019</SensorId>
                 <UserDefId>
                 </UserDefId>
-                <ManuName>
-                </ManuName>
+                <ManuName>SparkFun</ManuName>
                 <SerialNumber>
                 </SerialNumber>
-                <TypeName>
-                </TypeName>
+                <TypeName>TAL221 500 g</TypeName>
                 <Location>
                 </Location>
                 <CalDate>
@@ -415,9 +438,17 @@
               <Sensortype choice="Bridge">
                 <Bridge>
                   <MaxElectrical>5</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.71053</Min>
+                    <Max>0.71053</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-4.903325</Min>
+                    <Max>4.903325</Max>
+                  </PhysRange>
                   <ExciteAmpl>2.5</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
-                  <Impedance>350</Impedance>
+                  <Impedance>1090</Impedance>
                   <Wiring>6</Wiring>
                   <BridgeType>4</BridgeType>
                   <DriftCompensation>
@@ -432,19 +463,19 @@
                   </DriftCompensation>
                 </Bridge>
               </Sensortype>
+              <Overload>
+                <Mode choice="SensorInvalid">
+                  <SensorInvalid>
+                  </SensorInvalid>
+                </Mode>
+              </Overload>
               <Scaling>
-                <Scalingtype choice="LinTable">
-                  <LinTable>
-                    <Count>2</Count>
-                    <Point address="1">
-                      <X>0</X>
-                      <Y>0</Y>
-                    </Point>
-                    <Point address="2">
-                      <X>1</X>
-                      <Y>10</Y>
-                    </Point>
-                  </LinTable>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0</ElecZero>
+                    <ElecSpan>0.71053</ElecSpan>
+                    <PhysSpan>4.903325</PhysSpan>
+                  </ZeroSpan>
                 </Scalingtype>
               </Scaling>
               <Supply>0</Supply>
@@ -452,34 +483,34 @@
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
-              <PhysUnit>1901</PhysUnit>
-              <!-- kN -->
-              <PhysUnitUsr>kN</PhysUnitUsr>
+              <PhysUnit>1900</PhysUnit>
+              <!-- N -->
+              <PhysUnitUsr>N</PhysUnitUsr>
             </Sensor>
             <SyncSignal address="1">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
+              <OriginOfName>1</OriginOfName>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>20</FiltFreq>
+                  <FiltFreq>200</FiltFreq>
                 </Lowpass>
               </FilterType>
-              <OutputRate>200</OutputRate>
+              <OutputRate>2400</OutputRate>
               <Output>
                 <Description>analog input: connector 3, signal 1</Description>
                 <SignalReference>AnalogIn_Connector3.Signal1</SignalReference>
                 <DaqAvailable>1</DaqAvailable>
                 <RtAvailable>1</RtAvailable>
               </Output>
-              <Decimals>3</Decimals>
+              <Decimals>4</Decimals>
               <SignalFormat>4</SignalFormat>
             </SyncSignal>
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
+              <OriginOfName>1</OriginOfName>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
@@ -497,7 +528,7 @@
               <SignalFormat>4</SignalFormat>
             </SyncSignal>
             <ZeroOffset>
-              <Offset>0</Offset>
+              <Offset>-0.218346</Offset>
               <Target>0</Target>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
@@ -517,29 +548,26 @@
           <AnalogInChannel>
             <ChannelName>
             </ChannelName>
-            <OriginOfName>0</OriginOfName>
+            <OriginOfName>1</OriginOfName>
             <SpeedMode>0</SpeedMode>
             <OutputUnit>
-              <UnitId>1901</UnitId>
-              <!-- kN -->
-              <UserText>kN</UserText>
+              <UnitId>1900</UnitId>
+              <!-- N -->
+              <UserText>N</UserText>
+              <FollowSensor>1</FollowSensor>
               <Factor>1</Factor>
               <Offset>0</Offset>
             </OutputUnit>
             <Sensor>
               <Identification>
-                <SensorName>
-                </SensorName>
-                <SensorId>
-                </SensorId>
+                <SensorName>TAL221_B_500g</SensorName>
+                <SensorId>462336229798424</SensorId>
                 <UserDefId>
                 </UserDefId>
-                <ManuName>
-                </ManuName>
+                <ManuName>SparkFun</ManuName>
                 <SerialNumber>
                 </SerialNumber>
-                <TypeName>
-                </TypeName>
+                <TypeName>TAL221_B_500g</TypeName>
                 <Location>
                 </Location>
                 <CalDate>
@@ -560,9 +588,17 @@
               <Sensortype choice="Bridge">
                 <Bridge>
                   <MaxElectrical>5</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.7</Min>
+                    <Max>0.7</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-4.903325</Min>
+                    <Max>4.903325</Max>
+                  </PhysRange>
                   <ExciteAmpl>2.5</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
-                  <Impedance>350</Impedance>
+                  <Impedance>1090</Impedance>
                   <Wiring>6</Wiring>
                   <BridgeType>4</BridgeType>
                   <DriftCompensation>
@@ -577,19 +613,19 @@
                   </DriftCompensation>
                 </Bridge>
               </Sensortype>
+              <Overload>
+                <Mode choice="ChannelInvalid">
+                  <ChannelInvalid>
+                  </ChannelInvalid>
+                </Mode>
+              </Overload>
               <Scaling>
-                <Scalingtype choice="LinTable">
-                  <LinTable>
-                    <Count>2</Count>
-                    <Point address="1">
-                      <X>0</X>
-                      <Y>0</Y>
-                    </Point>
-                    <Point address="2">
-                      <X>1</X>
-                      <Y>10</Y>
-                    </Point>
-                  </LinTable>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0</ElecZero>
+                    <ElecSpan>0.7</ElecSpan>
+                    <PhysSpan>4.903325</PhysSpan>
+                  </ZeroSpan>
                 </Scalingtype>
               </Scaling>
               <Supply>0</Supply>
@@ -597,21 +633,21 @@
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
-              <PhysUnit>1901</PhysUnit>
-              <!-- kN -->
-              <PhysUnitUsr>kN</PhysUnitUsr>
+              <PhysUnit>1900</PhysUnit>
+              <!-- N -->
+              <PhysUnitUsr>N</PhysUnitUsr>
             </Sensor>
             <SyncSignal address="1">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
+              <OriginOfName>1</OriginOfName>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>20</FiltFreq>
+                  <FiltFreq>200</FiltFreq>
                 </Lowpass>
               </FilterType>
-              <OutputRate>200</OutputRate>
+              <OutputRate>2400</OutputRate>
               <Output>
                 <Description>analog input: connector 4, signal 1</Description>
                 <SignalReference>AnalogIn_Connector4.Signal1</SignalReference>
@@ -624,7 +660,7 @@
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
+              <OriginOfName>1</OriginOfName>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
@@ -642,7 +678,7 @@
               <SignalFormat>4</SignalFormat>
             </SyncSignal>
             <ZeroOffset>
-              <Offset>0</Offset>
+              <Offset>-0.128757</Offset>
               <Target>0</Target>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
@@ -663,7 +699,7 @@
   </Device>
   <!--For diagnostics only-->
   <RawDevice uuid="0009E5006EE2" name="MX440B">
-    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <!-- Hottinger Bruel & Kjaer GmbH, HBM QuantumX/SomatXR, firmware version=4.50.8.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
     <System>
       <ModuleName>MX440B</ModuleName>
       <ModuleLabel>MX440B</ModuleLabel>
@@ -690,11 +726,23 @@
         <Request>0</Request>
         <CurrentState>0</CurrentState>
       </DataRateDomain>
+      <UnitCharset>0</UnitCharset>
       <Platform>
         <SerialNumber>42496716514</SerialNumber>
         <SerialNo>0009E5006EE2</SerialNo>
-        <FirmwareVersion>4.2.10.0</FirmwareVersion>
-        <FPGAVersion>10</FPGAVersion>
+        <FirmwareVersion>4.50.8.0</FirmwareVersion>
+        <FirmwareRepository>XXXXXXXXXXXXXXXXXX@gitlab.hbkworld.com/quantumx/quantumx.git</FirmwareRepository>
+        <FirmwareCommitId>8bd29aed</FirmwareCommitId>
+        <FirmwareCommitDate>2025-08-18 16:38:27 +0200</FirmwareCommitDate>
+        <FirmwareCommitState>clean</FirmwareCommitState>
+        <FPGAVersion>4.19.3.40.1</FPGAVersion>
+        <FPGAId>16</FPGAId>
+        <Clock>
+          <CenterFreq>19.665920</CenterFreq>
+          <ClkType>1</ClkType>
+          <ClkAddress>0x55</ClkAddress>
+        </Clock>
+        <BootloaderVersion>0.997</BootloaderVersion>
         <HardwareRevision>2.20</HardwareRevision>
         <HardwareIdentification>801226947002</HardwareIdentification>
         <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
@@ -707,106 +755,88 @@
         <HardwareRevision>3.00</HardwareRevision>
         <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
         <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-        <CtrlApplVersion>04.00</CtrlApplVersion>
-        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        <CtrlApplVersion>04.20</CtrlApplVersion>
+        <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
       </AnalogIn>
       <AnalogIn address="2">
         <SerialNumber>CNT</SerialNumber>
         <HardwareRevision>3.00</HardwareRevision>
         <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
         <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-        <CtrlApplVersion>04.00</CtrlApplVersion>
-        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        <CtrlApplVersion>04.20</CtrlApplVersion>
+        <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
       </AnalogIn>
       <AnalogIn address="3">
         <SerialNumber>CNT</SerialNumber>
         <HardwareRevision>3.00</HardwareRevision>
         <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
         <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-        <CtrlApplVersion>04.00</CtrlApplVersion>
-        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        <CtrlApplVersion>04.20</CtrlApplVersion>
+        <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
       </AnalogIn>
       <AnalogIn address="4">
         <SerialNumber>CNT</SerialNumber>
         <HardwareRevision>3.00</HardwareRevision>
         <CtrlLoaderVersion>03.00</CtrlLoaderVersion>
         <CtrlLoaderDate>Jan 24 2014 10:30:59</CtrlLoaderDate>
-        <CtrlApplVersion>04.00</CtrlApplVersion>
-        <CtrlApplDate>Jan 16 2015 10:33:12</CtrlApplDate>
+        <CtrlApplVersion>04.20</CtrlApplVersion>
+        <CtrlApplDate>Sep 30 2022 12:08:05</CtrlApplDate>
       </AnalogIn>
-      <LogFiles>
-        <ComLog>
-          <Status>0</Status>
-          <FileName>
-          </FileName>
-          <Format>0</Format>
-          <WrapMode>0</WrapMode>
-          <MaxFileSize>0</MaxFileSize>
-          <StatusLogServer>0</StatusLogServer>
-          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
-          <Services>0</Services>
-          <SrvDataInXml>0</SrvDataInXml>
-          <SrvDataOutXml>0</SrvDataOutXml>
-          <SrvDataInMval>0</SrvDataInMval>
-          <SrvDataOutMval>0</SrvDataOutMval>
-          <RespTrans>0</RespTrans>
-          <ReqTrans>0</ReqTrans>
-          <AdrRes>0</AdrRes>
-          <ConnIn>0</ConnIn>
-          <ConnOut>0</ConnOut>
-          <LowLvlIn>0</LowLvlIn>
-          <LowLvlOut>0</LowLvlOut>
-          <IpSock>0</IpSock>
-        </ComLog>
-        <ErrLog>
-          <Status>0</Status>
-          <FileName>
-          </FileName>
-          <Format>0</Format>
-          <WrapMode>0</WrapMode>
-          <MaxFileSize>0</MaxFileSize>
-          <StatusLogServer>0</StatusLogServer>
-          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
-          <Debug>0</Debug>
-          <Communication>0</Communication>
-          <Services>0</Services>
-          <Methods>0</Methods>
-          <Hal>0</Hal>
-          <Daq>0</Daq>
-          <Param>0</Param>
-          <TEDs>0</TEDs>
-          <Fieldbus>0</Fieldbus>
-        </ErrLog>
-        <DbgLog>
-          <StatusLogServer>0</StatusLogServer>
-          <LogServerIpAdr>127.0.0.1</LogServerIpAdr>
-          <Status>0</Status>
-          <FileName>
-          </FileName>
-          <Format>0</Format>
-          <WrapMode>0</WrapMode>
-          <MaxFileSize>0</MaxFileSize>
-          <MessageQueue>0</MessageQueue>
-          <Daq>0</Daq>
-          <Param>0</Param>
-          <TEDs>0</TEDs>
-          <Hal>0</Hal>
-          <Msp>0</Msp>
-          <SystemLog>0</SystemLog>
-          <Threads>0</Threads>
-          <Timesync>0</Timesync>
-          <Thermo>0</Thermo>
-          <AutoAdjust>0</AutoAdjust>
-          <Fieldbus>0</Fieldbus>
-          <Simulation>0</Simulation>
-        </DbgLog>
-      </LogFiles>
+      <LogSystem>
+        <LogLevel>3</LogLevel>
+        <LogServerIP>
+        </LogServerIP>
+        <LogDebug>
+          <Enable>1</Enable>
+          <Misc>6</Misc>
+          <ReportError>1000</ReportError>
+          <ReportWarning>1000</ReportWarning>
+          <ParamReport>1000</ParamReport>
+          <Param>1000</Param>
+          <Teds>1000</Teds>
+          <Thermo>1000</Thermo>
+          <Adjust>6</Adjust>
+          <AutoAdjust>1000</AutoAdjust>
+          <AutoCal>1000</AutoCal>
+          <Led>1000</Led>
+          <Can>1000</Can>
+          <Snapshot>1000</Snapshot>
+          <Hal>1000</Hal>
+          <Msp>1000</Msp>
+          <FpgaBusRam>1000</FpgaBusRam>
+          <Overload>1000</Overload>
+          <Daq>1000</Daq>
+          <Simulation>1000</Simulation>
+          <MessageQueue>1000</MessageQueue>
+          <Threads>1000</Threads>
+          <Timesync>1000</Timesync>
+          <Fieldbus>1000</Fieldbus>
+          <System>1000</System>
+          <Communication>1000</Communication>
+          <FieldbusParam>1000</FieldbusParam>
+          <Framework>1000</Framework>
+          <XmlParser>1000</XmlParser>
+          <XmlToFlash>1000</XmlToFlash>
+        </LogDebug>
+      </LogSystem>
+      <Diagnosis>
+        <InitFirmware>4.50.8.0 - 2025-08-18 16:38:27 +0200</InitFirmware>
+        <InitDate>00:00:09</InitDate>
+        <WriteFlashLatest>13: 00:00:15 - 12: 00:00:15 - 11: 00:00:15 - 10: 00:00:15 - 9: 00:00:15 - 8: 00:00:16 - 7: 00:00:15 - 6: 00:00:15 - 5: 00:00:15 - 4: 00:00:15 - 3: 00:00:16 - 2: 00:00:15 - 1: 00:00:15</WriteFlashLatest>
+        <WriteFlashCount>13</WriteFlashCount>
+      </Diagnosis>
     </System>
-    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <!-- Hottinger Bruel & Kjaer GmbH, HBM QuantumX/SomatXR, firmware version=4.50.8.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
     <Communication>
       <Network>
-        <GateWay>0.0.0.0</GateWay>
+        <GateWay>
+        </GateWay>
         <TcpPort>5001</TcpPort>
+        <JetDTcpPort>11122</JetDTcpPort>
+        <Routing>
+          <Supported>0</Supported>
+          <Enabled>0</Enabled>
+        </Routing>
         <eth0>
           <Config>2</Config>
           <IpAdr>192.168.10.20</IpAdr>
@@ -815,7 +845,7 @@
         </eth0>
       </Network>
     </Communication>
-    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <!-- Hottinger Bruel & Kjaer GmbH, HBM QuantumX/SomatXR, firmware version=4.50.8.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
     <Amplifier>
       <Connector1>
         <Mode choice="AnalogInChannel">
@@ -823,12 +853,20 @@
             <Sensor>
               <Sensortype choice="Bridge">
                 <Bridge>
-                  <MaxElectrical>12.500000</MaxElectrical>
-                  <ExciteAmpl>1.000000</ExciteAmpl>
+                  <MaxElectrical>12.5</MaxElectrical>
+                  <ElecRange>
+                    <Min>-12.500000</Min>
+                    <Max>12.500000</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-51.594263</Min>
+                    <Max>51.594263</Max>
+                  </PhysRange>
+                  <ExciteAmpl>1.00</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <BridgeType>4</BridgeType>
                   <Wiring>6</Wiring>
-                  <Impedance>350.000000</Impedance>
+                  <Impedance>350.0</Impedance>
                   <DriftCompensation>
                     <Request choice="Default">
                       <Default />
@@ -850,15 +888,22 @@
                   </ZeroSpan>
                 </Scalingtype>
               </Scaling>
+              <Overload>
+                <Mode choice="ChannelInvalid">
+                  <ChannelInvalid />
+                </Mode>
+              </Overload>
               <ElectricalUnit>
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
               <PhysUnit>1900</PhysUnit>
               <PhysUnitUsr>N</PhysUnitUsr>
-              <Supply>0.000000</Supply>
+              <Supply>0.0</Supply>
               <TedsOptions>
                 <UseTeds>0</UseTeds>
+                <Tid>
+                </Tid>
                 <BinData>
                 </BinData>
               </TedsOptions>
@@ -882,11 +927,11 @@
             <SyncSignal address="1">
               <SignalName>Messung an Klemmen</SignalName>
               <OriginOfName>1</OriginOfName>
-              <OutputRate>2400.000000</OutputRate>
+              <OutputRate>2400.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>200.000000</FiltFreq>
+                  <FiltFreq>200.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -901,12 +946,12 @@
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
-              <OutputRate>1200.000000</OutputRate>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>1200.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>10.000000</FiltFreq>
+                  <FiltFreq>10.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -922,10 +967,11 @@
             <OriginOfName>1</OriginOfName>
             <ZeroOffset>
               <Target>0.000000</Target>
-              <Offset>9.296161</Offset>
+              <Offset>0.000000</Offset>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
             <OutputUnit>
+              <FollowSensor>1</FollowSensor>
               <UnitId>1900</UnitId>
               <UserText>N</UserText>
               <Factor>1.000000</Factor>
@@ -948,12 +994,20 @@
             <Sensor>
               <Sensortype choice="Bridge">
                 <Bridge>
-                  <MaxElectrical>5.000000</MaxElectrical>
-                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <MaxElectrical>5.0</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.931380</Min>
+                    <Max>0.931380</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-2.000000</Min>
+                    <Max>2.000000</Max>
+                  </PhysRange>
+                  <ExciteAmpl>2.50</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <BridgeType>4</BridgeType>
                   <Wiring>6</Wiring>
-                  <Impedance>350.000000</Impedance>
+                  <Impedance>350.0</Impedance>
                   <DriftCompensation>
                     <Request choice="Default">
                       <Default />
@@ -970,20 +1024,27 @@
                 <Scalingtype choice="ZeroSpan">
                   <ZeroSpan>
                     <ElecZero>0.000000</ElecZero>
-                    <ElecSpan>0.956660</ElecSpan>
+                    <ElecSpan>0.931380</ElecSpan>
                     <PhysSpan>2.000000</PhysSpan>
                   </ZeroSpan>
                 </Scalingtype>
               </Scaling>
+              <Overload>
+                <Mode choice="SensorInvalid">
+                  <SensorInvalid />
+                </Mode>
+              </Overload>
               <ElectricalUnit>
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
               <PhysUnit>1900</PhysUnit>
               <PhysUnitUsr>N</PhysUnitUsr>
-              <Supply>0.000000</Supply>
+              <Supply>0.0</Supply>
               <TedsOptions>
                 <UseTeds>2</UseTeds>
+                <Tid>
+                </Tid>
                 <BinData>
                 </BinData>
               </TedsOptions>
@@ -1006,11 +1067,11 @@
             <SyncSignal address="1">
               <SignalName>Kraft_KD24s_26202259</SignalName>
               <OriginOfName>1</OriginOfName>
-              <OutputRate>2400.000000</OutputRate>
+              <OutputRate>2400.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>200.000000</FiltFreq>
+                  <FiltFreq>200.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -1025,11 +1086,11 @@
             <SyncSignal address="2">
               <SignalName>U93 10kN</SignalName>
               <OriginOfName>1</OriginOfName>
-              <OutputRate>1200.000000</OutputRate>
+              <OutputRate>1200.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>10.000000</FiltFreq>
+                  <FiltFreq>10.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -1045,10 +1106,11 @@
             <OriginOfName>1</OriginOfName>
             <ZeroOffset>
               <Target>0.000000</Target>
-              <Offset>7.511056e-02</Offset>
+              <Offset>0.000000</Offset>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
             <OutputUnit>
+              <FollowSensor>1</FollowSensor>
               <UnitId>1900</UnitId>
               <UserText>N</UserText>
               <Factor>1.000000</Factor>
@@ -1079,12 +1141,20 @@
             <Sensor>
               <Sensortype choice="Bridge">
                 <Bridge>
-                  <MaxElectrical>5.000000</MaxElectrical>
-                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <MaxElectrical>5.0</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.710530</Min>
+                    <Max>0.710530</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-4.903325</Min>
+                    <Max>4.903325</Max>
+                  </PhysRange>
+                  <ExciteAmpl>2.50</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <BridgeType>4</BridgeType>
                   <Wiring>6</Wiring>
-                  <Impedance>350.000000</Impedance>
+                  <Impedance>1090.0</Impedance>
                   <DriftCompensation>
                     <Request choice="Default">
                       <Default />
@@ -1098,43 +1168,40 @@
                 </Bridge>
               </Sensortype>
               <Scaling>
-                <Scalingtype choice="LinTable">
-                  <LinTable>
-                    <Count>2</Count>
-                    <Point address="1">
-                      <X>0.000000</X>
-                      <Y>0.000000</Y>
-                    </Point>
-                    <Point address="2">
-                      <X>1.000000</X>
-                      <Y>10.000000</Y>
-                    </Point>
-                  </LinTable>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0.000000</ElecZero>
+                    <ElecSpan>0.710530</ElecSpan>
+                    <PhysSpan>4.903325</PhysSpan>
+                  </ZeroSpan>
                 </Scalingtype>
               </Scaling>
+              <Overload>
+                <Mode choice="SensorInvalid">
+                  <SensorInvalid />
+                </Mode>
+              </Overload>
               <ElectricalUnit>
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
-              <PhysUnit>1901</PhysUnit>
-              <PhysUnitUsr>kN</PhysUnitUsr>
-              <Supply>0.000000</Supply>
+              <PhysUnit>1900</PhysUnit>
+              <PhysUnitUsr>N</PhysUnitUsr>
+              <Supply>0.0</Supply>
               <TedsOptions>
                 <UseTeds>2</UseTeds>
+                <Tid>
+                </Tid>
                 <BinData>
                 </BinData>
               </TedsOptions>
               <Identification>
-                <SensorId>
-                </SensorId>
-                <SensorName>
-                </SensorName>
-                <ManuName>
-                </ManuName>
+                <SensorId>462335926724019</SensorId>
+                <SensorName>TAL221_A_500g</SensorName>
+                <ManuName>SparkFun</ManuName>
                 <SerialNumber>
                 </SerialNumber>
-                <TypeName>
-                </TypeName>
+                <TypeName>TAL221 500 g</TypeName>
                 <CalDate>
                 </CalDate>
                 <CalInitials>
@@ -1149,15 +1216,15 @@
             <SyncSignal address="1">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
-              <OutputRate>200.000000</OutputRate>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>2400.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>20.000000</FiltFreq>
+                  <FiltFreq>200.000</FiltFreq>
                 </Lowpass>
               </FilterType>
-              <Decimals>3</Decimals>
+              <Decimals>4</Decimals>
               <SignalFormat>4</SignalFormat>
               <Output>
                 <Description>analog input: connector 3, signal 1</Description>
@@ -1169,12 +1236,12 @@
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
-              <OutputRate>1200.000000</OutputRate>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>1200.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>10.000000</FiltFreq>
+                  <FiltFreq>10.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -1188,15 +1255,16 @@
             </SyncSignal>
             <ChannelName>
             </ChannelName>
-            <OriginOfName>0</OriginOfName>
+            <OriginOfName>1</OriginOfName>
             <ZeroOffset>
               <Target>0.000000</Target>
-              <Offset>0.000000</Offset>
+              <Offset>-0.218346</Offset>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
             <OutputUnit>
-              <UnitId>1901</UnitId>
-              <UserText>kN</UserText>
+              <FollowSensor>1</FollowSensor>
+              <UnitId>1900</UnitId>
+              <UserText>N</UserText>
               <Factor>1.000000</Factor>
               <Offset>0.000000</Offset>
             </OutputUnit>
@@ -1217,12 +1285,20 @@
             <Sensor>
               <Sensortype choice="Bridge">
                 <Bridge>
-                  <MaxElectrical>5.000000</MaxElectrical>
-                  <ExciteAmpl>2.500000</ExciteAmpl>
+                  <MaxElectrical>5.0</MaxElectrical>
+                  <ElecRange>
+                    <Min>-0.700000</Min>
+                    <Max>0.700000</Max>
+                  </ElecRange>
+                  <PhysRange>
+                    <Min>-4.903325</Min>
+                    <Max>4.903325</Max>
+                  </PhysRange>
+                  <ExciteAmpl>2.50</ExciteAmpl>
                   <ExciteFreq>5</ExciteFreq>
                   <BridgeType>4</BridgeType>
                   <Wiring>6</Wiring>
-                  <Impedance>350.000000</Impedance>
+                  <Impedance>1090.0</Impedance>
                   <DriftCompensation>
                     <Request choice="Default">
                       <Default />
@@ -1236,43 +1312,40 @@
                 </Bridge>
               </Sensortype>
               <Scaling>
-                <Scalingtype choice="LinTable">
-                  <LinTable>
-                    <Count>2</Count>
-                    <Point address="1">
-                      <X>0.000000</X>
-                      <Y>0.000000</Y>
-                    </Point>
-                    <Point address="2">
-                      <X>1.000000</X>
-                      <Y>10.000000</Y>
-                    </Point>
-                  </LinTable>
+                <Scalingtype choice="ZeroSpan">
+                  <ZeroSpan>
+                    <ElecZero>0.000000</ElecZero>
+                    <ElecSpan>0.700000</ElecSpan>
+                    <PhysSpan>4.903325</PhysSpan>
+                  </ZeroSpan>
                 </Scalingtype>
               </Scaling>
+              <Overload>
+                <Mode choice="ChannelInvalid">
+                  <ChannelInvalid />
+                </Mode>
+              </Overload>
               <ElectricalUnit>
                 <UnitId>1001</UnitId>
                 <UnitText>mV/V</UnitText>
               </ElectricalUnit>
-              <PhysUnit>1901</PhysUnit>
-              <PhysUnitUsr>kN</PhysUnitUsr>
-              <Supply>0.000000</Supply>
+              <PhysUnit>1900</PhysUnit>
+              <PhysUnitUsr>N</PhysUnitUsr>
+              <Supply>0.0</Supply>
               <TedsOptions>
                 <UseTeds>2</UseTeds>
+                <Tid>
+                </Tid>
                 <BinData>
                 </BinData>
               </TedsOptions>
               <Identification>
-                <SensorId>
-                </SensorId>
-                <SensorName>
-                </SensorName>
-                <ManuName>
-                </ManuName>
+                <SensorId>462336229798424</SensorId>
+                <SensorName>TAL221_B_500g</SensorName>
+                <ManuName>SparkFun</ManuName>
                 <SerialNumber>
                 </SerialNumber>
-                <TypeName>
-                </TypeName>
+                <TypeName>TAL221_B_500g</TypeName>
                 <CalDate>
                 </CalDate>
                 <CalInitials>
@@ -1287,12 +1360,12 @@
             <SyncSignal address="1">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
-              <OutputRate>200.000000</OutputRate>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>2400.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>20.000000</FiltFreq>
+                  <FiltFreq>200.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -1307,12 +1380,12 @@
             <SyncSignal address="2">
               <SignalName>
               </SignalName>
-              <OriginOfName>0</OriginOfName>
-              <OutputRate>1200.000000</OutputRate>
+              <OriginOfName>1</OriginOfName>
+              <OutputRate>1200.000</OutputRate>
               <FilterType choice="Lowpass">
                 <Lowpass>
                   <FiltCharact>1</FiltCharact>
-                  <FiltFreq>10.000000</FiltFreq>
+                  <FiltFreq>10.000</FiltFreq>
                 </Lowpass>
               </FilterType>
               <Decimals>3</Decimals>
@@ -1326,15 +1399,16 @@
             </SyncSignal>
             <ChannelName>
             </ChannelName>
-            <OriginOfName>0</OriginOfName>
+            <OriginOfName>1</OriginOfName>
             <ZeroOffset>
               <Target>0.000000</Target>
-              <Offset>0.000000</Offset>
+              <Offset>-0.128757</Offset>
               <Inhibit>0</Inhibit>
             </ZeroOffset>
             <OutputUnit>
-              <UnitId>1901</UnitId>
-              <UserText>kN</UserText>
+              <FollowSensor>1</FollowSensor>
+              <UnitId>1900</UnitId>
+              <UserText>N</UserText>
               <Factor>1.000000</Factor>
               <Offset>0.000000</Offset>
             </OutputUnit>
@@ -1349,8 +1423,14 @@
           </AnalogInChannel>
         </Mode>
       </Connector4>
+      <Diagnosis>
+        <InitFirmware>4.50.8.0 - 2025-08-18 16:38:27 +0200</InitFirmware>
+        <InitDate>00:00:10</InitDate>
+        <WriteFlashLatest>45: 00:03:55 - 44: 00:03:25 - 43: 00:03:08 - 42: 00:00:43 - 41: 00:26:49 - 40: 00:26:38 - 39: 00:20:06 - 38: 00:18:28 - 37: 00:09:30 - 36: 00:09:03 - 35: 00:06:47 - 34: 00:04:37 - 33: 00:10:21 - 32: 00:07:35 - 31: 00:07:17 - 30: 00:06:56 - 29: 00:06:2</WriteFlashLatest>
+        <WriteFlashCount>45</WriteFlashCount>
+      </Diagnosis>
     </Amplifier>
-    <!-- HBM QuantumX/SOMAT firmware version=4.2.10.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
+    <!-- Hottinger Bruel & Kjaer GmbH, HBM QuantumX/SomatXR, firmware version=4.50.8.0, MT=MX440A, config=^ML?MX440B^MT?MX440A^ME?B^MR?3D^SH?IP20^FA?10000000^EA?00:09:e5:00:6e:e2^^ -->
     <FactAdjust>
       <Connector address="0">
         <FactAdjustPoint address="1">

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Relations xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Relation>mA=A</Relation>
+  <Relation>kHz=Hz</Relation>
+  <Relation>µm/m=m/m</Relation>
+  <Relation>mV/V=V/V</Relation>
+  <Relation>kImp=Imp</Relation>
+  <Relation>bar=Pa</Relation>
+</Relations>

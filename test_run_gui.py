@@ -71,6 +71,10 @@ GSV_CMD_GET_VALUE = 0x3B
 FORCE_LOGGER_POLL_INTERVAL_SECONDS = 0.005
 QUANTUMX_HOST = "127.0.0.1"
 QUANTUMX_PORT = 5500
+QUANTUMX_FORCE_1_CHANNEL = 3
+QUANTUMX_FORCE_2_CHANNEL = 4
+QUANTUMX_FORCE_1_NAME = "TAL221 A"
+QUANTUMX_FORCE_2_NAME = "TAL221 B"
 QUANTUMX_MONITOR_EXE = (
     Path(__file__).parent
     / "quantumx_bridge"
@@ -402,8 +406,12 @@ class TestRunGui(tk.Tk):
         self.colibri_position_var = tk.StringVar(value="Position: --")
         self.force_status_var = tk.StringVar(value=self._force_status("QuantumX: disconnected"))
         self.force_value_var = tk.StringVar(value="Force total: --")
-        self.force_1_value_var = tk.StringVar(value="F1: --")
-        self.force_2_value_var = tk.StringVar(value="F2: --")
+        self.force_1_value_var = tk.StringVar(
+            value=f"{QUANTUMX_FORCE_1_NAME} (CH{QUANTUMX_FORCE_1_CHANNEL}): --"
+        )
+        self.force_2_value_var = tk.StringVar(
+            value=f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): --"
+        )
         self.force_rate_var = tk.StringVar(value="Force rate: --")
         self.debug_log_var = tk.StringVar(value="Debug log: off")
         self.german_csv_format_var = tk.BooleanVar(value=True)
@@ -1091,7 +1099,7 @@ class TestRunGui(tk.Tk):
         self.colibri_controls.append(self.part_colibri_move_button)
 
         force_controls = ttk.Frame(hardware_notebook, padding=(8, 6))
-        hardware_notebook.add(force_controls, text="FT sensors / QuantumX")
+        hardware_notebook.add(force_controls, text="TAL221 sensors / QuantumX")
 
         ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT)
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
@@ -1217,8 +1225,8 @@ class TestRunGui(tk.Tk):
             "valves_open": "Valves open",
             "flow": "Flow",
             "force": "Force total",
-            "force_1": "Force 1",
-            "force_2": "Force 2",
+            "force_1": "TAL221 A (CH3)",
+            "force_2": "TAL221 B (CH4)",
         }
         for col, heading in headings.items():
             self.table.heading(col, text=heading)
@@ -2837,8 +2845,12 @@ class TestRunGui(tk.Tk):
             self.force_rate_times.clear()
             self.force_sample_history.clear()
         self.force_connect_button.configure(text="Connect")
-        self.force_1_value_var.set("F1: --")
-        self.force_2_value_var.set("F2: --")
+        self.force_1_value_var.set(
+            f"{QUANTUMX_FORCE_1_NAME} (CH{QUANTUMX_FORCE_1_CHANNEL}): --"
+        )
+        self.force_2_value_var.set(
+            f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): --"
+        )
         self.force_value_var.set("Force total: --")
         self.force_rate_var.set("Force rate: --")
         self.force_status_var.set(self._force_status("QuantumX: disconnected"))
@@ -2847,7 +2859,8 @@ class TestRunGui(tk.Tk):
 
     def _force_status(self, prefix):
         return (
-            f"{prefix} | total = F1 + F2 | 20-value mean | "
+            f"{prefix} | total = {QUANTUMX_FORCE_1_NAME} + {QUANTUMX_FORCE_2_NAME} "
+            f"(CH{QUANTUMX_FORCE_1_CHANNEL} + CH{QUANTUMX_FORCE_2_CHANNEL}) | 20-value mean | "
             f"impulse threshold {self.force_impulse_threshold:.4g} N"
         )
 
@@ -3717,10 +3730,16 @@ class TestRunGui(tk.Tk):
                 if now_monotonic - self.last_force_ui_update_monotonic >= 0.05:
                     self.last_force_ui_update_monotonic = now_monotonic
                     self.force_1_value_var.set(
-                        "F1: --" if value.force_1_n is None else f"F1: {value.force_1_n:.4f} N"
+                        f"{QUANTUMX_FORCE_1_NAME} (CH{QUANTUMX_FORCE_1_CHANNEL}): --"
+                        if value.force_1_n is None
+                        else f"{QUANTUMX_FORCE_1_NAME} (CH{QUANTUMX_FORCE_1_CHANNEL}): "
+                        f"{value.force_1_n:.4f} N"
                     )
                     self.force_2_value_var.set(
-                        "F2: --" if value.force_2_n is None else f"F2: {value.force_2_n:.4f} N"
+                        f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): --"
+                        if value.force_2_n is None
+                        else f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): "
+                        f"{value.force_2_n:.4f} N"
                     )
                     self.force_value_var.set(self._format_force_value(self.latest_force_n))
                     if rate_hz is not None:
@@ -3736,8 +3755,12 @@ class TestRunGui(tk.Tk):
                         self.latest_force_2_n = None
                         self.latest_force_n = None
                         self.latest_force_status = "stale" if "stale" in value.lower() else "disconnected"
-                    self.force_1_value_var.set("F1: --")
-                    self.force_2_value_var.set("F2: --")
+                    self.force_1_value_var.set(
+                        f"{QUANTUMX_FORCE_1_NAME} (CH{QUANTUMX_FORCE_1_CHANNEL}): --"
+                    )
+                    self.force_2_value_var.set(
+                        f"{QUANTUMX_FORCE_2_NAME} (CH{QUANTUMX_FORCE_2_CHANNEL}): --"
+                    )
                     self.force_value_var.set("Force total: --")
                 self._update_connection_summary()
             else:
@@ -4590,6 +4613,21 @@ class TestRunGui(tk.Tk):
             ("flow detection threshold", self.flow_threshold_var.get(), "l/min"),
             ("force standard filter", 20, "samples, rolling mean"),
             ("force impulse threshold", self.force_impulse_threshold, "N"),
+            (
+                "force sensor 1",
+                "TAL221 500 g",
+                f"{QUANTUMX_FORCE_1_NAME}; MX440B channel {QUANTUMX_FORCE_1_CHANNEL}; profile TAL221_A_500g",
+            ),
+            (
+                "force sensor 2",
+                "TAL221 500 g",
+                f"{QUANTUMX_FORCE_2_NAME}; MX440B channel {QUANTUMX_FORCE_2_CHANNEL}; profile TAL221_B_500g",
+            ),
+            (
+                "force total definition",
+                f"{QUANTUMX_FORCE_1_NAME} + {QUANTUMX_FORCE_2_NAME}",
+                "N",
+            ),
             ("QuantumX endpoint", f"{self.quantumx_host_var.get()}:{self.quantumx_port_var.get()}", ""),
             ("Arduino port", self._selected_port_device(), ""),
             ("Colibri port", self._selected_colibri_port_device(), ""),

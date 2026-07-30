@@ -1,0 +1,574 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Hbm.Api.Utils</name>
+    </assembly>
+    <members>
+        <member name="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute">
+            <summary>
+            Implementation of the AdditionalValue attribute, 
+            which can be used as annotation for enumeration members 
+            (e.g. <c>[AdditionalValue("0.2")]</c>.
+            
+            This attribute requires a string parameter as value which can store additional
+            information for an enum member (e.g. the frequency in Hz). 
+            
+            The <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute"/>
+            of the enum defines the type of the value.
+            All values must use the InvariantCulture format (e.g. "0.2" instead of "0,2").
+            <example>
+            <para>Sample usage an enumeration using the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/>:</para>
+            
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            </example>
+            </summary>
+            <remarks>
+            AttributeUsage:
+            <c>AttributeTargets.Enum</c> just work on enums, not on enum members, 
+            so <c>AttributeTargets.Field</c> is the best workaround.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Utils.Attributes.AdditionalValueAttribute.#ctor(System.String)">
+            <summary>
+            Creates a new instance and stores the required parameter value
+            (representing the AdditionalValue string of a enum member)
+            </summary>
+            <param name="value">Additional value as string</param>
+        </member>
+        <member name="P:Hbm.Api.Utils.Attributes.AdditionalValueAttribute.Value">
+            <summary>
+            Additional value of the enumeration member
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute">
+            <summary>
+            Implementation of the AdditionalValueType attribute, 
+            which must be used as annotation for enumerations 
+            that use the AdditionalValue attribute on its enum members.
+            (e.g. <c>[AdditionalValueType(typeof(double))]</c>.
+            
+            This attribute requires a type as parameter which defines the interpretation 
+            of the data type for all <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> 
+            attributes of the enum members. 
+            <example>
+            <para>Sample usage an enumeration using the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute"/>:</para>
+            
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            </example>
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute.#ctor(System.Type)">
+            <summary>
+            Creates a new instance and stores the required type parameter 
+            (defining the data type of the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> values on the enum members)
+            </summary>
+            <param name="valueType">Type of the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> values</param>
+        </member>
+        <member name="P:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute.ValueType">
+            <summary>
+            Type of the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> values of the enumeration members.
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Utils.Attributes.IgnoreInTmsAttribute">
+            <summary>
+            Indicates if an annotated element should be serialized when used from TMS projects
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Utils.Helpers.AttributeHelper">
+            <summary>
+            Helper class for getting the values from (custom) attributes.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Helpers.AttributeHelper.GetAdditionalValueString(System.Type,System.String)">
+            <summary>
+            Gets the string value content of an <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> 
+            from a given enumeration member (specified by enumeration type and member name). 
+            </summary>
+            <param name="enumerationType">Type of the enumeration</param>
+            <param name="enumMemberName">Name of the enumeration member, which owns the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/></param>
+            <returns>Additional value as <c>string</c></returns>
+        </member>
+        <member name="M:Hbm.Api.Utils.Helpers.AttributeHelper.GetAdditionalValueType(System.Type)">
+            <summary>
+            Gets the data type content of an <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute"/> of the given enumeration. 
+            </summary>
+            <param name="enumerationType">Type of the enumeration</param>
+            <returns>Type, read from the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute"/></returns>
+        </member>
+        <member name="T:Hbm.Api.Utils.Helpers.CloningHelper">
+            <summary>
+            Helper class for cloning and comparing objects
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Helpers.CloningHelper.DeepClone``1(``0)">
+            <summary>
+            Performs a deep clone of the object including clones of all child objects. 
+            </summary>
+            <remarks>
+            This method requires that all entities of the object are marked with the [Serializable] attribute.
+            </remarks>
+            <typeparam name="T">Type of the object</typeparam>
+            <param name="obj">instance to be cloned</param>
+            <returns>Cloned instance of the object</returns>
+        </member>
+        <member name="M:Hbm.Api.Utils.Helpers.CloningHelper.DeepClonePublicMembers``1(``0)">
+            <summary>
+            Performs a deep clone of the object including clones of all child objects.
+            Only public members are cloned.
+            </summary>
+            <remarks>
+            This method doesn't require [Serializable] attributes on the entities.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Utils.Helpers.CloningHelper.IsSameObjectState(System.Object,System.Object)">
+            <summary>
+            Determines whether the given objects do have the same property values
+            </summary>
+            <param name="object1">The object1.</param>
+            <param name="object2">The object2.</param>
+            <returns></returns>
+        </member>
+        <member name="T:Hbm.Api.Utils.Exceptions.AttributeNotFoundException">
+            <summary>
+            This exception indicates that an required (custom) attribute is not found.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.AttributeNotFoundException.#ctor">
+            <summary>
+            Creates a new instance.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.AttributeNotFoundException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">Message of the error</param>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.AttributeNotFoundException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">Message of the error</param>
+            <param name="inner">Inner exception of the error</param>
+        </member>
+        <member name="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">
+            <summary>
+            Thrown, if a conversion produces an error
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.ConversionFailedException.#ctor">
+            <summary>
+            Creates a new instance.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.ConversionFailedException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">Message of the error</param>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.ConversionFailedException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">Message of the error</param>
+            <param name="inner">Inner exception of the error</param>
+        </member>
+        <member name="T:Hbm.Api.Utils.Exceptions.DuplicateAttributeException">
+            <summary>
+            This exception indicates that more than one required (custom) attribute is not found.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.DuplicateAttributeException.#ctor">
+            <summary>
+            Creates a new instance.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.DuplicateAttributeException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">Message of the error</param>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.DuplicateAttributeException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">Message of the error</param>
+            <param name="inner">Inner exception of the error</param>
+        </member>
+        <member name="T:Hbm.Api.Utils.Exceptions.UtilsException">
+            <summary>
+            Abstract exception class used as base class for all exceptions of the Hbm.API.Utils namespace
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.UtilsException.#ctor">
+            <summary>
+            Creates a new instance.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.UtilsException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">Message of the error</param>
+        </member>
+        <member name="M:Hbm.Api.Utils.Exceptions.UtilsException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">Message of the error</param>
+            <param name="inner">Inner exception of the error</param>
+        </member>
+        <member name="T:Hbm.Api.Utils.EnumConverter`1">
+            <summary>
+            Generic conversion methods for enumerations.
+            </summary>
+            <remarks>
+            These methods could not be implemented as extension methods of the Enum class, 
+            because extension methods require an instance.
+            </remarks>
+            <typeparam name="T">Type of the enumeration</typeparam>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.ToEnumFromValue(System.Object)">
+            <summary>
+            Finds the enumeration member that matches the given enumeration value.
+            
+            In contrast to the standard .NET Enum conversion, no invalid member is returned 
+            (instead an exception is thrown) and no type cast is needed.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+                <para>[AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>int value = 917;</para>
+            <para>FilterFrequency frequency = EnumConverter&lt;FilterFrequency&gt;.ToEnumFromValue(value);</para>
+            </code>
+            <para>The variable <c>frequency</c> contains FilterFrequency.Hz02 after the conversion.</para>
+            </example>
+            </summary>
+            <param name="value">Value to be converted into the matching enumeration member</param>
+            <returns>Matching enumeration member of type <typeparamref name="T"/></returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.ToEnumFromValue(System.Object,`0)">
+            <summary>
+            Finds the enumeration member that matches the given enumeration value. If the given value is not defined
+            int the target enumeration, than the given default enumeration member is returned.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>public enum BridgeSensorWiring : int</para>
+            <para>{</para>
+            <para>   NotSet = 0,</para>
+            <para>   ThreeWire = 3,</para>
+            <para>   FourWire = 4,</para>
+            <para>   FiveWire = 5,</para>
+            <para>   SixWire = 6</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>int wiring = 2;</para>
+            <para>BridgeSensorWiring bridgeSensorWiring = EnumConverter&lt;BridgeSensorWiring&gt;.ToEnumFromValue(wiring, BridgeSensorWiring.NotSet);</para>
+            </code>
+            <para>The variable <c>bridgeSensorWiring</c> contains BridgeSensorWiring.NotSet after the conversion, because the given</para>
+            <para>wiring value is not defined in the target enumeration.</para>
+            </example>
+            </summary>
+            <param name="value">Value to be converted into the matching enumeration member</param>
+            <param name="defaultEnumMember">Default enumeration member of the target enumeration which will be returned, 
+            if the given value is not defined in the target enumeration.</param>
+            <returns>Matching enumeration member of type <typeparamref name="T"/> if found, 
+            else the given default enumeration member <paramref name="defaultEnumMember"/></returns>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.ToEnumFromAdditionalValue(System.Object)">
+            <summary>
+            Finds the enumeration member that matches the the given additonal value,
+            in the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> of the enumeration member.
+            
+            All members of the enumeration are validated, if they have an <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> assigned. 
+            
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>       
+            <para>double additionalValue = 0.2;</para>
+            <para>FilterFrequency frequency = EnumConverter&lt;FilterFrequency&gt;.ToEnumFromAdditionalValue(additionalValue);</para>
+            </code>
+            <para>The variable <c>frequency</c> contains FilterFrequency.Hz02 after the conversion.</para>
+            </example>
+            </summary>
+            <param name="additionalValue">Additional value to be converted into the matching enumeration member</param>
+            <returns>Matching enumeration member of type <typeparamref name="T"/></returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.ToAdditionalValueFromValue(System.Object)">
+            <summary>
+            Finds the additional value of an enumeration member that matches the given enumeration value.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>int value = 917;</para>
+            <para>double additionalValue = EnumConverter&lt;FilterFrequency&gt;.ToAdditionalValueFromValue(value);</para>
+            </code>
+            <para>The variable <c>additionalValue</c> contains 0.2 after the conversion.</para>
+            </example>
+            </summary>
+            <param name="value">Value to be converted into the matching additional value</param>
+            <returns>Matching additional value</returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+            <remarks>
+            <paramref name="value"/> must have the type <c>object</c>, not <c>dynamic</c>  
+            to prevent a <see cref="T:Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"/>
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.ToValueFromAdditionalValue(System.Object)">
+            <summary>
+            Finds the value of an enumeration member that matches the given additional value.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>double additionalValue = 0.2;</para>
+            <para>int value = EnumConverter&lt;FilterFrequency&gt;.ToValueFromAdditionalValue(additionalValue);</para>
+            </code>
+            <para>The variable <c>value</c> contains 917 after the conversion.</para>
+            </example>
+            </summary>
+            <param name="additionalValue">Value to be converted into the matching additional value</param>
+            <returns>Matching additional value</returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+            <remarks>
+            <paramref name="additionalValue"/> must have the type <c>object</c>, not <c>dynamic</c>  
+            to prevent a <see cref="T:Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"/>
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.GetAdditionalValues">
+            <summary>
+            Gets the (unsorted) list of the additional values for members of the given enumeration. 
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversions:</para>
+            <code>
+            <para>IList list = EnumConverter&lt;FilterFrequency&gt;.GetAdditionalValues();</para>
+            </code>
+            <para>The list contains the double values 0.2 and 1.0.</para>
+            </example>
+            </summary>
+            <returns>Strongly typed list of all additional values of the enumeration</returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.HasAdditionalValue(System.Object)">
+            <summary>
+            Checks if the given <paramref name="value"/> exists in the list of the additional values of the given enumeration. 
+            Important: the type of the <paramref name="value"/> must be the same as the type of the additional values, else
+            the value cannot be found and <c>false</c> will be returned.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample:</para>
+            <code>
+            <para>bool hasValueDouble = EnumConverter&lt;FilterFrequency&gt;.HasAdditionalValue(0.2);</para>
+            <para>bool hasValueDecimal = EnumConverter&lt;FilterFrequency&gt;.HasAdditionalValue(0.2M);</para>
+            <para>bool hasValueDouble3 = EnumConverter&lt;FilterFrequency&gt;.HasAdditionalValue(3.0);</para>
+            </code>
+            <para>hasValueDouble is true, because the double value 0.2 is part of the additional values of the enumeration.</para>
+            <para>hasValueDecimal is false, because the decimal value 0.2 is not part of the additional values of the enumeration.</para>
+            <para>hasValueDouble3 is false, because the double value 3.0 is not part of the additional values of the enumeration.</para>
+            </example>
+            </summary>
+            <param name="value">Value to check</param>
+            <returns><c>true</c> if the <paramref name="value"/> is found in the additional values of the enum, else <c>false</c></returns>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion of the additional values list has failed.</exception>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumConverter`1.IsValueDefined(System.Object)">
+            <summary>
+            Checks, if the given value is defined 
+            in the current target enumeration T.
+            </summary>
+            <param name="value">Value to check</param>
+            <returns><c>true</c> if the given value is defined in the target enumeration, else <c>false</c></returns>
+            <exception cref="T:System.ArgumentNullException">Thrown, if <paramref name="value"/> is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown, if T is not an enumeration</exception>
+            <exception cref="T:System.ArgumentException">Thrown, if the type of <paramref name="value"/> does not match the underlying type of the enumeration T</exception>
+        </member>
+        <member name="T:Hbm.Api.Utils.EnumExtension">
+            <summary>
+            Encapsulates the extension methods for the Enum class.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumExtension.GetValue(System.Enum)">
+            <summary>
+            Gets the enum value of the enum member.
+            In contrast to the standard .NET Enum conversion, no type cast is needed.
+            <example>
+            <para>Sample enumeration:</para>
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>int value = FilterFrequency.Hz02.GetValue();</para>
+            </code>
+            <para>The variable <c>value</c> contains the int value 917</para>
+            </example>
+            </summary>
+            <param name="enumMember">Enumeration member for which the value should be retrieved</param>
+            <returns>Value of the enumeration member, converted in the type of the enum</returns>
+            <remarks>
+            This method uses a dynamic return value instead of object, so the return value 
+            doesn't need to be converted after calling this method and the return value can be a non nullable type.
+            </remarks>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+        </member>
+        <member name="M:Hbm.Api.Utils.EnumExtension.GetAdditionalValue(System.Enum)">
+            <summary>
+            Extension method to get the value of the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/>
+            of a enum member, converted in the target type, specified by the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueTypeAttribute"/>.
+            <example>
+            <para>Sample enumeration:</para>
+            
+            <code>
+            <para>[AdditionalValueType(typeof(double))]</para>
+            <para>internal enum FilterFrequency</para>
+            <para>{</para>
+            <para>    [AdditionalValue("0.2")]</para>
+            <para>    Hz02 = 917,</para>
+            <para></para>
+            <para>    [AdditionalValue("1.0")]</para>
+            <para>    Hz1 = 927</para>
+            <para>}</para>
+            </code>
+            <para>Sample conversion:</para>
+            <code>
+            <para>double additionalValue = FilterFrequency.Hz02.GetAdditionalValue();</para>
+            </code>
+            <para>The variable <c>additionalValue</c> contains the double value 0.2</para>
+            </example>
+            </summary>
+            <param name="enumMember">Enumeration member which must be annotated with the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/></param>
+            <returns>Converted value from the <see cref="T:Hbm.Api.Utils.Attributes.AdditionalValueAttribute"/> of the enum member</returns>
+            <remarks>
+            This method uses a dynamic return value instead of object, so the return value 
+            doesn't need to be converted after calling this method and the return value can be a non nullable type.
+            </remarks>
+            <exception cref="T:Hbm.Api.Utils.Exceptions.ConversionFailedException">Thrown, if the conversion is failed.</exception>
+        </member>
+        <member name="T:Hbm.Api.Utils.StructConverter">
+            <summary>
+            Generic conversion methods for structs
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Utils.StructConverter.BytesToStruct``1(System.Byte[])">
+            <summary>
+            Converts a byte array to a structure
+            </summary>
+            <typeparam name="T">Struct</typeparam>
+            <param name="bytes">Byte array</param>
+            <returns>Filled structure, in case of an error T is filled with defaults</returns>
+        </member>
+        <member name="M:Hbm.Api.Utils.StructConverter.StructToBytes``1(``0)">
+            <summary>
+            Converts a structure to a byte array 
+            </summary>
+            <typeparam name="T">Struct</typeparam>
+            <param name="data">Struct to convert</param>
+            <returns>Byte array</returns>
+        </member>
+    </members>
+</doc>

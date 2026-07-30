@@ -1,0 +1,526 @@
+// This file holds the possible settings for sample rates, filter, sensor types and scaling types for the various MGC module types.
+//
+// All known sensor  types : "Bridge", "CanBus", "Counter", "Current", "CurrentProbe", "Frequency", "Iepe", "Lvdt", "NotSupported", "PiezoPassive", "Potentiometer", "Pt", "Pwm", "Resistance", "Ssi", "ThermoCouple", "Voltage", "VoltageProbe" 
+// All known filter  types : "Bessel", "Butterworth", "ButterworthFir", "LinearPhase", "NoFilter"
+// All known scaling types : "CanBus", "Gage", "Internal", "NotSupported", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" 
+//
+// "ModuleTypes": ["Default"]            works as fallback ModuleType. It will be used when a requested ModuleType is not defined within the file
+// "NumberOfChannels": "0", ...          works as fallback if the demanded number of channels is not available (used only by ML71 or by unknown ModuleTypes)
+// "ConnectionBoardTypes": ["Default"]   works as fallback if the demanded property could not be found (see "ML801"...)
+{
+  "MinimumFirmwareVersionSupported" : "4.44",
+  "Domains": [
+    {
+      "Type": "Classic",
+      "Amplifiers": [
+        {
+          "ModuleTypes": [ "Default" ],
+          "PossibleSampleRatesPerNumberOfChannels": [
+            {
+              "NumberOfChannels": "0",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0 ]
+            },
+            {
+              "NumberOfChannels": "1",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0 ]
+            },
+            {
+              "NumberOfChannels": "2",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0 ]
+            },
+            {
+              "NumberOfChannels": "4",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0, 4800.0 ]
+            },
+            {
+              "NumberOfChannels": "8",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0 ]
+            },
+            {
+              "NumberOfChannels": "16",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0 ]
+            }
+          ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "Default" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0, 100000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0, 100000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "CurrentProbe", "Frequency", "Iepe", "Lvdt", "NotSupported", "PiezoPassive", "Potentiometer", "Pt", "Pwm", "Resistance", "Ssi", "ThermoCouple", "Voltage", "VoltageProbe" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML01", "ML01B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1100.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 2000.0, 2400.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Voltage", "Current" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP08", "AP08i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1100.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 2000.0, 2400.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "PiezoPassive" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP18i", "AP18" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1100.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 2000.0, 2400.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "IEPE" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP09" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "ThermoCouple", "Voltage", "Current" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML10", "ML10B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP03", "AP03i", "AP11", "AP11i", "AP13", "AP13i", "AP14", "AP14i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0, 10000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP01i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0, 10000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP08", "AP08i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0, 10000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "PiezoPassive" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP14", "AP14i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0, 10000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP18i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0, 10000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "IEPE" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP18" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 1000.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "IEPE" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML30", "ML30B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i", "AP11", "AP11i", "AP13", "AP13i", "AP14", "AP14i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 200.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML35", "ML35B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP03", "AP03i", "AP11", "AP11i", "AP13", "AP13i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.03, 0.05, 0.1, 0.2, 0.5, 0.9, 1.5 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 1.0, 1.5, 2.5, 3.0, 5.0, 6.0, 9.0, 10.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Pt", "Resistance" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP01i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 15.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Pt", "Resistance" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML38", "ML38B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.03, 0.05, 0.1, 0.2, 0.5, 0.9, 1.5 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 1.0, 1.5, 2.5, 3.0, 5.0, 6.0, 9.0, 10.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML50", "ML50B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 900.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 1500.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML55", "ML55B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i", "AP11", "AP11i", "AP13", "AP13i", "AP14", "AP14i", "AP17", "AP0506" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 900.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 1500.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML55S6", "ML55BS6" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i", "AP11", "AP11i", "AP13", "AP13i", "AP14", "AP14i", "AP0506" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 900.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 3000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML60", "ML60B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP01", "AP01i", "AP03", "AP03i", "AP11", "AP11i", "AP17", "AP07", "AP07i" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0, 900.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0, 1000.0, 2000.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge", "Frequency", "Counter" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML801", "ML801B" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "Default" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 200.0, 250.0, 500.0, 1000.0 ]
+                }
+              ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP401", "AP801", "AP801S6" ],
+              "PossibleSensorTypes": [ "Voltage" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP402" ],
+              "PossibleSensorTypes": [ "Voltage", "Current" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP409", "AP809" ],
+              "PossibleSensorTypes": [ "ThermoCouple" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP418" ],
+              "PossibleSensorTypes": [ "IEPE" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP810", "AP814", "AP815" ],
+              "PossibleSensorTypes": [ "Bridge" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP835" ],
+              "PossibleSensorTypes": [ "Pt" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            },
+            {
+              "ConnectionBoardTypes": [ "AP836", "AP836i" ],
+              "PossibleSensorTypes": [ "Potentiometer" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML455" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP455" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 200.0, 250.0, 500.0, 700.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Bridge", "Lvdt" ],
+              "PossibleScalingTypes": [ "TwoPoint", "Gage" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML460" ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP460" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.05, 0.1, 0.2, 0.5, 1.25, 2.5, 5.0, 10.0, 20.0, 40.0, 100.0, 200.0, 400.0 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": [ 5.0, 10.0, 20.0, 40.0, 80.0, 250.0, 500.0 ]
+                }
+              ],
+              "PossibleSensorTypes": [ "Counter", "Frequency", "Pwm" ],
+              "PossibleScalingTypes": [ "TwoPoint" ]
+            }
+          ]
+        },
+        {
+          "ModuleTypes": [ "ML71" ],
+          "PossibleSampleRatesPerNumberOfChannels": [
+            {
+              "NumberOfChannels": "0",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0, 2400.0 ]
+            }
+          ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP71" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": []
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": []
+                }
+              ],
+              "PossibleSensorTypes": [ "CanBus" ],
+              "PossibleScalingTypes": [ "CanBus" ]
+            }
+          ],
+          "SupportedCanBitRates": [ 10000, 20000, 50000, 125000, 250000, 500000, 1000000 ]
+        },
+        {
+          "ModuleTypes": [ "ML74","ML74B" ],
+          "PossibleSampleRatesPerNumberOfChannels": [
+            {
+              "NumberOfChannels": "0",
+              "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 600.0, 1200.0 ]
+            }
+          ],
+          "ConnectionBoardInfos": [
+            {
+              "ConnectionBoardTypes": [ "AP74" ],
+              "PossibleFilters": [
+                {
+                  "Filtertype": "Bessel",
+                  "Frequencies": [ 0.025, 0.04, 0.05, 0.08, 0.1, 0.15, 0.4, 0.6, 0.8, 1.25, 1.5, 2.5, 3, 5, 7, 10, 15, 25 ]
+                },
+                {
+                  "Filtertype": "Butterworth",
+                  "Frequencies": []
+                }
+              ],
+              "PossibleSensorTypes": [ "Voltage" , "Bridge" ],
+              "PossibleScalingTypes": [ "Gage" , "TwoPoint" ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

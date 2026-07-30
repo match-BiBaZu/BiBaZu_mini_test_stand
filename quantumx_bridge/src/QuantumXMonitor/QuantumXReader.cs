@@ -21,11 +21,15 @@ namespace QuantumXMonitor
         private const int FastAverageWindowSize = 20;
         private const int ZeroBalanceSampleCount = 100;
         private readonly string _ipAddress;
+        private readonly int _force1ChannelNumber;
+        private readonly int _force2ChannelNumber;
         private int _zeroBothRequested;
 
-        public QuantumXReader(string ipAddress)
+        public QuantumXReader(string ipAddress, int force1ChannelNumber, int force2ChannelNumber)
         {
             _ipAddress = ipAddress;
+            _force1ChannelNumber = force1ChannelNumber;
+            _force2ChannelNumber = force2ChannelNumber;
         }
 
         public event Action<string> StatusChanged;
@@ -65,17 +69,19 @@ namespace QuantumXMonitor
                         "Unexpected device: " + device.Model + " / " + device.Name);
                 }
 
-                Channel channel1 = GetPrimaryChannel(device, 1);
-                Channel channel2 = GetPrimaryChannel(device, 2);
-                Signal signal1 = GetPrimarySignal(channel1, 1);
-                Signal signal2 = GetPrimarySignal(channel2, 2);
+                Channel channel1 = GetPrimaryChannel(device, _force1ChannelNumber);
+                Channel channel2 = GetPrimaryChannel(device, _force2ChannelNumber);
+                Signal signal1 = GetPrimarySignal(channel1, _force1ChannelNumber);
+                Signal signal2 = GetPrimarySignal(channel2, _force2ChannelNumber);
                 string unit1 = device.GetUnit(channel1);
                 string unit2 = device.GetUnit(channel2);
                 if (!string.Equals(unit1, "N", StringComparison.OrdinalIgnoreCase) ||
                     !string.Equals(unit2, "N", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
-                        "Both channels must be scaled in N (CH1=" + unit1 + ", CH2=" + unit2 + ").");
+                        "Both force channels must be scaled in N (CH" +
+                        _force1ChannelNumber + "=" + unit1 + ", CH" +
+                        _force2ChannelNumber + "=" + unit2 + ").");
                 }
 
                 measurement = new DaqMeasurement();
@@ -100,6 +106,7 @@ namespace QuantumXMonitor
 
                 OnStatus(
                     "Connected - firmware " + device.FirmwareVersion +
+                    ", CH" + _force1ChannelNumber + " + CH" + _force2ChannelNumber +
                     ", " + signal1.SampleRate.ToString("0") + " Hz");
 
                 var average1 = new RollingAverage(AverageWindowSize);

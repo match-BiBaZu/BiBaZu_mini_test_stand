@@ -1,0 +1,885 @@
+﻿// This file holds the possible settings for sample rates, filter, sensor types and scaling types for the various QuantumX module types.
+// Attention: Not all combinations are valid. Invalid combinations of settings (e.g. certain sample rate and filter frequencies) are not reflected here!
+//
+// All known sensor  types : "Bridge", "CanBus", "Counter", "Current", "CurrentProbe", "Frequency", "Iepe", "Lvdt", "NotSupported", "PiezoPassive", "Potentiometer", "Pt", "Pwm", "Resistance", "Ssi", "ThermoCouple", "Voltage", "VoltageProbe", "FbgGeneric", "FbgStrainGage", "FbgTemperature", "FbgWavelength", "FbgAccelerometer" 
+// All known filter  types : "Bessel", "Butterworth", "ButterworthFir", "LinearPhase", "NoFilter"
+// All known scaling types : "CanBus", "Gage", "Internal", "NotSupported", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" 
+//
+// Typical Bessel/Butterworth filter frequencies 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0 ,10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0
+//
+// Classic Domain specific settings:
+// Typical samplerates        : 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 48000.0, 96000.0, 192000.0
+//
+// Decimal Domain specific settings:
+// Typical samplerates for Decimal Domain: 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 50000.0, 100000.0, 200000.0
+// Typical filter frequencies for ButterworthFir : 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0
+// Typical filter frequencies for LinearPhase    : 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0
+{
+  "MinimumFirmwareVersionSupported": "4.12.14.0",
+  "Domains": [
+    {
+      "Type": "Classic",
+      "Amplifiers": [
+        {
+          "ModuleTypes": [ "Default" ],
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0, 48000.0, 96000.0, 192000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "CurrentProbe", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Pwm", "Resistance", "Ssi", "ThermoCouple", "Voltage", "VoltageProbe", "FbgGeneric", "FbgStrainGage", "FbgTemperature", "FbgWavelength", "FbgAccelerometer" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 10000, 20000, 50000, 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "SupportsChangingConnectorType": "false"
+        },
+        {
+          "ModuleTypes": [ "MX1601", "MX1601A", "MX1601B" ],
+          "JackType": "PHOENIXMX1601",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Current", "Iepe", "Voltage" ],
+          "PossibleScalingTypes": [ "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX1615", "MX1615A", "MX1615B", "MX1616", "MX1616B" ],
+          "JackType": "PHOENIXMX1615",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Potentiometer", "Resistance", "Pt", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX471", "MX471B", "MX471C", "MX471B-R", "MX471C-R" ],
+          "JackType": "SUBD9",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0, 48000.0, 96000.0, 192000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "CanBus" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 10000, 20000, 50000, 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ]
+        },
+        {
+          "ModuleTypes": [ "MX840" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 200.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "38400.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True"
+        },
+        {
+          "ModuleTypes": [ "MX840A" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 200.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "38400.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True",
+          "SupportsChangingConnectorType": "true"
+        },
+        {
+          "ModuleTypes": [ "MX840B", "MX840B-R" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 200.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "38400.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 4000.0, 6000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True",
+          "SupportsChangingConnectorType": "true"
+        },
+        {
+          "ModuleTypes": [ "MX440", "MX440A", "MX440B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 38400.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX410", "MX410A", "MX410B", "MX411", "MX411A", "MX411B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 48000.0, 96000.0, 192000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 40000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 40000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Current", "Iepe", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX460", "MX460A", "MX460B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 48000.0, 96000.0, 192000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Frequency", "Counter", "Pwm" ],
+          "PossibleScalingTypes": [ "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX1609", "MX1609A", "MX1609B", "MX1609KB" ],
+          "JackType": "THERMO",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 200.0, 300.0, 600.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "ThermoCouple" ],
+          "PossibleScalingTypes": [ "Internal" ]
+        },
+        {
+          "ModuleTypes": [ "MX403", "MX403B" ],
+          "JackType": "BANANA",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0, 48000.0, 96000.0, 192000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.1, 0.2, 0.4, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 40.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 4000.0, 5000.0, 10000.0, 20000.0, 40000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.1, 0.2, 0.4, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 40.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 4000.0, 5000.0, 10000.0, 20000.0, 40000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX809", "MX809B" ],
+          "JackType": "THERMO",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX430", "MX430B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX238", "MX238B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX590", "MX590B" ],
+          "JackType": "PRESSURE",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 60.0, 75.0, 100.0, 150.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9600.0, 19200.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100, 200, 500, 1000, 2000 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100, 200, 500, 1000, 2000 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "NotSupported" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        }
+      ]
+    },
+    {
+      "Type": "Decimal",
+      "Amplifiers": [
+        {
+          "ModuleTypes": [ "Default" ],
+          "JackType": "",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 40000.0, 50000.0, 100000.0, 200000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0, 8333.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "CurrentProbe", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Pwm", "Resistance", "Ssi", "ThermoCouple", "Voltage", "VoltageProbe" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 10000, 20000, 50000, 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "SupportsChangingConnectorType": "false"
+        },
+        {
+          "ModuleTypes": [ "MX1601", "MX1601A", "MX1601B" ],
+          "JackType": "PHOENIXMX1601",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Current", "Iepe", "Voltage" ],
+          "PossibleScalingTypes": [ "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX1615", "MX1615A", "MX1615B", "MX1616", "MX1616B" ],
+          "JackType": "PHOENIXMX1615",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Potentiometer", "Resistance", "Pt", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX471", "MX471B", "MX471C", "MX471B-R", "MX471C-R" ],
+          "JackType": "SUBD9",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 40000.0, 50000.0, 100000.0, 200000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0, 8333.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "CanBus" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 10000, 20000, 50000, 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ]
+        },
+        {
+          "ModuleTypes": [ "MXFS4", "MXFS8" ],
+          "JackType": "FIBER",
+          "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "FbgGeneric", "FbgStrainGage", "FbgTemperature", "FbgWavelength", "FbgAccelerometer" ],
+          "PossibleScalingTypes": [ "Internal" ]
+        },
+        {
+          "ModuleTypes": [ "MXFS8DI2", "MXFS8DI" ],
+          "JackType": "FIBER",
+          "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "FbgGeneric", "FbgStrainGage", "FbgTemperature", "FbgWavelength", "FbgAccelerometer" ],
+          "PossibleScalingTypes": [ "Internal" ]
+        },
+        {
+          "ModuleTypes": [ "MXFS8SI" ],
+          "JackType": "FIBER",
+          "PossibleSamplerates": [ 1.0, 2.0, 5.0, 10.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "FbgGeneric", "FbgStrainGage", "FbgTemperature", "FbgWavelength", "FbgAccelerometer" ],
+          "PossibleScalingTypes": [ "Internal" ]
+        },
+        {
+          "ModuleTypes": [ "MX840" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "40000.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True"
+        },
+        {
+          "ModuleTypes": [ "MX840A" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "40000.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True",
+          "SupportsChangingConnectorType": "true"
+        },
+        {
+          "ModuleTypes": [ "MX840B", "MX840B-R" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 40000.0 ],
+          //"PossibleFiltersForSampleRates": [{"SampleRate": "40000.0", "PossibleFilters": [{"Filtertype": "NoFilter",    "Frequencies": [ 0.0 ]}]}],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 6000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0, 1700.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "CanBus", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "CanBus", "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ],
+          "SupportedCanBitRates": [ 100000, 125000, 250000, 400000, 500000, 666666, 800000, 1000000 ],
+          "HasSupplyVoltage": "True",
+          "SupportsChangingConnectorType": "true"
+        },
+        {
+          "ModuleTypes": [ "MX440", "MX440A", "MX440B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Counter", "Current", "Frequency", "Iepe", "Lvdt", "Potentiometer", "Pt", "Resistance", "Ssi", "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX410", "MX410A", "MX410B", "MX411", "MX411A", "MX411B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 50000.0, 100000.0, 200000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 30000.0, 40000.0, 60000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 30000.0, 40000.0, 60000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0, 8333.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge", "Current", "Iepe", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX460", "MX460A", "MX460B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 50000.0, 100000.0, 200000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0, 8333.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Frequency", "Counter", "Pwm" ],
+          "PossibleScalingTypes": [ "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX1609", "MX1609A", "MX1609B", "MX1609KB" ],
+          "JackType": "THERMO",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 600.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "ThermoCouple" ],
+          "PossibleScalingTypes": [ "Internal" ]
+        },
+        {
+          "ModuleTypes": [ "MX403", "MX403B" ],
+          "JackType": "BANANA",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 25000.0, 50000.0, 100000.0, 200000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.1, 0.2, 0.4, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 40.0, 50.0, 100.0, 200.0, 400.0, 500.0, 1000.0, 2000.0, 4000.0, 5000.0, 10000.0, 20000.0, 30000, 40000, 60000 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.1, 0.2, 0.4, 0.5, 1.0, 2.0, 4.0, 5.0, 10.0, 20.0, 40.0, 50.0, 100.0, 200.0, 400.0, 500.0, 1000.0, 2000.0, 4000.0, 5000.0, 10000.0, 20000.0, 30000, 40000, 60000 ]
+            },
+            {
+              "Filtertype": "ButterworthFir",
+              "Frequencies": [ 15.0, 30.0, 75.0, 150.0, 300.0, 370.0, 750.0, 1500.0, 1700.0 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0, 8333.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX809", "MX809B" ],
+          "JackType": "THERMO",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 600.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "ThermoCouple", "Voltage" ],
+          "PossibleScalingTypes": [ "Gage", "Internal", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX430", "MX430B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 6000.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX238", "MX238B" ],
+          "JackType": "SUBD15",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "Bridge" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        },
+        {
+          "ModuleTypes": [ "MX590", "MX590B" ],
+          "JackType": "PRESSURE",
+          "PossibleSamplerates": [ 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0, 40000.0 ],
+          "PossibleFilters": [
+            {
+              "Filtertype": "NoFilter",
+              "Frequencies": [ 0.0 ]
+            },
+            {
+              "Filtertype": "Bessel",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100, 200, 500, 1000, 2000, 5000 ]
+            },
+            {
+              "Filtertype": "Butterworth",
+              "Frequencies": [ 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100, 200, 500, 1000, 2000, 5000, 6000 ]
+            },
+            {
+              "Filtertype": "LinearPhase",
+              "Frequencies": [ 33.0, 67.0, 167.0, 333.0, 667.0, 833.0, 1000.0, 1667.0, 3333.0, 6667.0 ]
+            }
+          ],
+          "PossibleSensorTypes": [ "NotSupported" ],
+          "PossibleScalingTypes": [ "Gage", "Off", "Polynomial", "Table", "TwoPoint", "ZeroSpan" ]
+        }
+      ]
+    }
+  ]
+}

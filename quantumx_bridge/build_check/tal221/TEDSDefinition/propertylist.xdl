@@ -1,0 +1,92 @@
+%ACDCCoupling; Coupling of electrical signal (AC or DC)
+%Appended_TEDS; Indicates if an appended TEDS exists.
+%Appended_TEDS_location; Indicates location of the Appended TEDS if it exists.
+%ASCIITEDS; Indicates that the next portion of the TEDS is in free form ASCII mode.
+%Attached_MfgrID; Manufacturer code of transducer attached to amplifier
+%Attached_ModelNum; Model number of transducer attached to amplifier
+%Attached_SerialNum; Serial nmber of transducer attached to amplifier
+%Attached_VersionLetter; Version letter of transducer attached to amplifier
+%Attached_VersionNum; Version number of transducer attached to amplifier
+%BridgeTopology; Topology of bridge circuit
+%BridgeType; Type of bridge (quarter, half, or full)
+%CableLen; Length of cable
+%CalCurve_Coef; Coefficient of polynomial
+%CalCurve_Domain; Indicates calibration curve domain as electrical or physical
+%CalCurve_PieceStart; Start of calibration curve segment
+%CalCurve_Power; Power of domain value
+%CalDate; The date of the last calibration
+%CalInitials; Calibration initials
+%CalPeriod; Amount of time recommended between calibrations
+%CalPoint_DomainValue; Domain calibration value
+%CalPoint_RangeValue; Range calibration deviation
+%CalTable_Domain; Indicates calibration table domain as electrical or physical
+%Ccable; Capacitance of cable
+%Ccic; Charge injection capacity (CIC) in amplifier
+%Cin; Input capacitance of amplifier
+%CJSource; Cold-junction compensation method
+%Cmic; Microphone capacitance
+%Cstray; Passive capacitance
+%Direction; Direction, or axis, of sensitivity (x, y, or z)
+%DiscSigAmpl; Discrete signal voltage amplitude
+%DiscSigType; Discrete signal type
+%ElecSigType; Type of electrical signal (enumerated)
+%Equi_Vol; Equivalent microphone volume
+%ExciteAmplMax; Excitation or power supply level, maximum
+%ExciteAmplMin; Excitation or power supply level, minimum
+%ExciteAmplNom; Excitation or power supply level, nominal
+%ExciteCurrentDraw; Maximum current required to power/excite transducer
+%ExciteFreqMax; Excitation signal frequency, maximum
+%ExciteFreqMin; Excitation signal frequency, minimum
+%ExciteFreqNom; Excitation signal frequency, nominal
+%ExciteType; Type of excitation or power (DC, AC, or bipolar DC)
+%Gain; Gain of preamplifier
+%GaugeFactor; Sensitivity of strain gauge
+%GaugeOffset; Zero offset of gauge circuit after installation
+%LoopSupplyMax; Supply for current loop transducers, maximum
+%LoopSupplyMin; Supply for current loop transducers, minimum
+%MapMeth; Mapping method of physical to electrical units
+%MaxElecVal; Maximum value of electrical signal range
+%MaxPhysVal; Maximum value of physical measurement/control range
+%MDEF; Prefix for manufacturer defined paramaters
+%MeasID; Measurement location ID
+%MinElecVal; Minimum value of electrical signal range
+%MinPhysVal; Minimum value of physical measurement/control range
+%Passive; Indicates support of passive mode
+%PhaseCorrection; Phase correction at the reference condition
+%PoissonCoef; Poisson coefficient of strain gauge
+%Prepolarized; Prepolarized (yes or no)
+%PulseMeasType; Pulse signal measurement type (frequency, period, count, etc.)
+%Reffreq; Reference frequency (f ref)
+%RefPol; Polarization
+%Refpress; Reference pressure
+%RefTemp; Reference temperature (T ref)
+%RespTime; Response time
+%Rin; Input resistance of amplifier
+%RTDCoef_A; Coefficient A of Callendar Van-Dusen equation for RTDs
+%RTDCoef_B; Coefficient B of Callendar Van-Dusen equation for RTDs
+%RTDCoef_C; Coefficient C of Callendar Van-Dusen equation for RTDs
+%RTDCoef_R0; RTD or thermistor resistance at 0 °C
+%SelfHeating; Coefficient of self-heating, intended for thermistors
+%Sens; Sensitivity of transducer
+%Sens@Ref; Sensitivity of transducer at reference conditions
+%SensorImped; Electrical impedance of sensor (of each element in case of bridge)
+%Sign; Phase Inversion (0° or 180°)
+%SteinhartA; Coefficient A of Steinhart-Hart equation for thermistors
+%SteinhartB; Coefficient B of Steinhart-Hart equation for thermistors
+%SteinhartC; Coefficient C of Steinhart-Hart equation for thermistors
+%TCType; Thermocouple calibration type (J, K, T, etc.)
+%TempCoef; Temperature coefficient
+%TF_HP_S; Single zero at 0 and a single pole (high pass filter )
+%TF_KPq; Quality factor Qp for the complex pole (Mounted quality factor)
+%TF_KPr; Complex pole at Fpres (F mounted resonance)
+%TF_KZq; Quality factor parameter Qz of a complex zero
+%TF_KZr; Complex zero
+%TF_SL; Constant relative slope
+%TF_SP; Single pole (Low pass filter of first order).
+%TF_SPm; Single pole dependent on previous property
+%TF_SZ; Single zero
+%TF_SZm; Single zero dependent on previous property
+%TF_Table_Ampl; Amplitude point value for tabular transfer function
+%TF_Table_Freq; Frequency point value for tabular transfer function
+%user; Freeform TEDS format
+%XML; XML format

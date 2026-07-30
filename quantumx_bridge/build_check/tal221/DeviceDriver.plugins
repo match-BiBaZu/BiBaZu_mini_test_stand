@@ -1,0 +1,26 @@
+// This file contains the names of the device driver assemblies
+// and the types of their ISkillReader to be used by the Common API.
+// A DeviceDriverAssembly listed here, that is not physically present, will be ignored and does not produce an error.
+// A missing, not present or invalid SkillReaderType will also be ignored and does not produce an error.
+// However - all occurring shortcomings will be logged.
+{
+  "Version": "1.0",
+  "DeviceDriverInfos": [
+    {
+      "DeviceDriverAssembly": "Hbm.Api.Mgc.dll",
+      "SkillReaderType": "Hbm.Api.Mgc.SkillReaders.MgcFileSkillReader"
+    },
+    {
+      "DeviceDriverAssembly": "Hbm.Api.Pmx.dll",
+      "SkillReaderType": "Hbm.Api.Pmx.SkillReaders.PmxFileSkillReader"
+    },
+    {
+      "DeviceDriverAssembly": "Hbm.Api.QuantumX.dll",
+      "SkillReaderType": "Hbm.Api.QuantumX.SkillReaders.QuantumXFileSkillReader"
+    },
+    {
+      "DeviceDriverAssembly": "Hbm.Api.GenericStreaming.dll",
+      "SkillReaderType": "Hbm.Api.GenericStreaming.SkillReaders.GenericStreamingFileSkillReader"
+    }
+  ]
+}

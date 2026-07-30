@@ -1,0 +1,408 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Hbm.Api.Scan</name>
+    </assembly>
+    <members>
+        <member name="T:Hbm.Api.Scan.Entities.Device">
+            <summary>
+            Device class with properties delivered by scan
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.Device.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Constructor of the device
+            </summary>
+            <param name="uuid">UUID of the device</param>
+            <param name="name">Name of the device</param>
+            <param name="type">Type of the device</param>
+            <param name="label">Label of the device</param>
+            <param name="family">Familyname of the device</param>
+            <param name="firmwareVersion">Firmware version of the device</param>
+            <param name="gatewayIp4Address">IP4 address of the device</param>
+            <param name="gatewayIp6Address">IP6 address of the device</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Uuid">
+            <summary>
+            UUID of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Name">
+            <summary>
+            Name of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Label">
+            <summary>
+            Label of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Type">
+            <summary>
+            Type of the device 
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Family">
+            <summary>
+            Family name of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.FirmwareVersion">
+            <summary>
+            Firmware version of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.GatewayIP4Address">
+            <summary>
+            Gateway IP4 address of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.GatewayIP6Address">
+            <summary>
+            Gateway IP6 address of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Interfaces">
+            <summary>
+            Network interfaces of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.Services">
+            <summary>
+            Services of the device
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Device.IsConnectable">
+            <summary>
+            Flag indicating if the device is connectable or not
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.HbmScanDll">
+            <summary>
+            Class that enables access to the c++ framework of HBM Scan functionality
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.Interface">
+            <summary>
+            Represents a network interface
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.Interface.#ctor(System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="adapterMacAddress">MAC address of the network interface</param>
+            <param name="name">Name of the network interface </param>
+            <param name="type">Type of the network interface</param>
+            <param name="configurationMethod">Configuration method of the interface (e.g. DHCP)</param>
+            <param name="description">Descreiption of the interface</param>
+            <param name="routerUuid">Router UUID</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.AdapterMacAddress">
+            <summary>
+            Mac address of the inteface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.Name">
+            <summary>
+            Name of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.Type">
+            <summary>
+            Type of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.ConfigurationMethod">
+            <summary>
+            Configuration methode that is used for the interface (e.g. DHCP or static)
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.Description">
+            <summary>
+            Description of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.RouterUUID">
+            <summary>
+            Router UUID of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.Ip4Addresses">
+            <summary>
+            IP4 addresses of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.Ip6Addresses">
+            <summary>
+            IP6 addresses of the interface
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Interface.IsConnectable">
+            <summary>
+            Gets or sets a value indicating whether this instance is connectable.
+            </summary>
+            <value>
+              <c>true</c> if this instance is connectable; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.Ip4Address">
+            <summary>
+            Represents an IP4 address
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.Ip4Address.#ctor(System.String,System.String)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="ipAddress">IP4 address </param>
+            <param name="subnetMask">Subnet mask of IP4 address</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Ip4Address.IpAddress">
+            <summary>
+            IP4 address (e.g. 172.19.123.212)
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Ip4Address.SubnetMask">
+            <summary>
+            Subnet mask of IP4 address (e.g. 255.255.0.0)
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.Ip6Address">
+            <summary>
+            Represents an IP6 address
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.Ip6Address.#ctor(System.String,System.String,System.UInt32)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="ipAddress">IP6 address</param>
+            <param name="subnetMask">Subnet mask of IP6 address</param>
+            <param name="prefix">Prefix</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Ip6Address.IpAddress">
+            <summary>
+            IP6 address (e.g. 2001:db8:0:8d3:0:8a2e:70:7344 )
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Ip6Address.SubnetMask">
+            <summary>
+            Subnet mask of IP6 address
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Ip6Address.Prefix">
+            <summary>
+            Prefix (defines the part of the subnet of the IPV6 address)
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.NetworkAdapter">
+            <summary>
+            Represents a network adapter
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.NetworkAdapter.#ctor(System.UInt64,System.String,System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="macAddress">MAC address of network adapter</param>
+            <param name="macAddressString">MAC address of network adapter as string</param>
+            <param name="name">Name of the network adapter</param>
+            <param name="description">Description of the network adapter</param>
+            <param name="friendlyName">Friendly name of the adapter</param>
+            <param name="active">True if the adapter is activated</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.MacAddress">
+            <summary>
+            MAC address of the network adapter
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.MacAddressString">
+            <summary>
+            MAC address of the network adapter as string
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.Name">
+            <summary>
+            Name of the network adapter
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.Description">
+            <summary>
+            Description for the network adapter
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.FriendlyName">
+            <summary>
+            Friendly name of the network adapter
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.Active">
+            <summary>
+            True if network adapter is activated
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.ScanAddresses">
+            <summary>
+            IP4 addresses used by the network adapter
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.NetworkAdapter.ScanAddressesV6">
+            <summary>
+            IP6 addresses used by the network adapter
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.NetworkChangeFailedException.#ctor">
+            <summary>
+            Creates a new instance of the class.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.NetworkChangeFailedException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">The message of the error.</param>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.NetworkChangeFailedException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">The message of the error.</param>
+            <param name="inner">The inner exception that caused the error.</param>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.ScanFailedException">
+            <summary>
+            This exception indicates that the scan for devices failed
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.ScanFailedException.#ctor">
+            <summary>
+            Creates a new instance of the class.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.ScanFailedException.#ctor(System.String)">
+            <summary>
+            Creates a new instance using the given error message.
+            </summary>
+            <param name="message">The message of the error.</param>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.ScanFailedException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new instance using the given error message and the inner exception.
+            </summary>
+            <param name="message">The message of the error.</param>
+            <param name="inner">The inner exception that caused the error.</param>
+        </member>
+        <member name="T:Hbm.Api.Scan.Entities.Service">
+            <summary>
+            Represents a service 
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Entities.Service.#ctor(System.String,System.UInt16,System.UInt16)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="type">Type of the service</param>
+            <param name="port">Port of the service</param>
+            <param name="interfaceIndex">Interface index of the service</param>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Service.Type">
+            <summary>
+            Type of the service
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Service.Port">
+            <summary>
+            Port at which the service is available
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Scan.Entities.Service.InterfaceIndex">
+            <summary>
+            Interface index of the service
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Scan.Scan">
+            <summary>
+            Class uses common HBM scan to find devices connected to Ethernet.
+            At present PMX and QX devices can be found (DMP will follow).
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.#cctor">
+            <summary>
+            Constructor 
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.Init">
+            <summary>
+            Initializes the scan
+            </summary>
+            <exception cref="T:Hbm.Api.Scan.Entities.ScanFailedException">Thrown if HBM_Scan_Init or HBM_Scan_StartServersAll fail.</exception>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.Exit">
+            <summary>
+            Cleans up the running threads in scan dll...
+            Call this function before closing main application
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.ScanForDevices(System.String,System.Boolean)">
+            <summary>
+            Function executes a scan over all network interfaces (network adapters).
+            </summary>
+            <param name="deviceFamily">Device family to scan for. Scan returns only devices of this family (e.g. "QuantumX" or "PMX"). To get devices of all families, set DeviceFamily=""</param>
+            <param name="detectUnconnectableDevices">If set to <c>true</c> excludes unconnectable devices.</param>
+            <returns>
+            List of devices that have been found.
+            </returns>
+            <exception cref="T:Hbm.Api.Scan.Entities.ScanFailedException">Problems during scan! Errornumber=" + lastResult.ToString() + "  " + ex.Message</exception>
+            <exception cref="T:Hbm.Api.Scan.Entities.ScanFailedException">Thrown if errors during scan occur.</exception>
+            <remarks>
+            Devices that are not reachable (due to incompatible ip settings) will also be returned!
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.ScanForConnectableDevices(System.String)">
+            <summary>
+            Function executes a scan over all network interfaces (network adapters).
+            </summary>
+            <param name="deviceFamily">Device family to scan for. Scan returns only devices of this family (e.g. "QuantumX" or "PMX"). To get devices of all families, set DeviceFamily=""</param>
+            <returns>List of connectable devices that have been found.</returns>
+            <remarks>Devices that are found by scan but not reachable (due to incompatible IP settings) will not be returned!</remarks>
+            <exception cref="T:Hbm.Api.Scan.Entities.ScanFailedException">Thrown if errors during scan occur.</exception>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.ChangeDeviceIpAddress(System.String,System.Boolean,System.String,System.String)">
+            <summary>
+            Changes the ipAdress of a device
+            </summary>
+            <param name="serialNumber">Serial number of the device, required for the scan dll</param>
+            <param name="isDhcp">indicator if it is an automatic or manual network assignment</param>
+            <param name="ipAddress">ipAddress to apply</param>
+            <param name="subnetMask">subnetMask</param>
+            <exception cref="T:Hbm.Api.Scan.Entities.NetworkChangeFailedException">
+            Problems during scan! Assingn device interface failed Errornumber = " + lastResult.ToString() + "  " + ex.Message
+            </exception>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.ScanForNetworkAdapters">
+            <summary>
+            Function returns a list of network adapters (only activated adapters!)
+            </summary>
+            <returns>List of active network adapters of the PC</returns>
+            <exception cref="T:Hbm.Api.Scan.Entities.ScanFailedException">Thrown if errors during scan for network adapters occur.</exception>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.DetectUnconnectableDevicesAndInterfaces(System.Collections.Generic.List{Hbm.Api.Scan.Entities.Device},System.Collections.Generic.List{Hbm.Api.Scan.Entities.NetworkAdapter},System.Boolean)">
+            <summary>
+            Flags the devices that are not connectable to any of the given list of network adapters
+            </summary>
+            <param name="listOfDevices">Devices to check for connectivity</param>
+            <param name="listOfNetworkAdapters">List of available network adpaters, that could be used to connect the given list of devices</param>
+            <param name="deleteNonConnectableDevices">if set to <c>true</c> [delete non connectable devices].</param>
+        </member>
+        <member name="M:Hbm.Api.Scan.Scan.IsIp4AddressConnectable(Hbm.Api.Scan.Entities.Ip4Address,System.String,System.Collections.Generic.List{Hbm.Api.Scan.Entities.NetworkAdapter})">
+            <summary>
+            Function checks if the given IPAddress, SubnetMask and MacAddress fits to any of the given network adapters
+            </summary>
+            <param name="ip4Address">IPAddress of a device to check for connectivity</param>
+            <param name="adapterMacAddress">Mac address of the device network adapter</param>
+            <param name="listOfNetworkAdapters">List of network adapters of the PC</param>
+            <returns>True, if IPAddress is connectable from any network adapter</returns>
+        </member>
+    </members>
+</doc>

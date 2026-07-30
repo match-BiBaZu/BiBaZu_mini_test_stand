@@ -1,0 +1,586 @@
+TEMPLATE 31,8,2,"HBM Signal Conditioning"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 2 is the decimal value of this template ID.
+  //created: 12. June 2003 by Jochen Schneider, HBM
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT HBM Template
+ABSTRACT to specify signal conditioning parameters
+SPACING
+
+ENUMERATE FiltTypeEnum, "Butterworth","Bessel"
+
+SELECTCASE "LowpassFilter", USR, 1
+  CASE "not defined", 0
+  ENDCASE
+  CASE "defined", 1
+    %MDEF_FilterCharacteristicsLP, "Lowpass Filter Characteristics", USR, 4, FiltTypeEnum, "e",""
+    %MDEF_FilterFrequencyLP, "Lowpass Filter Frequency", USR, 32, SINGLE,"0.000p","Hz"
+  ENDCASE
+ENDSELECT
+SELECTCASE "HighpassFilter", USR, 1
+  CASE "not defined", 0
+  ENDCASE
+  CASE "defined", 1
+    %MDEF_FilterFrequencyHP, "Highpass Filter Frequency", USR, 32, SINGLE,"0.000p","Hz"
+  ENDCASE
+ENDSELECT
+SELECTCASE "Zero Compensation", USR, 1
+  CASE "not defined", 0
+  ENDCASE
+  CASE "defined", 1
+    %MDEF_CDVValue, "Zero Compensation Value", USR, 32, SINGLE,"0.000p","phys. Unit"
+  ENDCASE
+ENDSELECT
+SELECTCASE "Tara Compensation", USR, 1
+  CASE "not defined", 0
+  ENDCASE
+  CASE "defined", 1
+    %MDEF_TaraValue, "Tara Value", USR, 32, SINGLE,"0.000p","phys. Unit"
+  ENDCASE
+ENDSELECT
+ENDTEMPLATE
+
+TEMPLATE 31,8,3,"HBM Unit Conversion"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 3 is the decimal value of this template ID.
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT HBM Template
+ABSTRACT to specify signal conditioning parameters
+SPACING
+%MDEF_ConversionUnit, "ConversionUnit", USR, 56, ASCII,"s",""
+%MDEF_UnitconversionFactor, "Unit Conversion Factor", USR, 32, SINGLE,"0.000000p",""
+ENDTEMPLATE
+
+TEMPLATE 31,8,7,"HBM Channel Name"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 2 is the decimal value of this template ID.
+  //created: 12. June 2003 by Jochen Schneider, HBM
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT IEEE P1451.4 HBM Template
+ABSTRACT For Adding User Comment (up to 45 char) to Channel
+SPACING
+
+%MDEF_Ucc, "Channel name", USR, 315, ASCII,"s",""
+
+ENDTEMPLATE
+
+TEMPLATE 31,8,8,"HBM Pressure"
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 1 is the decimal value of this template ID.
+  //created: 25. April 2003 by Jochen Schneider, HBM
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT IEEE P1451.4 HBM Pressure
+ABSTRACT For pressure sensors
+SPACING
+ 
+%MDEF_MaxPressure, "Maximum pressure", ID, 32, SINGLE,"0.000p","bar"
+ 
+ENUMERATE PressureTypeEnum, "absolute", "relative"
+%MDEF_PressureType, "Pressure type", USR, 2, PressureTypeEnum, "", ""
+
+ENDTEMPLATE
+
+TEMPLATE 31,8,10,"HBM Frequency/Pulse Sensor"
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 10 is the decimal value of this template ID.
+  //created: 25. April 2003 by Jochen Schneider, HBM
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT IEEE P1451.4 HBM Frequency/Pulse Sensor
+ABSTRACT For sensors that linearly convert a physical measurand to a frequency/pulse count
+SPACING
+
+//Physical Base Units: (ratio, radian, steradian, meter, kg, sec, Ampere, kelvin, mole, candela, scaling, offset)
+PHYSICAL_UNIT "K",          (0, 0,0, 0,0, 0, 0,1,0,0,1,0)          // Temperature: base SI unit is kelvin
+PHYSICAL_UNIT "°C",         (0, 0,0, 0,0, 0, 0,1,0,0,1,-273.15)    // Celsius is (kelvin - 273.15 K)
+PHYSICAL_UNIT "strain",     (1, 0,0, 1,0, 0, 0,0,0,0,1,0)          // Strain: equals meter/meter
+PHYSICAL_UNIT "microstrain",(1, 0,0, 1,0, 0, 0,0,0,0,1e-6,0)       // microstrain = 10^(-6) x strain
+PHYSICAL_UNIT "N",          (0, 0,0, 1,1,-2, 0,0,0,0,1,0)          // Force: Newton equals m*kg/s²   
+PHYSICAL_UNIT "lb",         (0, 0,0, 1,1,-2, 0,0,0,0,4.44822,0)    // pound is 4.44822 x Newton
+PHYSICAL_UNIT "kgf",        (0, 0,0, 1,1,-2, 0,0,0,0,9.80665,0)    // kilogram-force (kilopond) is 9.80665 x Newton
+PHYSICAL_UNIT "m/s²",       (0, 0,0, 1,0,-2, 0,0,0,0,1,0)          // Acceleration: m/s² 
+PHYSICAL_UNIT "ga",         (0, 0,0, 1,0,-2, 0,0,0,0,9.80665,0)    // ga = 9.80665 m/s²
+PHYSICAL_UNIT "Nm/radian",  (0,-1,0, 2,1,-2, 0,0,0,0,1,0)          // Torque: Nom/rad equals m²*kg/(s²*rad)
+PHYSICAL_UNIT "Nm",         (0, 0,0, 2,1,-2, 0,0,0,0,1,0)          // real Nm!!!
+PHYSICAL_UNIT "oz-in",      (0,-1,0, 2,1,-2, 0,0,0,0,0.00706155,0) // oz-in is 0.00706155 Nm
+PHYSICAL_UNIT "Pa",         (0, 0,0,-1,1,-2, 0,0,0,0,1,0)          // Pressure: Pascal equals Newton/m² = kg/(m*s²)
+PHYSICAL_UNIT "PSI",        (0, 0,0,-1,1,-2, 0,0,0,0,6894.757,0)   // Pounds per Square Inch = 6894.757 Pa
+PHYSICAL_UNIT "kg",         (0, 0,0, 0,1, 0, 0,0,0,0,1,0)          // Mass:  base SI unit is kilogram
+PHYSICAL_UNIT "g",          (0, 0,0, 0,1, 0, 0,0,0,0,0.001,0)      // gram = 0.001 kg
+PHYSICAL_UNIT "m",          (0, 0,0, 1,0, 0, 0,0,0,0,1,0)          // Distance:  base SI unit is meter
+PHYSICAL_UNIT "mm",         (0, 0,0, 1,0, 0, 0,0,0,0,0.001,0)      // millimeter = 0.001 m
+PHYSICAL_UNIT "in",         (0, 0,0, 1,0, 0, 0,0,0,0,0.0254,0)     // inches = 0.0254 m
+PHYSICAL_UNIT "m/s",        (0, 0,0, 1,0,-1, 0,0,0,0,1,0)          // Velocity: Preferred SI unit is meter/second
+PHYSICAL_UNIT "mph",        (0, 0,0, 1,0,-1, 0,0,0,0,0.44704,0)    // miles per hour = 0.44704 m/s
+PHYSICAL_UNIT "fps",        (0, 0,0, 1,0,-1, 0,0,0,0,0.3048,0)     // feet per second = 0.3048 m/s
+PHYSICAL_UNIT "radian",     (0, 1,0, 0,0, 0, 0,0,0,0,1,0)          // Angular position: base SI unit is radian
+PHYSICAL_UNIT "degrees",    (0, 1,0, 0,0, 0, 0,0,0,0,0.0174533,0)  // degrees = 0.0174533 radians
+PHYSICAL_UNIT "radian/s",   (0, 1,0, 0,0,-1, 0,0,0,0,1,0)          // Angular velocity: preferred SI unit is radian/s
+PHYSICAL_UNIT "rpm",        (0, 1,0, 0,0,-1, 0,0,0,0,0.104720,0)   // rev. per minute = 0.104720 radian/s
+PHYSICAL_UNIT "Hz",         (0, 0,0, 0,0,-1, 0,0,0,0,1,0)          // Frequency: Hertz = 1/second
+PHYSICAL_UNIT "kg/m³",      (0, 0,0,-3,1, 0, 0,0,0,0,1,0)          // Density: kg/m³
+PHYSICAL_UNIT "g/l",        (0, 0,0,-3,1, 0, 0,0,0,0,1,0)          // gram per liter equals kg/m³ 
+PHYSICAL_UNIT "mole/m³",    (0, 0,0,-3,0, 0, 0,0,1,0,1,0)          // Molar concentration: preferred SI unit is mole/m³
+PHYSICAL_UNIT "mole/l",     (0, 0,0,-3,0, 0, 0,0,1,0,1000,0)       // mole per liter = 1000 mole/m³
+PHYSICAL_UNIT "m³/m³",      (1, 0,0, 3,0, 0, 0,0,0,0,1,0)          // Volumetric concentration: base SI unit is m³/m³
+PHYSICAL_UNIT "l/l",        (1, 0,0, 3,0, 0, 0,0,0,0,1,0)          // liter per liter equals m³/m³
+PHYSICAL_UNIT "kg/s",       (0, 0,0, 0,1,-1, 0,0,0,0,1,0)          // Mass Flow:  preferred SI unit is kg/s
+PHYSICAL_UNIT "m³/s",       (0, 0,0, 3,0,-1, 0,0,0,0,1,0)          // Volumetric Flow: preferred SI unit is m³/s
+PHYSICAL_UNIT "m³/hr",      (0, 0,0, 3,0,-1, 0,0,0,0,3600,0)       // m³ per hour = 3600 m³/s
+PHYSICAL_UNIT "gpm",        (0, 0,0, 3,0,-1, 0,0,0,0,6.30902e-5,0) // gallons(US) per minute = 6.30902e-5 m³/s
+PHYSICAL_UNIT "cfm",        (0, 0,0, 3,0,-1, 0,0,0,0,4.71947e-4,0) // cubic feet per minute = 4.71947e-4 m³/s
+PHYSICAL_UNIT "l/min",      (0, 0,0, 3,0,-1, 0,0,0,0,1.66667e-5,0) // liters per minute = 1.66667e-5 m³/s
+PHYSICAL_UNIT "RH",         (1, 0,0,-3,1, 0, 0,0,0,0,1,0)          // Relative Humidity: = (kg/m³)/(kg/m³)
+PHYSICAL_UNIT "%",          (1, 0,0, 0,0, 0, 0,0,0,0,100,0)        // Dimensionless Ratio: percent 
+PHYSICAL_UNIT "Ohm",        (0, 0,0, 2,1,-3,-2,0,0,0,1,0)          // Resistance: Ohm equals m²*kg/(s³*A²)
+PHYSICAL_UNIT "V",          (0, 0,0, 2,1,-3,-1,0,0,0,1,0)          // Voltage: Volts equals m²*kg/(sec³*A)
+PHYSICAL_UNIT "A",          (0, 0,0, 0,0, 0, 1,0,0,0,1,0)          // Current: base SI unit is Ampere
+PHYSICAL_UNIT "mA",         (0, 0,0, 0,0, 0, 1,0,0,0,0.001,0)      // milliAmpere = 0.001 x Ampere
+PHYSICAL_UNIT "sec",        (0, 0,0, 0,0, 1, 0,0,0,0,1,0)          // Time: base SI unit is seconds
+PHYSICAL_UNIT "ms",         (0, 0,0, 0,0, 1, 0,0,0,0,1.0e-03,0)    // Time: is a thousandth (1/1000) of a second
+PHYSICAL_UNIT "days",       (0,0,0,0,0,1,0,0,0,0,86400,0)          // Time: Days = 86400 seconds  
+PHYSICAL_UNIT "Imp",        (0,0,0,0,0,0,0,0,0,0,1,0)              // Impulses
+PHYSICAL_UNIT "kImp",       (0,0,0,0,0,0,0,0,0,0,1e3,0)            // kilo Impulses
+
+ENUMERATE ElecSigTypeEnum,"Voltage Sensor","Current Sensor","Resistance Sensor","Bridge Sensor","LVDT Sensor","Potentiometric Voltage Divider Sensor","Pulse Sensor","Voltage Actuator","Current Actuator","Pulse Actuator"
+%ElecSigType, "Transducer Electrical Signal Type", ID, 0, ElecSigTypeEnum,"e","" = "Pulse Sensor"
+
+SELECTCASE "Physical Measurand", ID, 6
+  CASE "Temperature (kelvin)", 0
+    %MinPhysVal, "Minimum Temperature", CAL, 32, SINGLE, "0.000p", "K"
+    %MaxPhysVal, "Maximum Temperature", CAL, 32, SINGLE, "0.000p", "K"
+  ENDCASE
+  CASE "Temperature (Celsius)", 1
+    %MinPhysVal, "Minimum Temperature", CAL, 32, SINGLE, "0.000p", "°C"
+    %MaxPhysVal, "Maximum Temperature", CAL, 32, SINGLE, "0.000p", "°C"
+  ENDCASE
+  CASE "Strain", 2
+    %MinPhysVal, "Minimum Strain", CAL, 32, SINGLE, "0.000p", "strain"
+    %MaxPhysVal, "Maximum Strain", CAL, 32, SINGLE, "0.000p", "strain"
+  ENDCASE
+  CASE "microstrain", 3
+    %MinPhysVal, "Minimum Strain", CAL, 32, SINGLE, "0.000E+0", "microstrain"
+    %MaxPhysVal, "Maximum Strain", CAL, 32, SINGLE, "0.000E+0", "microstrain"
+  ENDCASE
+  CASE "Force/Weight (Newton)", 4
+    %MinPhysVal, "Minimum Force/Weight", CAL, 32, SINGLE, "0.000p", "N"
+    %MaxPhysVal, "Maximum Force/weight", CAL, 32, SINGLE, "0.000p", "N"
+  ENDCASE
+  CASE "Force/Weight (pounds)", 5
+    %MinPhysVal, "Minimum Force/Weight", CAL, 32, SINGLE, "0.000E+0", "lb"
+    %MaxPhysVal, "Maximum Force/weight", CAL, 32, SINGLE, "0.000E+0", "lb"
+  ENDCASE
+  CASE "Force/Weight (kilogram-force/kilopond)", 6
+    %MinPhysVal, "Minimum Force/Weight", CAL, 32, SINGLE, "0.000E+0", "kgf"
+    %MaxPhysVal, "Maximum Force/weight", CAL, 32, SINGLE, "0.000E+0", "kgf"
+  ENDCASE
+  CASE "Acceleration (m/s²)", 7
+    %MinPhysVal, "Minimum Acceleration", CAL, 32, SINGLE, "0.000E+0", "m/s²"
+    %MaxPhysVal, "Maximum Acceleration", CAL, 32, SINGLE, "0.000E+0", "m/s²"
+  ENDCASE
+  CASE "Acceleration (g)", 8
+    %MinPhysVal, "Minimum Acceleration", CAL, 32, SINGLE, "0.000E+0", "ga"
+    %MaxPhysVal, "Maximum Acceleration", CAL, 32, SINGLE, "0.000E+0", "ga"
+  ENDCASE
+  CASE "Torque (Nm/radian)", 9
+    %MinPhysVal, "Minimum Torque", CAL, 32, SINGLE, "0.000E+0", "Nm/radian"
+    %MaxPhysVal, "Maximum Torque", CAL, 32, SINGLE, "0.000E+0", "Nm/radian"
+  ENDCASE
+  CASE "Torque (Nm)", 10
+    %MinPhysVal, "Minimum Torque", CAL, 32, SINGLE, "0.000E+0", "Nm"
+    %MaxPhysVal, "Maximum Torque", CAL, 32, SINGLE, "0.000E+0", "Nm"
+  ENDCASE
+  CASE "Torque (oz-in)", 11
+    %MinPhysVal, "Minimum Torque", CAL, 32, SINGLE, "0.000E+0", "oz-in"
+    %MaxPhysVal, "Maximum Torque", CAL, 32, SINGLE, "0.000E+0", "oz-in"
+  ENDCASE
+  CASE "Pressure (Pascal)", 12
+    %MinPhysVal, "Minimum Pressure", CAL, 32, SINGLE, "0.000p", "Pa"
+    %MaxPhysVal, "Maximum Pressure", CAL, 32, SINGLE, "0.000p", "Pa"
+  ENDCASE
+  CASE "Pressure (PSI)", 13
+    %MinPhysVal, "Minimum Pressure", CAL, 32, SINGLE, "0.000E+0", "PSI"
+    %MaxPhysVal, "Maximum Pressure", CAL, 32, SINGLE, "0.000E+0", "PSI"
+  ENDCASE
+  CASE "Mass (kg)", 14
+    %MinPhysVal, "Minimum Mass", CAL, 32, SINGLE, "0.000E+0", "kg"
+    %MaxPhysVal, "Maximum Mass", CAL, 32, SINGLE, "0.000E+0", "kg"
+  ENDCASE
+  CASE "Mass (g)", 15
+    %MinPhysVal, "Minimum Mass", CAL, 32, SINGLE, "0.000p", "g"
+    %MaxPhysVal, "Maximum Mass", CAL, 32, SINGLE, "0.000p", "g"
+  ENDCASE
+  CASE "Distance (m)", 16
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000p", "m"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000p", "m"
+  ENDCASE
+  CASE "Distance (mm)", 17
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000E+0", "mm"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000E+0", "mm"
+  ENDCASE
+  CASE "Distance (inches)", 18
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000E+0", "in"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000E+0", "in"
+  ENDCASE
+  CASE "Velocity (m/s)", 19
+    %MinPhysVal, "Minimum Velocity", CAL, 32, SINGLE, "0.000p", "m/s"
+    %MaxPhysVal, "Maximum Velocity", CAL, 32, SINGLE, "0.000p", "m/s"
+  ENDCASE
+  CASE "Velocity (mph)", 20
+    %MinPhysVal, "Minimum Velocity", CAL, 32, SINGLE, "0.000E+0", "mph"
+    %MaxPhysVal, "Maximum Velocity", CAL, 32, SINGLE, "0.000E+0", "mph"
+  ENDCASE
+  CASE "Velocity (fps)", 21
+    %MinPhysVal, "Minimum Velocity", CAL, 32, SINGLE, "0.000E+0", "fps"
+    %MaxPhysVal, "Maximum Velocity", CAL, 32, SINGLE, "0.000E+0", "fps"
+  ENDCASE
+  CASE "Angular Position (radian)", 22
+    %MinPhysVal, "Minimum Position", CAL, 32, SINGLE, "0.000E+0", "radian"
+    %MaxPhysVal, "Maximum Position", CAL, 32, SINGLE, "0.000E+0", "radian"
+  ENDCASE
+  CASE "Angular Position (degrees)", 23
+    %MinPhysVal, "Minimum Position", CAL, 32, SINGLE, "0.000E+0", "degrees"
+    %MaxPhysVal, "Maximum Position", CAL, 32, SINGLE, "0.000E+0", "degrees"
+  ENDCASE
+  CASE "Rotational Velocity (radian/s)", 24
+    %MinPhysVal, "Minimum Velocity", CAL, 32, SINGLE, "0.000E+0", "radian/s"
+    %MaxPhysVal, "Maximum Velocity", CAL, 32, SINGLE, "0.000E+0", "radian/s"
+  ENDCASE
+  CASE "Rotational Velocity (rpm)", 25
+    %MinPhysVal, "Minimum Velocity", CAL, 32, SINGLE, "0.000E+0", "rpm"
+    %MaxPhysVal, "Maximum Velocity", CAL, 32, SINGLE, "0.000E+0", "rpm"
+  ENDCASE
+  CASE "Frequency", 26
+    %MinPhysVal, "Minimum Frequency", CAL, 32, SINGLE, "0.000p", "Hz"
+    %MaxPhysVal, "Maximum Frequency", CAL, 32, SINGLE, "0.000p", "Hz"
+  ENDCASE
+  CASE "Concentration (gram/liter)", 27
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000p", "g/l"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000p", "g/l"
+  ENDCASE
+  CASE "Concentration (kg/liter)", 28
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000E+0", "kg/m³"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000E+0", "kg/m³"
+  ENDCASE
+  CASE "Molar Concentration (mole/m³)", 29
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000E+0", "mole/m³"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000E+0", "mole/m³"
+  ENDCASE
+  CASE "Molar Concentration (mole/l)", 30
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000E+0", "mole/l"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000E+0", "mole/l"
+  ENDCASE
+  CASE "Volumetric Concentration (m³/m³)", 31
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000E+0", "m³/m³"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000E+0", "m³/m³"
+  ENDCASE
+  CASE "Volumetric Concentration (l/l)", 32
+    %MinPhysVal, "Minimum Concentration", CAL, 32, SINGLE, "0.000p", "l/l"
+    %MaxPhysVal, "Maximum Concentration", CAL, 32, SINGLE, "0.000p", "l/l"
+  ENDCASE
+  CASE "Mass Flow", 33
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000E+0", "kg/s"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000E+0", "kg/s"
+  ENDCASE
+  CASE "Volumetric Flow (m³/s)", 34
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000E+0", "m³/s"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000E+0", "m³/s"
+  ENDCASE
+  CASE "Volumetric Flow (m³/hr)", 35
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000E+0", "m³/hr"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000E+0", "m³/hr"
+  ENDCASE
+  CASE "Volumetric Flow (gpm)", 36
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000E+0", "gpm"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000E+0", "gpm"
+  ENDCASE
+  CASE "Volumetric Flow (cfm)", 37
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000E+0", "cfm"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000E+0", "cfm"
+  ENDCASE
+  CASE "Volumetric Flow (l/min)", 38
+    %MinPhysVal, "Minimum Flow", CAL, 32, SINGLE, "0.000p", "l/min"
+    %MaxPhysVal, "Maximum Flow", CAL, 32, SINGLE, "0.000p", "l/min"
+  ENDCASE
+  CASE "Relative Humidity", 39
+    %MinPhysVal, "Minimum Relative Humidity", CAL, 32, SINGLE, "0.0000", "RH"
+    %MaxPhysVal, "Maximum Relative Humidity", CAL, 32, SINGLE, "0.0000", "RH"
+  ENDCASE
+  CASE "Ratio (percent)", 40
+    %MinPhysVal, "Maximum Percentage", CAL, 32, SINGLE, "0.0000", "%"
+    %MaxPhysVal, "Minimum Percentage", CAL, 32, SINGLE, "0.0000", "%"
+  ENDCASE
+  CASE "Time (seconds)", 41
+    %MinPhysVal, "Maximum seconds", CAL, 32, SINGLE, "0.0000p", "sec"
+    %MaxPhysVal, "Minimum seconds", CAL, 32, SINGLE, "0.0000p", "sec"
+  ENDCASE
+  CASE "Time (milliseconds)", 42
+    %MinPhysVal, "Maximum milliseconds", CAL, 32, SINGLE, "0.0000p", "ms"
+    %MaxPhysVal, "Minimum milliseconds", CAL, 32, SINGLE, "0.0000p", "ms"
+  ENDCASE
+  CASE "Impulses (Imp)", 43
+    %MinPhysVal, "Maximum impulses (Imp)", CAL, 32, SINGLE, "0.0000p", "Imp"
+    %MaxPhysVal, "Minimum impulses (Imp)", CAL, 32, SINGLE, "0.0000p", "Imp"
+  ENDCASE
+  CASE "Impulses (kImp)", 44
+    %MinPhysVal, "Maximum impulses (kImp)", CAL, 32, SINGLE, "0.0000p", "kImp"
+    %MaxPhysVal, "Minimum impulses (kImp)", CAL, 32, SINGLE, "0.0000p", "kImp"
+  ENDCASE
+ENDSELECT
+
+ENUMERATE PulseTypeEnum, "Frequency", "Period", "On time", "Off time", "Duty cycle", "Count"
+
+SELECTCASE "Pulse Measurement Type", ID, 3
+  CASE "Frequency",0
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "Frequency"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "16 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "Hz"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "Hz"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "Hz"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "Hz"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.00000p", "Hz"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.00000p", "Hz"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+  CASE "Period",1
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "Period"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "16 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+  CASE "On time",2
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "On time"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "16 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+  CASE "Off time",3
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "Off time"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "16 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "ms"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "ms"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.00000p", "ms"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+  CASE "Duty cycle",4
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "Duty cycle"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "16 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "%"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 16, ConRes, -32767, 1, "#0", "%"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "%"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -838860, 0.1, "#0.0", "%"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.00000p", "%"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.00000p", "%"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+  CASE "Count", 5
+    %PulseMeasType, "Pulse Measurement Type", ID, 0, PulseTypeEnum,"e","" = "Count"
+    SELECTCASE "Full Scale Electrical Value precision", CAL, 2
+      CASE "14 Bit Precision", 0
+        %MinElecVal, "Minimum Electrical Value", CAL, 14, ConRes, -8191, 1, "#0", "Imp"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 14, ConRes, -8191, 1, "#0", "Imp"
+      ENDCASE
+      CASE "24 Bit Precision", 1
+        %MinElecVal, "Minimum Electrical Value", CAL, 24, ConRes, -8388607, 1, "#0", "Imp"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 24, ConRes, -8388607, 1, "#0", "Imp"
+      ENDCASE
+      CASE "SINGLE Precision", 2
+        %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "#0.0", "Imp"
+        %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "#0.0", "Imp"
+      ENDCASE
+    ENDSELECT
+  ENDCASE
+ENDSELECT
+ENUMERATE MapMethEnum, "Linear","Inverse m/(x+b)","Inverse (b+m/x)","Thermocouple","Thermistor","RTD","Bridge"
+%MapMeth, "Mapping Method", ID, 0, MapMethEnum,"e","" = "Linear"
+
+ENUMERATE DiscSigEnum,"Contact to Gnd","Contact to Power","Active Low","Active High","Bipolar"
+%DiscSigType, "Discrete Signal Type", ID, 3,DiscSigEnum,"e", ""
+%DiscSigAmpl, "Discrete Signal Amplitude", ID, 5 ,ConRelRes, 0.001, 0.2, "rp", "V"
+ENUMERATE SigConfigEnum, "single", "double 90 degree", "double phase plus zero index", "single phase plus zero index", "double 90 degree quad freq", "double phase plus zero index quad freq", "double static", "double static plus zero index"
+%MDEF_DiscSigConfig, "Discrete Signal Configuration", ID, 3, SigConfigEnum, "e", ""
+
+%RespTime, "Transducer Response Time", ID, 6, ConRelRes, 1E-6, 0.146, "rp", "seconds"
+
+%ExciteAmplNom, "Excitation level, nominal", ID, 9, ConRes, 0.1, 0.1,"#0.0", "V"
+%ExciteAmplMin,   "Excitation level, min.", ID, 9, ConRes, 0.1, 0.1, "#0.0", "V"
+%ExciteAmplMax,   "Excitation level, max.",ID, 9, ConRes, 0.1, 0.1, "#0.0", "V"
+ENUMERATE ExciteTypeEnum, "DC", "Bipolar DC", "AC (rms)"
+%ExciteType, "Excitation Voltage Type", ID, 2, ExciteTypeEnum, "e", ""
+%ExciteCurrentDraw, "Excitation Current Draw", ID, 5, ConRelRes, 0.0001, 1,"rp","A"
+
+%CalDate, "Calibration Date", CAL, 16, DATE,"d-mmm-yyyy",""
+%CalInitials, "Calibration Initials", CAL, 15, CHR5,"s",""
+%CalPeriod, "Calibration Period (Days)", CAL, 12, UNINT, "0", "days"
+
+%MeasID, "Measurement location ID", USR, 11, UNINT,"###0", ""
+
+ENDTEMPLATE
+
+TEMPLATE 31,8,11,"HBM Inductive Displacement Transducer"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 11 is the decimal value of this template ID.
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT HBM Template
+ABSTRACT for inductive bridge displacement transducers 
+SPACING
+
+//Physical Base Units: (ratio, radian, steradian, meter, kg, sec, Ampere, kelvin, mole, candela, scaling, offset)
+
+PHYSICAL_UNIT "m",       (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1,0)         // Distance:  base SI unit is meter
+PHYSICAL_UNIT "mm",      (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.001,0)     // millimeter = 0.001 m
+PHYSICAL_UNIT "in",      (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.0254,0)    // inches = 0.0254 m
+PHYSICAL_UNIT "radian",  (0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1,0)         // Angular position: base SI unit is radian
+PHYSICAL_UNIT "degrees", (0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0.0174533,0) // degrees = 0.0174533 radians
+PHYSICAL_UNIT "V/V",     (1, 0, 0, 2, 1,-3,-1, 0, 0, 0, 1,0)         // Voltage ratio: [m²*kg/(sec³*A)]/[m²*kg/(sec³*A)]
+PHYSICAL_UNIT "Ohm",     (0, 0, 0, 2, 1,-3,-2, 0, 0, 0, 1,0)         // Resistance: Ohm equals m²*kg/(s³*A²)
+PHYSICAL_UNIT "V",       (0, 0, 0, 2, 1,-3,-1, 0, 0, 0, 1,0)         // Voltage: V equals m²*kg/(sec³*A)
+PHYSICAL_UNIT "seconds", (0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,0)         // Time: base SI unit is seconds
+PHYSICAL_UNIT "Hz",      (0, 0, 0, 0, 0,-1, 0, 0, 0, 0, 1,0)         // Frequency: Hertz = 1/second
+PHYSICAL_UNIT "days",    (0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 86400,0)     // Time: Days = 86400 seconds
+PHYSICAL_UNIT "Pa",      (0, 0, 0,-1, 1,-2, 0, 0, 0, 0, 1,0)         // Pressure: Pascal equals Newton/m² = kg/(m*s²)
+PHYSICAL_UNIT "bar",     (0, 0, 0,-1, 1,-2, 0, 0, 0, 0, 1.0e+05,0)   // Pressure: bar = 10^5 Pa = 10^5 kg/(m*s²)
+PHYSICAL_UNIT "mbar",    (0, 0, 0,-1, 1,-2, 0, 0, 0, 0, 1.0e+02,0)   // Pressure: mbar = 10^(-3) bar = 10^2 kg/(m*s²)
+
+ENUMERATE ElecSigTypeEnum,"Voltage Sensor","Current Sensor","Resistance Sensor","Bridge Sensor","LVDT Sensor","Potentiometric Voltage Divider Sensor","Pulse Sensor","Voltage Actuator","Current Actuator","Pulse Actuator"
+%ElecSigType, "Transducer Electrical Signal Type", ID, 0, ElecSigTypeEnum,"e","" = "Bridge Sensor"
+
+SELECTCASE "Units of displacement", ID, 3
+  CASE "meters", 0
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000p", "m"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000p", "m"
+  ENDCASE
+  CASE "millimeters", 1
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000E+0", "mm"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000E+0", "mm"
+  ENDCASE
+  CASE "inches", 2
+    %MinPhysVal, "Minimum Distance", CAL, 32, SINGLE, "0.000E+0", "in"
+    %MaxPhysVal, "Maximum Distance", CAL, 32, SINGLE, "0.000E+0", "in"
+  ENDCASE
+  CASE "Angular Position (radian)", 3
+    %MinPhysVal, "Minimum Position", CAL, 32, SINGLE, "0.000E+0", "radian"
+    %MaxPhysVal, "Maximum Position", CAL, 32, SINGLE, "0.000E+0", "radian"
+  ENDCASE
+  CASE "Angular Position (degrees)", 4
+    %MinPhysVal, "Minimum Position", CAL, 32, SINGLE, "0.000E+0", "degrees"
+    %MaxPhysVal, "Maximum Position", CAL, 32, SINGLE, "0.000E+0", "degrees"
+  ENDCASE
+  CASE "Pressure (Pascal)", 5
+    %MinPhysVal, "Minimum Pressure", CAL, 32, SINGLE, "0.000p", "Pa"
+    %MaxPhysVal, "Maximum Pressure", CAL, 32, SINGLE, "0.000p", "Pa"
+  ENDCASE
+  CASE "Pressure (Bar)", 6
+    %MinPhysVal, "Minimum Pressure", CAL, 32, SINGLE, "0.000p", "bar"
+    %MaxPhysVal, "Maximum Pressure", CAL, 32, SINGLE, "0.000p", "bar"
+  ENDCASE
+  CASE "Pressure (Millibar)", 7
+    %MinPhysVal, "Minimum Pressure", CAL, 32, SINGLE, "0.000p", "mbar"
+    %MaxPhysVal, "Maximum Pressure", CAL, 32, SINGLE, "0.000p", "mbar"
+  ENDCASE
+
+ENDSELECT
+
+SELECTCASE "Full Scale Electrical Value precision", CAL, 1
+  CASE "mV/V", 0
+    %MinElecVal, "Minimum Electrical Value", CAL, 11, ConRes, -1, .001, "0p", "V/V"
+    %MaxElecVal, "Maximum Electrical Value", CAL, 11, ConRes, -1, .001, "0p", "V/V"
+  ENDCASE
+  CASE "Full precision", 1
+    %MinElecVal, "Minimum Electrical Value", CAL, 32, SINGLE, "0.000p", "V/V"
+    %MaxElecVal, "Maximum Electrical Value", CAL, 32, SINGLE, "0.000p", "V/V"
+  ENDCASE
+ENDSELECT
+
+ENUMERATE MapMethEnum, "Linear","Inverse m/(x+b)","Inverse (b+m/x)","Thermocouple","Thermistor","RTD","Bridge"
+%MapMeth, "Mapping Method", ID, 0, MapMethEnum,"e","" = "Linear"
+
+ENUMERATE BridgeTypeEnum, "Quarter", "Half", "Full"
+%BridgeType, "Bridge type", ID, 2, BridgeTypeEnum,"e",""
+
+%RespTime, "Transducer Response Time", ID, 6, ConRelRes, 1E-6, 0.146, "rp", "seconds"
+
+%ExciteAmplNom, "Excitation Level (Nominal)", ID, 8, ConRes, 0.1, 0.1, "0.0", "V"
+%ExciteAmplMax, "Excitation Level (Maximum)", ID, 8, ConRes, 0.1, 0.1, "0.0", "V"
+ENUMERATE ExciteTypeEnum, "DC", "Bipolar DC", "AC (rms)"
+%ExciteType, "Excitation Voltage Type", ID, 0, ExciteTypeEnum,"e","" = "AC (rms)"
+
+%ExciteFreqNom, "Excitation Frequency (Nominal)", ID, 12, ConRes, 1, 10, "0", "Hz"
+%ExciteFreqMin, "Excitation Frequency (Minimum)", ID, 12, ConRes, 1, 10, "0", "Hz"
+%ExciteFreqMax, "Excitation Frequency (Maximum)", ID, 12, ConRes, 1, 10, "0", "Hz"
+
+%SensorImped, "input impedance @ nominal frequency", ID, 7, ConRelRes, 1, 0.043, "rp", "Ohm"
+%CalDate, "Calibration Date", CAL, 16, DATE,"d-mmm-yyyy",""
+%CalInitials, "Calibration Initials", CAL, 15, CHR5,"s",""
+%CalPeriod, "Calibration Period (Days)", CAL, 12, UNINT, "0", "days"
+
+%MeasID, "Measurement location ID",  USR, 11, UNINT, "###0", ""
+
+ENDTEMPLATE
+
+TEMPLATE 31,8,12,"HBM Output Unit"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 11 is the decimal value of this template ID.
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT HBM Template
+ABSTRACT output unit
+SPACING
+%MDEF_OutputUnit, "Output unit",  USR, 18, UNINT, "###0", ""
+ENDTEMPLATE
+
+TEMPLATE 31,8,13,"HBM User defined ID"  
+  //The first 31 in the Template field indicates HBM defined template, the 8 is the number of bits to read from
+  //the sensor to get the template ID, the 2 is the decimal value of this template ID.
+  //created: 09-04-14, Daniel Ruehmer, HBM
+TDL_VERSION_NUMBER 2  //Version 2 refers to the final IEEE 1451.4 version 1.0 TDL specification
+ABSTRACT HBM Template
+ABSTRACT For giving a user defined ID (15 characters)
+SPACING
+
+%MDEF_UserID, "User defined ID", USR, 105, ASCII, "s", ""
+
+ENDTEMPLATE
+
+Validation_Keycode 1234

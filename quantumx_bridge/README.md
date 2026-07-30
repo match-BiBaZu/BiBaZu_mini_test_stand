@@ -44,10 +44,19 @@ API-Zeitstempel beider Werte waren in jedem gemeinsamen Snapshot identisch.
 
 ## Einfache Kraftanzeige
 
-Die Windows-GUI `QuantumXMonitor` zeigt Sensor 1, Sensor 2 und deren Summe in
-Newton. Jeder angezeigte Wert ist ein gleitender Mittelwert aus den letzten 100
+Die Windows-GUI `QuantumXMonitor` zeigt die beiden TAL221-500-g-Sensoren auf
+MX440B-Kanal 3 und 4 sowie deren Summe in Newton. Jeder angezeigte Wert ist ein
+gleitender Mittelwert aus den letzten 100
 synchronen MX440B-Messwerten. Ungültige/Overrange-Werte werden nicht als Null
 in das Fenster aufgenommen.
+
+- Kraft 1: `TAL221_A_500g`, MX440B-Kanal 3
+- Kraft 2: `TAL221_B_500g`, MX440B-Kanal 4
+- Summe: `Kraft 1 + Kraft 2`
+
+Der Modus `--server-only`, den die große Test-GUI startet, verwendet ebenfalls
+die TAL221 auf MX440B-Kanal 3 und 4. Damit nutzen Livemonitor, NDJSON-Ausgabe,
+Testsequenz, Impulsauswertung und CSV-Export dieselbe Sensorzuordnung.
 
 ```powershell
 dotnet build .\quantumx_bridge\src\QuantumXMonitor\QuantumXMonitor.csproj -c Release

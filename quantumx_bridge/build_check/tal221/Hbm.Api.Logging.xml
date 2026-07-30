@@ -1,0 +1,2610 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Hbm.Api.Logging</name>
+    </assembly>
+    <members>
+        <member name="T:Hbm.Api.Logging.Enums.LoggingFramework">
+            <summary>
+            Supported logging frameworks.
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LoggingFramework.Loupe">
+            <summary>
+            Gibraltar Loupe (http://www.gibraltarsoftware.com/loupe)
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LoggingFramework.NLog">
+            <summary>
+            NLog (http://nlog-project.org/)
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Logging.Enums.LogLevel">
+            <summary>
+            Available log levels.
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Off">
+            <summary>
+            Off log level
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.All">
+            <summary>
+            Represents all log level
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Trace">
+            <summary>
+            Log level for trace
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Debug">
+            <summary>
+            Log level for debug
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Info">
+            <summary>
+            Log level for info
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Warn">
+            <summary>
+            Log level for warn
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Error">
+            <summary>
+            Log level for error
+            </summary>
+        </member>
+        <member name="F:Hbm.Api.Logging.Enums.LogLevel.Database">
+            <summary>
+            Log level for database operations
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Logging.Factories.AbstractLoggerFactory">
+            <summary>
+            Abstract factory for creating logger instances.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Factories.AbstractLoggerFactory.FileTargetAbsolutePath">
+            <summary>
+            Gets the absolute path of the file target where logs actually goes into.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.#ctor">
+            <summary>
+            Create a new abstract logger factory instance.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.Restart">
+            <summary>
+            Restarts the logging framework (NLog or Loupe).
+            </summary>
+            <remarks>
+            Must be implemented by derived classes.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.Shutdown">
+            <summary>
+            Safe shutdown of the underlying logging framework.
+            </summary>
+            <remarks>
+            Must be implemented by derived classes.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.GetLogger(System.String)">
+            <summary>
+            Returns the logger.
+            </summary>
+            <param name="name">Unique name of the logger.</param>
+            <remarks>
+            Based on the name of the logger either a new instance is created or the previously created logger (with the same name) is returned.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.GetAllLoggers">
+            <summary>
+            Gets all loggers.
+            </summary>
+            <returns>Logger grouped by their name.</returns>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.ReconfigureLogLevels">
+            <summary>
+            Reconfigures log levels on all underlying (NLog or Loupe) logger.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.AbstractLoggerFactory.CreateLogger(System.String)">
+            <summary>
+            Create concrete logger object based on the <see cref="P:Hbm.Api.Logging.LogManager.LoggingFramework"/>.
+            </summary>
+            <param name="name">Name for the logger.</param>
+            <remarks>
+            Must be implemented by derived classes.
+            </remarks>
+            <returns>A logger object. If logging service is disabled, an empty logger is returned.</returns>
+        </member>
+        <member name="T:Hbm.Api.Logging.Factories.LoggerFactoryLoupe">
+            <summary>
+            Factory for creating new instances of <see cref="T:Hbm.Api.Logging.Logger.LoggerLoupe"/>.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.FileTargetAbsolutePath">
+            <summary>
+            Gets the absolute path of the file target where logs goes actually into.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.#ctor">
+            <summary>
+            Create a new instance of a logger factory for Loupe and initialize the loupe environment.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.Restart">
+            <summary>
+            Restarts/ rebinds the Loupe framework.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.Shutdown">
+            <summary>
+            Save shutdown of the Loupe log environment.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.CreateLogger(System.String)">
+            <summary>
+            Creates a new instance of the <see cref="T:Hbm.Api.Logging.Logger.LoggerLoupe"/> class.
+            </summary>
+            <param name="name">Name for the logger.</param>
+            <returns>Abstract logger object of the loupe logger.</returns>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.Log_Initializing(System.Object,Gibraltar.Agent.LogInitializingEventArgs)">
+            <summary>
+            Eventhandler of the Gibraltar log initialization.
+            Here the Gibraltar Log environment is configured by code.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryLoupe.GetAbsolutePathOfFileTarget(System.String)">
+            <summary>
+            Scans given logFolder directory for "*.glf" file (loupe binary log files) 
+            and returns the absolute file path of the newest.
+            </summary>
+            <param name="logFolder">Valid directory for parsing *.glf files.</param>
+            <returns>Absolute file path to the newest *.glf file.</returns>
+        </member>
+        <member name="T:Hbm.Api.Logging.Factories.LoggerFactoryNlog">
+            <summary>
+            Factory for creating new instances of <see cref="T:Hbm.Api.Logging.Logger.LoggerNlog"/>.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Factories.LoggerFactoryNlog.FileTargetAbsolutePath">
+            <summary>
+            Gets the absolute path of the file target where logs goes actually into.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.#ctor">
+            <summary>
+            Create a new instance of a logger factory for NLog and initialize the NLog environment.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.Restart">
+            <summary>
+            Restarts/ rebinds the NLog framework.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.Shutdown">
+            <summary>
+            Save shutdown of the NLog log environment.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.ConfigureNLog">
+            <summary>
+            Create configuration for NLog if it is not configured already.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.CreateLogger(System.String)">
+            <summary>
+            Creates a new instance of the <see cref="T:Hbm.Api.Logging.Logger.LoggerNlog"/> class.
+            </summary>
+            <param name="name">Name for the logger.</param>
+            <returns>Abstract logger object of the NLog logger.</returns>
+        </member>
+        <member name="M:Hbm.Api.Logging.Factories.LoggerFactoryNlog.GetAbsolutePathOfFileTarget(NLog.Targets.FileTarget)">
+            <summary>
+            Creates a dummy event for rendering the current absolute file path to the log.
+            </summary>
+            <param name="fileTarget">A valid file target (NLog).</param>
+            <returns>Absolute file path to the current log file.</returns>
+        </member>
+        <member name="T:Hbm.Api.Logging.LoggerEventArgs">
+            <summary>
+            Event argument containing an <see cref="T:Hbm.Api.Logging.Logger.ILogger"/> instance.
+            </summary>
+            <seealso cref="T:System.EventArgs" />
+        </member>
+        <member name="P:Hbm.Api.Logging.LoggerEventArgs.Logger">
+            <summary>
+            Gets the logger.
+            </summary>
+            <value>
+            The logger.
+            </value>
+        </member>
+        <member name="M:Hbm.Api.Logging.LoggerEventArgs.#ctor(Hbm.Api.Logging.Logger.ILogger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Hbm.Api.Logging.LoggerEventArgs"/> class.
+            </summary>
+            <param name="logger">The logger.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.ILogger">
+            <summary>
+            Interface of logger objects encapsulating a specific logging framework (NLog, Loupe, ...)
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.Name">
+            <summary>
+            Gets the name.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsActive">
+            <summary>
+            Flag to indicate if logger is activated at all.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsTraceEnabled">
+            <summary>
+            Flag to indicate if log level trace is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsDebugEnabled">
+            <summary>
+            Flag to indicate if log level debug is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsInfoEnabled">
+            <summary>
+            Flag to indicate if log level info is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsWarnEnabled">
+            <summary>
+            Flag to indicate if log level warn is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.ILogger.IsErrorEnabled">
+            <summary>
+            Flag to indicate if log level error is activated.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.UpdateLoglevels">
+            <summary>
+            Updates the log levels based on current <see cref="P:Hbm.Api.Logging.LogManager.LogLevelsActive"/> property.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Trace(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Trace(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Trace(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Trace(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.TraceFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.TraceFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Debug(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Debug(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Debug(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Debug(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.DebugFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.DebugXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.DebugXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Info(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Info(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Info(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Info(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.InfoFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.InfoXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.InfoXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.ILogger.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LogContext">
+            <summary>
+            The LogContext classifies log messages in hierarchical way.
+            It should be used for meaningful categorization like "Database.Queries.Select".
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LogContext.Category">
+            <summary>
+            The log category for the log message. The value should be dot-separated.
+            For example "Database.Queries.Select"
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LogContext.#ctor">
+            <summary>
+            Constructor initializing instances of type <see cref="T:Hbm.Api.Logging.Logger.LogContext"/>.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LogContext.#ctor(System.String)">
+            <summary>
+            Constructor initializing instances of type <see cref="T:Hbm.Api.Logging.Logger.LogContext"/>.
+            </summary>
+            <param name="category">The category for the log message. The value should be dot-separated.
+            For example "Database.Queries.Select"</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LogContext.ToString">
+            <summary>
+            Returns the <see cref="P:Hbm.Api.Logging.Logger.LogContext.Category"/> string property.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LoggerBase">
+            <summary>
+            Base class for all loggers.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.Name">
+            <summary>
+            Gets the name.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsActive">
+            <summary>
+            Flag to indicate if logger is activated at all.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsTraceEnabled">
+            <summary>
+            Flag to indicate if log level trace is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsDebugEnabled">
+            <summary>
+            Flag to indicate if log level debug is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsInfoEnabled">
+            <summary>
+            Flag to indicate if log level info is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsWarnEnabled">
+            <summary>
+            Flag to indicate if log level warn is activated.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerBase.IsErrorEnabled">
+            <summary>
+            Flag to indicate if log level error is activated.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.#ctor">
+            <summary>
+            Constructor of the abstract logger class.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.UpdateLoglevels">
+            <summary>
+            Updates the log levels based on current <see cref="P:Hbm.Api.Logging.LogManager.LogLevelsActive"/> property.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Trace(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Trace(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Trace(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Trace(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.TraceFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.TraceFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Debug(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Debug(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Debug(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Debug(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.DebugFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.DebugXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.DebugXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Info(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Info(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Info(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Info(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.InfoFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.InfoXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.InfoXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn" /> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext" /> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerBase.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LoggerEmpty">
+            <summary>
+            Default logger object, which logs nothing.
+            All properties determining if some log level is enabled are false.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Trace(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Trace(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Trace(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Trace(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.TraceFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.TraceFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Debug(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Debug(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Debug(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Debug(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.DebugFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.DebugXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.DebugXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Info(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Info(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Info(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Info(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.InfoFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.InfoXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.InfoXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerEmpty.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LoggerLoupe">
+            <summary>
+            Wraps a Loupe logger.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.#ctor(System.String)">
+            <summary>
+            Create a new instance and initialize data.
+            </summary>
+            <param name="name">Name for which the loupe logger is active.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Trace(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:System.LogLevel.Trace"/> level./// </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Trace(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Trace(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Trace(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.TraceFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.TraceFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Debug(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level./// </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Debug(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Debug(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Debug(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.DebugFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.DebugXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.DebugXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Info(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Info(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Info(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Info(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.InfoFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.InfoXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.InfoXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider">
+            <summary>
+            This class provides source properties for the Gibraltar.
+            so that it can be grouped by class name for example in the Loupe Agent.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider.ClassName">
+            <summary>
+            Class name of the logger.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider.FileName">
+            <summary>
+            Alway null, not needed right now.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider.LineNumber">
+            <summary>
+            Alway -1, not needed right now.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider.MethodName">
+            <summary>
+            Alway null, not needed right now.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerLoupe.LoggerLoupeMessageSourceProvider.#ctor(System.String)">
+            <summary>
+            Create a new instance and initialize data.
+            </summary>
+            <param name="className">The class name for the logger.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.Logger.LoggerNlog">
+            <summary>
+            Wraps a NLog logger.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.#ctor(NLog.Logger)">
+            <summary>
+            Create a new instance and initialize data.
+            </summary>
+            <param name="loggerNlog">The NLog logger.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Trace(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Trace(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Trace(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Trace(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.TraceFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.TraceFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Trace"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Debug(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Debug(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Debug(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Debug(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.DebugFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.DebugFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.DebugXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.DebugXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Debug"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Info(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Info(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Info(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Info(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.InfoFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.InfoFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.InfoXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.InfoXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Info"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Warn(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.WarnXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Warn"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separated by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(Hbm.Api.Logging.Logger.LogContext,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Object)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message. Context classifications are separeted by '.'</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(System.Func{System.String},System.Exception)">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+            <param name="ex">The exception to be logged.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(Hbm.Api.Logging.Logger.LogContext,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.Error(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.Func{System.String})">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="messageBuilderCallback">Callback method returning the log message string.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorFormat(System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorFormat(System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorFormat(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object[])">
+            <summary>
+            Log a message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level.
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="format">The format of the message object to log. See <see cref="M:System.String.Format(System.String,System.Object[])"/>.</param>
+            <param name="args">Format arguments.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorXml(System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorXml(System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML string with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.Logger.LoggerNlog.ErrorXml(Hbm.Api.Logging.Logger.LogContext,System.Exception,System.String,System.Object)">
+            <summary>
+            Log a XML message with the <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Error"/> level. 
+            </summary>
+            <param name="context">Context details for the log message.
+            <see cref="T:Hbm.Api.Logging.Logger.LogContext"/> classifications are separeted by '.'.</param>
+            <param name="ex">The exception to be logged.</param>
+            <param name="xml">XML string to log.</param>
+            <param name="message">Message object to log.</param>
+        </member>
+        <member name="T:Hbm.Api.Logging.LogManager">
+            <summary>
+            Manager class to start and stop the logging service for the Common Device API.
+            Use the <see cref="M:Hbm.Api.Logging.LogManager.CreateLogger(System.String)"/> to instantiate logger objects of type <see cref="T:Hbm.Api.Logging.Logger.ILogger"/>.
+            </summary>
+            <remarks>
+            Best practice: Create a logger for each class with the full qualified type name.
+            </remarks>
+        </member>
+        <member name="E:Hbm.Api.Logging.LogManager.LoggerAdded">
+            <summary>
+            Occurs when a new logger has been added.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.IsLoggingRunning">
+            <summary>
+            Gets the flag indicating if logging is enabled and ready for use.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.LoggingFramework">
+            <summary>
+            Gets the used logging framework.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.LogFolder">
+            <summary>
+            Gets the folder location for the log files.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.CurrentLogFile">
+            <summary>
+            Gets the current log file as absoulute file path.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.LogLevelsActive">
+            <summary>
+            Gets the active log levels on which messages are logged.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.LogArchiveDays">
+            <summary>
+            Gets or sets the maximum number of days to store log messages in archive.
+            </summary>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.ProductName">
+            <summary>
+            Gets or sets the custom product name for the running application.
+            The product name helps to seperate between logging sessions.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown, if value is null or an empty string.</exception> 
+            <remarks>
+            This value is optional. If it's not set, it will use the product name of the executing assembly.
+            </remarks>
+        </member>
+        <member name="P:Hbm.Api.Logging.LogManager.IsDatabaseLoggingEnabled">
+            <summary>
+            Gets the flag indicating if logging for database operatios is enabled or not.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.#cctor">
+            <summary>
+            Static Constructor to initialize data
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.Start(Hbm.Api.Logging.Enums.LoggingFramework,Hbm.Api.Logging.Enums.LogLevel,System.String)">
+            <summary>
+            Starts the logging service.
+            If the logging is already active (see also <see cref="P:Hbm.Api.Logging.LogManager.IsLoggingRunning"/>) the call has no effect.
+            </summary>
+            <param name="loggingFramework">Determines which logging framework is plugged into the application.
+            See <see cref="T:Hbm.Api.Logging.Enums.LoggingFramework"/> for more details.
+            </param>
+            <param name="logLevels">Determines on which level(s) message are logged, see <see cref="T:Hbm.Api.Logging.Enums.LogLevel"/>.</param>
+            <param name="logFolder">Valid directory to use for logging or empty to let LogManager generate valid folder.</param>
+            <remarks>
+            If <see cref="F:Hbm.Api.Logging.Enums.LogLevel.Off"/> is set, logging service will not start.
+            Even if <see cref="F:Hbm.Api.Logging.Enums.LogLevel.All"/> is set.
+            </remarks>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.Stop">
+            <summary>
+            Stops the logging service, if it is enabled. See <see cref="P:Hbm.Api.Logging.LogManager.IsLoggingRunning"/>.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.CreateLogger(System.String)">
+            <summary>
+            Creates a logger object.
+            </summary>
+            <param name="name">Name of the logger, for example the full qualified class name.</param>
+            <returns>Logger object, which can be used to log messages. See <see cref="T:Hbm.Api.Logging.Logger.ILogger"/>.
+            Even if <see cref="P:Hbm.Api.Logging.LogManager.IsLoggingRunning"/> is false, an empty logger will be returned.
+            This empty logger simply does nothing, so it is not necessary to do null checks when you want to log something.
+            </returns>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.Flush">
+            <summary>
+            Flushs pending log messages in buffers to disk.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.GetAllLoggers">
+            <summary>
+            Gets all loggers.
+            </summary>
+            <returns>
+            List of all loggers.
+            </returns>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.RaiseLoggerAddedEventAsync(Hbm.Api.Logging.Logger.ILogger)">
+            <summary>
+            Raises the logger added event.
+            </summary>
+            <param name="logger">The logger.</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.InitiateLoggingFactory(Hbm.Api.Logging.Enums.LoggingFramework)">
+            <summary>
+            Initiate the logging factory based on the given framework.
+            </summary>
+            <param name="loggingFramework">LoggingFramework determining which type of Logger is created (NLog / Loupe).</param>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.ReconfiguringLogLevelsOfUnderlyingLogger">
+            <summary>
+            Reconfiguring the logger of the active framework to reflect the new log levels on each (already initiated) logger.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.LogManager.LogCurrentLogLevels">
+            <summary>
+            Tries to log the current active log levels on:
+            a) INFO
+            b) DEBUG
+            c) TRACE
+            If none of those levels are active, nothing is logged.
+            </summary>
+        </member>
+        <member name="T:Hbm.Api.Logging.Helper.LoupeRepositoryConfigUpdater">
+            <summary>
+            Handles updates on the 'Local Repository Options.xml' of Gibraltar Loupe Desktop application.
+            This file is needed to tell Loupe Desktop where it has to find the log files.
+            The file is not created when Loupe Desktop is being installed, so it must be created or updated. The config file is also an user file.
+            Path to find the file: %LOCALAPPDATA%\Gibraltar\Analyst
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Helper.LoupeRepositoryConfigUpdater.UpdateLocalRepositoryOptionsFile">
+            <summary>
+            Updates or creates the local repository options config file, which is used by the Gibraltar Desktop application.
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Helper.LoupeRepositoryConfigUpdater.CreateGibraltarRepositoryCongifFile">
+            <summary>
+            Creates an empty repository config file for Gibraltar Desktop
+            </summary>
+        </member>
+        <member name="M:Hbm.Api.Logging.Helper.LoupeRepositoryConfigUpdater.AddCurrentLogFolderToRepositoryList(System.Xml.XmlDocument,System.Xml.XmlNode)">
+            <summary>
+            Adds the current log folder as respository node to the config file of Gibraltar Desktop.
+            </summary>
+            <param name="doc">The xml document.</param>
+            <param name="repositoryListNode">The repository list node.</param>
+        </member>
+    </members>
+</doc>

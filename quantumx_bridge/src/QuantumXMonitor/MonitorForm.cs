@@ -18,13 +18,17 @@ namespace QuantumXMonitor
         private readonly Button _zeroBothButton;
         private readonly Button _reconnectButton;
         private readonly NdjsonForceServer _forceServer;
+        private readonly int _force1ChannelNumber;
+        private readonly int _force2ChannelNumber;
         private CancellationTokenSource _cancellation;
         private Task _readerTask;
         private QuantumXReader _reader;
 
         public MonitorForm(bool serverOnly = false)
         {
-            Text = "MX440B Force Monitor";
+            _force1ChannelNumber = 3;
+            _force2ChannelNumber = 4;
+            Text = "MX440B TAL221 Force Monitor";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(760, 360);
             Size = new Size(980, 430);
@@ -33,7 +37,7 @@ namespace QuantumXMonitor
 
             var heading = new Label
             {
-                Text = "Force measurement - average over 100 samples",
+                Text = "TAL221 force measurement - average over 100 samples",
                 Dock = DockStyle.Top,
                 Height = 58,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -52,9 +56,9 @@ namespace QuantumXMonitor
             valuesTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333F));
             valuesTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334F));
 
-            _force1Value = CreateValueCard(valuesTable, 0, "Sensor 1");
-            _force2Value = CreateValueCard(valuesTable, 1, "Sensor 2");
-            _totalValue = CreateValueCard(valuesTable, 2, "Total");
+            _force1Value = CreateValueCard(valuesTable, 0, "TAL221 A (CH3)");
+            _force2Value = CreateValueCard(valuesTable, 1, "TAL221 B (CH4)");
+            _totalValue = CreateValueCard(valuesTable, 2, "Total force");
 
             var footer = new Panel
             {
@@ -178,7 +182,10 @@ namespace QuantumXMonitor
             SetStatus("Connecting ...", Color.DarkOrange);
 
             _cancellation = new CancellationTokenSource();
-            var reader = new QuantumXReader(DeviceIp);
+            var reader = new QuantumXReader(
+                DeviceIp,
+                _force1ChannelNumber,
+                _force2ChannelNumber);
             _reader = reader;
             long lastUiUpdateTicks = 0;
             reader.StatusChanged += status => PostToUi(() =>
@@ -251,9 +258,9 @@ namespace QuantumXMonitor
 
         private void DisplaySample(FilteredSample sample)
         {
-            _force1Value.Text = sample.FastForce1N.ToString("0.000") + " N";
-            _force2Value.Text = sample.FastForce2N.ToString("0.000") + " N";
-            _totalValue.Text = sample.FastForceTotalN.ToString("0.000") + " N";
+            _force1Value.Text = sample.Force1N.ToString("0.000") + " N";
+            _force2Value.Text = sample.Force2N.ToString("0.000") + " N";
+            _totalValue.Text = sample.ForceTotalN.ToString("0.000") + " N";
             _windowLabel.Text =
                 "Averaging window: " + sample.WindowCount + " / " + sample.WindowSize +
                 "   |   Sample rate: " + sample.SampleRateHz.ToString("0") + " Hz";
