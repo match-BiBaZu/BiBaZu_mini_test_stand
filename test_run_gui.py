@@ -73,6 +73,7 @@ COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM = 1.0
 COLIBRI_TOUCH_MAX_APPROACH_MM = 5.0
 COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
 COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
+COLIBRI_TOUCH_BASELINE_MAX_SECONDS = 1.5
 COLIBRI_TOUCH_MIN_BASELINE_SAMPLES = 10
 COLIBRI_TOUCH_MAX_BASELINE_ABS_N = 0.05
 COLIBRI_TOUCH_MAX_BASELINE_STD_N = 0.01
@@ -4317,7 +4318,9 @@ class TestRunGui(tk.Tk):
         threading.Thread(target=stop_worker, daemon=True).start()
 
     def _acquire_touch_baseline(self):
-        deadline = time.monotonic() + COLIBRI_TOUCH_BASELINE_SECONDS
+        start_time = time.monotonic()
+        minimum_deadline = start_time + COLIBRI_TOUCH_BASELINE_SECONDS
+        deadline = start_time + COLIBRI_TOUCH_BASELINE_MAX_SECONDS
         values_by_id = {}
         while time.monotonic() < deadline:
             cancel_event = self.colibri_touch_cancel_event
@@ -4325,11 +4328,22 @@ class TestRunGui(tk.Tk):
                 return None
             sample, force_n = self._current_touch_force_sample()
             values_by_id[sample.sample_id] = force_n
+            if (
+                time.monotonic() >= minimum_deadline
+                and len(values_by_id) >= COLIBRI_TOUCH_MIN_BASELINE_SAMPLES
+            ):
+                break
             time.sleep(0.005)
         values = list(values_by_id.values())
+        elapsed_seconds = time.monotonic() - start_time
+        self._write_debug_log(
+            "COLIBRI touch baseline "
+            f"samples={len(values)} elapsed_s={elapsed_seconds:.3f}"
+        )
         if len(values) < COLIBRI_TOUCH_MIN_BASELINE_SAMPLES:
             raise RuntimeError(
-                f"Only {len(values)} unique force samples were received during baseline acquisition."
+                f"Only {len(values)} unique force samples were received during "
+                f"{elapsed_seconds:.2f} s baseline acquisition."
             )
         baseline_mean = statistics.mean(values)
         baseline_std = statistics.stdev(values) if len(values) > 1 else 0.0
