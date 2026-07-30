@@ -75,12 +75,14 @@ COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
 COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
 COLIBRI_TOUCH_BASELINE_MAX_SECONDS = 1.5
 COLIBRI_TOUCH_MIN_BASELINE_SAMPLES = 10
-COLIBRI_TOUCH_MAX_BASELINE_ABS_N = 0.05
+COLIBRI_TOUCH_MIN_BASELINE_N = -5.0
+COLIBRI_TOUCH_MAX_BASELINE_N = 0.05
 COLIBRI_TOUCH_MAX_BASELINE_STD_N = 0.01
 COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS = 0.005
 COLIBRI_TOUCH_CONTINUOUS_POSITION_POLL_SECONDS = 0.05
 COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS = 60.0
-COLIBRI_FORCE_SAFETY_LIMIT_N = 1.0
+COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N = 1.0
+COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N = -5.0
 FORCE_BAUD_RATE = 38400
 FORCE_READ_TIMEOUT_SECONDS = 0.005
 FORCE_RATE_WINDOW_SECONDS = 2.0
@@ -3697,25 +3699,35 @@ class TestRunGui(tk.Tk):
             f"{prefix} | total = {QUANTUMX_FORCE_1_NAME} + {QUANTUMX_FORCE_2_NAME} "
             f"(CH{QUANTUMX_FORCE_1_CHANNEL} + CH{QUANTUMX_FORCE_2_CHANNEL}) | 20-value mean | "
             f"impulse threshold {self.force_impulse_threshold:.4g} N | "
-            f"Colibri + safety {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N"
+            f"Colibri + safety {COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N:.3f}..."
+            f"+{COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N:.3f} N"
         )
 
-    def _colibri_safety_force_value(self, sample):
+    def _colibri_safety_force_values(self, sample):
         if sample is None or not sample.valid or sample.status != "ok":
-            return None
+            return ()
         values = (
             sample.force_total_n,
             sample.force_total_mean_20_n,
             sample.force_total_raw_n,
         )
-        finite_values = [
+        return tuple(
             float(value)
             for value in values
             if value is not None and math.isfinite(float(value))
-        ]
-        if not finite_values:
+        )
+
+    def _colibri_force_limit_violation(self, sample):
+        values = self._colibri_safety_force_values(sample)
+        if not values:
             return None
-        return max(finite_values, key=abs)
+        maximum = max(values)
+        if maximum >= COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N:
+            return maximum, COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N
+        minimum = min(values)
+        if minimum <= COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N:
+            return minimum, COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N
+        return None
 
     def _require_positive_colibri_motion_safe(self):
         with self.force_lock:
@@ -3731,17 +3743,21 @@ class TestRunGui(tk.Tk):
                 "Positive Colibri motion is blocked: QuantumX force data is stale "
                 f"({age_seconds:.3f} s old)."
             )
-        force_n = self._colibri_safety_force_value(sample)
-        if force_n is None:
+        force_values = self._colibri_safety_force_values(sample)
+        if not force_values:
             raise RuntimeError(
                 "Positive Colibri motion is blocked: the QuantumX force value is invalid."
             )
-        if abs(force_n) >= COLIBRI_FORCE_SAFETY_LIMIT_N:
+        violation = self._colibri_force_limit_violation(sample)
+        if violation is not None:
+            force_n, _limit_n = violation
             raise RuntimeError(
                 "Positive Colibri motion is blocked at "
-                f"{force_n:.4f} N (limit {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N)."
+                f"{force_n:.4f} N (allowed range "
+                f"{COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N:.3f}..."
+                f"+{COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N:.3f} N)."
             )
-        return force_n
+        return sample.force_total_n
 
     def _set_colibri_motion_direction(self, direction):
         direction = 1 if direction > 0 else -1 if direction < 0 else 0
@@ -3768,12 +3784,15 @@ class TestRunGui(tk.Tk):
                 self.colibri_motion_direction = 0
 
     def _enforce_colibri_force_safety(self, sample, source):
-        force_n = self._colibri_safety_force_value(sample)
-        if force_n is None or abs(force_n) < COLIBRI_FORCE_SAFETY_LIMIT_N:
+        violation = self._colibri_force_limit_violation(sample)
+        if violation is None:
             return
+        force_n, limit_n = violation
         self._trigger_colibri_force_safety_stop(
             f"{source} measured {force_n:.4f} N "
-            f"(limit {COLIBRI_FORCE_SAFETY_LIMIT_N:.3f} N)"
+            f"(limit {limit_n:+.3f} N; allowed range "
+            f"{COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N:.3f}..."
+            f"+{COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N:.3f} N)"
         )
 
     def _stop_positive_colibri_if_force_monitor_unavailable(self, reason):
@@ -4089,7 +4108,8 @@ class TestRunGui(tk.Tk):
                 "Separate hand test: the Colibri moves in the POSITIVE direction. "
                 f"The default mode uses {COLIBRI_TOUCH_STEP_MM:.3f} mm steps. "
                 "Press the platform gently by hand. "
-                f"At |F total| >= {COLIBRI_TOUCH_FORCE_N:.3f} N it stops and retracts "
+                f"When F total rises by {COLIBRI_TOUCH_FORCE_N:.3f} N above the measured "
+                "baseline, it stops and retracts "
                 f"{COLIBRI_TOUCH_RETRACT_MM:.3f} mm in the NEGATIVE direction."
             ),
             wraplength=590,
@@ -4255,11 +4275,15 @@ class TestRunGui(tk.Tk):
         except RuntimeError as exc:
             messagebox.showerror("Force data unavailable", str(exc), parent=self.colibri_touch_dialog)
             return
-        if abs(initial_force_n) > COLIBRI_TOUCH_MAX_BASELINE_ABS_N:
+        if (
+            initial_force_n <= COLIBRI_TOUCH_MIN_BASELINE_N
+            or initial_force_n > COLIBRI_TOUCH_MAX_BASELINE_N
+        ):
             messagebox.showerror(
-                "Platform is not unloaded",
-                f"Current total force is {initial_force_n:.4f} N. It must be within "
-                f"+/-{COLIBRI_TOUCH_MAX_BASELINE_ABS_N:.3f} N before starting.",
+                "Baseline force outside allowed range",
+                f"Current total force is {initial_force_n:.4f} N. Before starting it "
+                f"must be above {COLIBRI_TOUCH_MIN_BASELINE_N:.3f} N and no greater "
+                f"than +{COLIBRI_TOUCH_MAX_BASELINE_N:.3f} N.",
                 parent=self.colibri_touch_dialog,
             )
             return
@@ -4271,7 +4295,8 @@ class TestRunGui(tk.Tk):
                 "- NEGATIVE motion moves safely away.\n"
                 "- Nothing rigid is currently below the platform.\n"
                 "- You will press the platform gently by hand to trigger the stop.\n\n"
-                f"Contact threshold: {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
+                f"Contact threshold: baseline + {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
+                f"Current baseline: {initial_force_n:.3f} N\n"
                 f"Approach mode: {'CONTINUOUS / EXPERIMENTAL' if continuous_approach else f'{COLIBRI_TOUCH_STEP_MM:.3f} mm steps'}\n"
                 f"Maximum approach: {max_approach_mm:.3f} mm\n"
                 f"Automatic retract: {COLIBRI_TOUCH_RETRACT_MM:.3f} mm"
@@ -4347,10 +4372,14 @@ class TestRunGui(tk.Tk):
             )
         baseline_mean = statistics.mean(values)
         baseline_std = statistics.stdev(values) if len(values) > 1 else 0.0
-        if abs(baseline_mean) > COLIBRI_TOUCH_MAX_BASELINE_ABS_N:
+        if (
+            baseline_mean <= COLIBRI_TOUCH_MIN_BASELINE_N
+            or baseline_mean > COLIBRI_TOUCH_MAX_BASELINE_N
+        ):
             raise RuntimeError(
-                f"Unloaded baseline {baseline_mean:.4f} N exceeds "
-                f"+/-{COLIBRI_TOUCH_MAX_BASELINE_ABS_N:.3f} N."
+                f"Baseline {baseline_mean:.4f} N is outside the allowed range "
+                f"({COLIBRI_TOUCH_MIN_BASELINE_N:.3f}, "
+                f"+{COLIBRI_TOUCH_MAX_BASELINE_N:.3f}] N."
             )
         if baseline_std > COLIBRI_TOUCH_MAX_BASELINE_STD_N:
             raise RuntimeError(
@@ -4413,6 +4442,7 @@ class TestRunGui(tk.Tk):
                     start_steps,
                     max_approach_steps,
                     max_approach_mm,
+                    baseline_mean,
                     trace,
                 )
                 if cancelled_snapshot is not None:
@@ -4454,14 +4484,17 @@ class TestRunGui(tk.Tk):
                         return result
 
                     _sample, force_n = self._current_touch_force_sample()
-                    if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                    force_delta_n = force_n - baseline_mean
+                    if force_delta_n >= COLIBRI_TOUCH_FORCE_N:
                         contact_snapshot = self._read_colibri_snapshot()
                         contact_force_n = force_n
-                        if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                        if force_delta_n >= COLIBRI_TOUCH_HARD_LIMIT_N:
                             self.messages.put(
                                 (
                                     "touch_off_progress",
-                                    f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                                    "Hard contact-force rise exceeded "
+                                    f"({force_delta_n:.4f} N above baseline); "
+                                    "retracting immediately.",
                                 )
                             )
                         break
@@ -4492,21 +4525,26 @@ class TestRunGui(tk.Tk):
                         )
                     )
                     if step_count == 1 or step_count % 10 == 0:
+                        force_delta_n = force_n - baseline_mean
                         self.messages.put(
                             (
                                 "touch_off_progress",
                                 f"Approach {step_count * COLIBRI_TOUCH_STEP_MM:.3f} / "
-                                f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
+                                f"{max_approach_mm:.3f} mm | force {force_n:.4f} N | "
+                                f"rise {force_delta_n:+.4f} N",
                             )
                         )
-                    if abs(force_n) >= COLIBRI_TOUCH_FORCE_N:
+                    force_delta_n = force_n - baseline_mean
+                    if force_delta_n >= COLIBRI_TOUCH_FORCE_N:
                         contact_snapshot = snapshot
                         contact_force_n = force_n
-                        if abs(force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N:
+                        if force_delta_n >= COLIBRI_TOUCH_HARD_LIMIT_N:
                             self.messages.put(
                                 (
                                     "touch_off_progress",
-                                    f"Hard force limit exceeded ({force_n:.4f} N); retracting immediately.",
+                                    "Hard contact-force rise exceeded "
+                                    f"({force_delta_n:.4f} N above baseline); "
+                                    "retracting immediately.",
                                 )
                             )
                         break
@@ -4567,7 +4605,8 @@ class TestRunGui(tk.Tk):
                 (
                     "touch_off_progress",
                     f"Contact {contact_force_n:.4f} N at "
-                    f"{contact_snapshot['position_mm']:.3f} mm. Retracting...",
+                    f"{contact_snapshot['position_mm']:.3f} mm "
+                    f"(rise {contact_force_n - baseline_mean:+.4f} N). Retracting...",
                 )
             )
             self._set_colibri_motion_direction(-1)
@@ -4601,6 +4640,8 @@ class TestRunGui(tk.Tk):
                     "touch_off_result",
                     {
                         "contact_force_n": contact_force_n,
+                        "contact_delta_n": contact_force_n - baseline_mean,
+                        "baseline_force_n": baseline_mean,
                         "contact_position_mm": contact_snapshot["position_mm"],
                         "final_force_n": final_force_n,
                         "final_position_mm": final_snapshot["position_mm"],
@@ -4633,6 +4674,7 @@ class TestRunGui(tk.Tk):
         start_steps,
         max_approach_steps,
         max_approach_mm,
+        baseline_mean_n,
         trace,
     ):
         target_steps = start_steps + max_approach_steps
@@ -4677,10 +4719,16 @@ class TestRunGui(tk.Tk):
                     )
                     last_sample_id = sample.sample_id
 
-                contact_detected = abs(force_n) >= COLIBRI_TOUCH_FORCE_N
+                force_delta_n = force_n - baseline_mean_n
+                raw_force_delta_n = (
+                    None
+                    if raw_force_n is None
+                    else raw_force_n - baseline_mean_n
+                )
+                contact_detected = force_delta_n >= COLIBRI_TOUCH_FORCE_N
                 hard_limit_detected = (
-                    raw_force_n is not None
-                    and abs(raw_force_n) >= COLIBRI_TOUCH_HARD_LIMIT_N
+                    raw_force_delta_n is not None
+                    and raw_force_delta_n >= COLIBRI_TOUCH_HARD_LIMIT_N
                 )
                 if contact_detected or hard_limit_detected:
                     # Stop before requesting any further status or position data.
@@ -4689,16 +4737,20 @@ class TestRunGui(tk.Tk):
                     contact_force_n = force_n
                     self._write_debug_log(
                         "COLIBRI touch continuous contact "
+                        f"baseline_force_n={baseline_mean_n:.6f} "
                         f"filtered_force_n={force_n:.6f} "
+                        f"filtered_delta_n={force_delta_n:.6f} "
                         f"raw_force_n={raw_force_n} "
+                        f"raw_delta_n={raw_force_delta_n} "
                         f"position_mm={contact_snapshot['position_mm']:.3f}"
                     )
                     if hard_limit_detected:
                         self.messages.put(
                             (
                                 "touch_off_progress",
-                                "Hard raw-force limit exceeded "
-                                f"({raw_force_n:.4f} N); retracting immediately.",
+                                "Hard raw contact-force rise exceeded "
+                                f"({raw_force_delta_n:.4f} N above baseline); "
+                                "retracting immediately.",
                             )
                         )
                     return contact_snapshot, contact_force_n, sample_count, None
@@ -4713,7 +4765,8 @@ class TestRunGui(tk.Tk):
                         (
                             "touch_off_progress",
                             f"Continuous approach {travelled_mm:.3f} / "
-                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N",
+                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N | "
+                            f"rise {force_delta_n:+.4f} N",
                         )
                     )
                     if last_position_steps >= target_steps - 1:
@@ -4755,7 +4808,8 @@ class TestRunGui(tk.Tk):
                     "phase",
                     "baseline_mean_n",
                     "baseline_std_n",
-                    "contact_threshold_n",
+                    "contact_delta_threshold_n",
+                    "absolute_contact_threshold_n",
                     "contact_force_n",
                     "calibration_profile_id",
                 )
@@ -4771,6 +4825,11 @@ class TestRunGui(tk.Tk):
                         "" if baseline_mean_n is None else f"{baseline_mean_n:.9f}",
                         "" if baseline_std_n is None else f"{baseline_std_n:.9f}",
                         f"{COLIBRI_TOUCH_FORCE_N:.9f}",
+                        (
+                            ""
+                            if baseline_mean_n is None
+                            else f"{baseline_mean_n + COLIBRI_TOUCH_FORCE_N:.9f}"
+                        ),
                         "" if contact_force_n is None else f"{contact_force_n:.9f}",
                         (
                             ""
@@ -5470,7 +5529,9 @@ class TestRunGui(tk.Tk):
                 trace_path = value.get("trace_path")
                 result_text = (
                     f"Contact detected at {value['contact_force_n']:.4f} N and "
-                    f"{value['contact_position_mm']:.3f} mm.\n\n"
+                    f"{value['contact_position_mm']:.3f} mm.\n"
+                    f"Baseline: {value['baseline_force_n']:.4f} N | "
+                    f"force rise: {value['contact_delta_n']:+.4f} N.\n\n"
                     f"Retracted to {value['final_position_mm']:.3f} mm "
                     f"({value['final_force_n']:.4f} N)."
                 )
@@ -5478,6 +5539,7 @@ class TestRunGui(tk.Tk):
                     result_text += f"\n\nTrace: {trace_path}"
                 self.colibri_touch_status_var.set(
                     f"Touch-off complete: contact {value['contact_force_n']:.4f} N, "
+                    f"rise {value['contact_delta_n']:+.4f} N, "
                     f"retracted to {value['final_position_mm']:.3f} mm"
                 )
                 messagebox.showinfo(
