@@ -83,11 +83,15 @@ COLIBRI_TOUCH_SPEED_SETTING_HZ = 100.0
 COLIBRI_TOUCH_SPEED_INCREMENT_MM_S = (
     COLIBRI_TOUCH_SPEED_SETTING_HZ * COLIBRI_MM_PER_STEP
 )
-COLIBRI_TOUCH_DEFAULT_SPEED_MM_S = 1.0
+COLIBRI_TOUCH_DEFAULT_SPEED_MM_S = 2.0
 COLIBRI_TOUCH_MIN_SPEED_MM_S = COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
 COLIBRI_TOUCH_MAX_SPEED_MM_S = 5.0
 COLIBRI_TOUCH_DEFAULT_SPEED_SETTING = round(
     COLIBRI_TOUCH_DEFAULT_SPEED_MM_S / COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
+)
+COLIBRI_TOUCH_RETRACT_SPEED_MM_S = 5.0
+COLIBRI_TOUCH_RETRACT_SPEED_SETTING = round(
+    COLIBRI_TOUCH_RETRACT_SPEED_MM_S / COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
 )
 COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
 COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
@@ -4751,6 +4755,31 @@ class TestRunGui(tk.Tk):
                         message += f" Trace: {trace_path}"
                     self.messages.put(("touch_off_progress", message))
                     return cancelled_snapshot
+                self.colibri.stop()
+                self.colibri.set_parameter(
+                    COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                    COLIBRI_TOUCH_RETRACT_SPEED_SETTING,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_BYTES,
+                )
+                applied_retract_speed_setting = self.colibri.parameter(
+                    COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                )
+                if (
+                    applied_retract_speed_setting
+                    != COLIBRI_TOUCH_RETRACT_SPEED_SETTING
+                ):
+                    raise RuntimeError(
+                        "Colibri did not accept the force probe retract speed "
+                        f"(read back {applied_retract_speed_setting})."
+                    )
+                self._write_debug_log(
+                    "COLIBRI touch retract speed "
+                    f"temporary_setting={applied_retract_speed_setting} "
+                    f"temporary_speed_mm_s="
+                    f"{COLIBRI_TOUCH_RETRACT_SPEED_MM_S:.3f}"
+                )
             else:
                 approach_deadline = time.monotonic() + timeout_seconds
                 step_size_steps = max(
@@ -4860,10 +4889,16 @@ class TestRunGui(tk.Tk):
                 stopped_snapshot = self._read_colibri_snapshot()
                 return_steps = stopped_snapshot["position_steps"] - start_steps
                 if return_steps > 0:
+                    return_speed_text = (
+                        f" at {COLIBRI_TOUCH_RETRACT_SPEED_MM_S:.3f} mm/s"
+                        if continuous_approach
+                        else ""
+                    )
                     self.messages.put(
                         (
                             "touch_off_progress",
-                            "No contact detected; returning to the force probe start position...",
+                            "No contact detected; returning to the force probe "
+                            f"start position{return_speed_text}...",
                         )
                     )
                     self._set_colibri_motion_direction(-1)
@@ -4907,12 +4942,18 @@ class TestRunGui(tk.Tk):
                 1, self._colibri_mm_to_steps(retract_mm)
             )
             retract_target_steps = contact_snapshot["position_steps"] - retract_steps
+            retract_speed_text = (
+                f" at {COLIBRI_TOUCH_RETRACT_SPEED_MM_S:.3f} mm/s"
+                if continuous_approach
+                else ""
+            )
             self.messages.put(
                 (
                     "touch_off_progress",
                     f"Contact {contact_force_n:.4f} N at "
                     f"{contact_snapshot['position_mm']:.3f} mm "
-                    f"(rise {contact_force_n - baseline_mean:+.4f} N). Retracting...",
+                    f"(rise {contact_force_n - baseline_mean:+.4f} N). "
+                    f"Retracting{retract_speed_text}...",
                 )
             )
             self._set_colibri_motion_direction(-1)

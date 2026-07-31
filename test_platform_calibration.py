@@ -435,7 +435,10 @@ class PlatformCalibrationTests(unittest.TestCase):
         )
 
         self.assertEqual(gui.colibri.moves, [20, -10])
-        self.assertEqual(gui.colibri.speed_writes, [(2, 2), (24, 2)])
+        self.assertEqual(
+            gui.colibri.speed_writes,
+            [(4, 2), (10, 2), (24, 2)],
+        )
         self.assertEqual(gui.colibri.speed_setting, 24)
         self.assertAlmostEqual(result["position_mm"], 0.05)
 
@@ -451,7 +454,7 @@ class PlatformCalibrationTests(unittest.TestCase):
         self.assertGreaterEqual(cancelled_gui.colibri.stop_count, 2)
         self.assertEqual(
             cancelled_gui.colibri.speed_writes,
-            [(2, 2), (24, 2)],
+            [(4, 2), (24, 2)],
         )
         self.assertEqual(cancelled_gui.colibri.speed_setting, 24)
         self.assertAlmostEqual(cancelled_result["position_mm"], 0.1)
@@ -467,7 +470,7 @@ class PlatformCalibrationTests(unittest.TestCase):
         )
         self.assertEqual(
             custom_speed_gui.colibri.speed_writes,
-            [(3, 2), (24, 2)],
+            [(3, 2), (10, 2), (24, 2)],
         )
         self.assertEqual(custom_speed_gui.colibri.speed_setting, 24)
 

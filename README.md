@@ -469,9 +469,9 @@ The position is a signed little-endian 32-bit integer. `70 1a 00 00` is 6768 ste
 
 ### Force probe
 
-**Start force probe** begins the configured probing cycle. **Force probe settings...** configures the approach mode, speed, maximum positive distance, retract distance, and safety timeout. The defaults are continuous motion at `1.000 mm/s`, a maximum approach of `10.0 mm`, a `30 s` safety timeout, and a `0.050 mm` retract. The controller accepts speed increments of `0.5 mm/s`; the GUI limits probing speeds to `0.5...5.0 mm/s`.
+**Start force probe** begins the configured probing cycle. **Force probe settings...** configures the approach mode, speed, maximum positive distance, retract distance, and safety timeout. The defaults are continuous motion at `2.000 mm/s`, a maximum approach of `10.0 mm`, a `30 s` safety timeout, and a `0.050 mm` retract. The controller accepts speed increments of `0.5 mm/s`; the GUI limits probing speeds to `0.5...5.0 mm/s`.
 
-The continuous mode temporarily changes BAC parameter `3:2` (maximum positioning speed) to value `2`, verifies the value by reading it back, and sends one positive relative move. With the installed `0.005 mm/step` axis scale and the controller parameter unit of `100 steps/s`, this is nominally `1.000 mm/s`. Setting `1` (`0.500 mm/s`) caused noticeably rough motor operation near the lower speed limit.
+The continuous mode temporarily changes BAC parameter `3:2` (maximum positioning speed) to value `4`, verifies the value by reading it back, and sends one positive relative move. With the installed `0.005 mm/step` axis scale and the controller parameter unit of `100 steps/s`, this is nominally `2.000 mm/s`. After the positive search motion stops, the negative retract temporarily uses setting `10` (`5.000 mm/s`). The original controller speed is restored after the complete probing cycle. Setting `1` (`0.500 mm/s`) caused noticeably rough motor operation near the lower speed limit.
 
 The force is polled independently while the move is running. Contact stops the current move and retracts from the measured contact position by the configured distance. The original BAC speed parameter is restored and verified after success, cancellation, no-contact return, or an error. The stepped approach remains available in the settings as a fallback.
 
