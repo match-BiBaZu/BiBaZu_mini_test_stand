@@ -71,17 +71,23 @@ COLIBRI_TOUCH_STEP_MM = 0.01
 COLIBRI_TOUCH_DEFAULT_RETRACT_MM = 0.05
 COLIBRI_TOUCH_MIN_RETRACT_MM = COLIBRI_MM_PER_STEP
 COLIBRI_TOUCH_MAX_RETRACT_MM = 5.0
-COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM = 1.0
-COLIBRI_TOUCH_MAX_APPROACH_MM = 5.0
+COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM = 10.0
+COLIBRI_TOUCH_MAX_APPROACH_MM = COLIBRI_TRAVEL_MM
+COLIBRI_TOUCH_DEFAULT_TIMEOUT_SECONDS = 30.0
+COLIBRI_TOUCH_MIN_TIMEOUT_SECONDS = 1.0
+COLIBRI_TOUCH_MAX_TIMEOUT_SECONDS = 300.0
 COLIBRI_TOUCH_SPEED_PARAMETER_INDEX = 3
 COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX = 2
 COLIBRI_TOUCH_SPEED_PARAMETER_BYTES = 2
-COLIBRI_TOUCH_MIN_SPEED_SETTING = 1
 COLIBRI_TOUCH_SPEED_SETTING_HZ = 100.0
-COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S = (
-    COLIBRI_TOUCH_MIN_SPEED_SETTING
-    * COLIBRI_TOUCH_SPEED_SETTING_HZ
-    * COLIBRI_MM_PER_STEP
+COLIBRI_TOUCH_SPEED_INCREMENT_MM_S = (
+    COLIBRI_TOUCH_SPEED_SETTING_HZ * COLIBRI_MM_PER_STEP
+)
+COLIBRI_TOUCH_DEFAULT_SPEED_MM_S = 1.0
+COLIBRI_TOUCH_MIN_SPEED_MM_S = COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
+COLIBRI_TOUCH_MAX_SPEED_MM_S = 5.0
+COLIBRI_TOUCH_DEFAULT_SPEED_SETTING = round(
+    COLIBRI_TOUCH_DEFAULT_SPEED_MM_S / COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
 )
 COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
 COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
@@ -91,7 +97,6 @@ COLIBRI_TOUCH_MIN_BASELINE_N = -5.0
 COLIBRI_TOUCH_MAX_BASELINE_N = 0.05
 COLIBRI_TOUCH_MAX_BASELINE_STD_N = 0.01
 COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS = 0.005
-COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS = 60.0
 COLIBRI_FORCE_SAFETY_POSITIVE_LIMIT_N = 1.0
 COLIBRI_FORCE_SAFETY_NEGATIVE_LIMIT_N = -5.0
 FORCE_BAUD_RATE = 38400
@@ -440,13 +445,41 @@ class TestRunGui(tk.Tk):
         self.colibri_touch_cancel_event = None
         self.colibri_touch_running = False
         self.colibri_touch_max_approach_var = tk.DoubleVar(
-            value=COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM
+            value=self._preset_float(
+                "colibri_probe_max_approach_mm",
+                COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM,
+                COLIBRI_TOUCH_STEP_MM,
+                COLIBRI_TOUCH_MAX_APPROACH_MM,
+            )
         )
         self.colibri_touch_retract_var = tk.DoubleVar(
-            value=COLIBRI_TOUCH_DEFAULT_RETRACT_MM
+            value=self._preset_float(
+                "colibri_probe_retract_mm",
+                COLIBRI_TOUCH_DEFAULT_RETRACT_MM,
+                COLIBRI_TOUCH_MIN_RETRACT_MM,
+                COLIBRI_TOUCH_MAX_RETRACT_MM,
+            )
         )
-        self.colibri_touch_continuous_var = tk.BooleanVar(value=False)
-        self.colibri_touch_status_var = tk.StringVar(value="Touch-off: idle")
+        self.colibri_touch_timeout_var = tk.DoubleVar(
+            value=self._preset_float(
+                "colibri_probe_timeout_seconds",
+                COLIBRI_TOUCH_DEFAULT_TIMEOUT_SECONDS,
+                COLIBRI_TOUCH_MIN_TIMEOUT_SECONDS,
+                COLIBRI_TOUCH_MAX_TIMEOUT_SECONDS,
+            )
+        )
+        self.colibri_touch_speed_var = tk.DoubleVar(
+            value=self._preset_float(
+                "colibri_probe_speed_mm_s",
+                COLIBRI_TOUCH_DEFAULT_SPEED_MM_S,
+                COLIBRI_TOUCH_MIN_SPEED_MM_S,
+                COLIBRI_TOUCH_MAX_SPEED_MM_S,
+            )
+        )
+        self.colibri_touch_continuous_var = tk.BooleanVar(
+            value=self._preset_bool("colibri_probe_continuous", True)
+        )
+        self.colibri_touch_status_var = tk.StringVar(value="Force probe: idle")
         self.debug_log_file = None
         self.debug_log_path = None
         self.debug_log_lock = threading.Lock()
@@ -495,6 +528,14 @@ class TestRunGui(tk.Tk):
         self.motor_enabled_var = tk.BooleanVar(value=False)
         self.motor_distance_var = tk.DoubleVar(value=10.0)
         self.motor_absolute_var = tk.DoubleVar(value=0.0)
+        self.motor_center_position_var = tk.DoubleVar(
+            value=self._preset_float(
+                "motor_center_position_mm",
+                -7.0,
+                -2000.0,
+                2000.0,
+            )
+        )
         self.motor_speed_var = tk.DoubleVar(value=5.0)
         self.motor_position_var = tk.StringVar(value="Stepper position: --")
         self.last_motor_position_mm = None
@@ -582,6 +623,14 @@ class TestRunGui(tk.Tk):
             value = default
         return min(max(value, minimum), maximum)
 
+    def _preset_bool(self, key, default):
+        value = self.user_presets.get(key, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() not in ("", "0", "false", "no", "off")
+        return bool(value)
+
     def _on_close(self):
         response = self._ask_save_user_presets()
         if response is None:
@@ -601,7 +650,8 @@ class TestRunGui(tk.Tk):
             dialog,
             text=(
                 "Save the current connection and force settings, nozzle offset, and target "
-                "distance to the plate as defaults?"
+                "distance to the plate, stepper center position, and force probe settings "
+                "as defaults?"
             ),
             wraplength=420,
             justify=tk.LEFT,
@@ -638,6 +688,24 @@ class TestRunGui(tk.Tk):
                 "quantumx_port": int(self.quantumx_port_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
+                "motor_center_position_mm": float(
+                    self.motor_center_position_var.get()
+                ),
+                "colibri_probe_max_approach_mm": float(
+                    self.colibri_touch_max_approach_var.get()
+                ),
+                "colibri_probe_retract_mm": float(
+                    self.colibri_touch_retract_var.get()
+                ),
+                "colibri_probe_timeout_seconds": float(
+                    self.colibri_touch_timeout_var.get()
+                ),
+                "colibri_probe_speed_mm_s": float(
+                    self.colibri_touch_speed_var.get()
+                ),
+                "colibri_probe_continuous": bool(
+                    self.colibri_touch_continuous_var.get()
+                ),
                 "sequence_save_root": "" if self.sequence_save_root is None else str(self.sequence_save_root),
                 "platform_calibration_profile": (
                     "" if self.platform_calibration_path is None else str(self.platform_calibration_path)
@@ -813,6 +881,12 @@ class TestRunGui(tk.Tk):
         for button in getattr(self, "calibration_action_buttons", []):
             if button.winfo_exists():
                 button.configure(state=state)
+        direct_zero_button = getattr(self, "calibration_zero_button", None)
+        if (
+            direct_zero_button is not None
+            and direct_zero_button.winfo_exists()
+        ):
+            direct_zero_button.configure(state=state)
 
     def _set_calibration_run_lock(self, locked):
         if hasattr(self, "calibration_button"):
@@ -1618,7 +1692,7 @@ class TestRunGui(tk.Tk):
         self.motor_absolute_spinbox = ttk.Spinbox(
             motor_motion_controls,
             from_=-2000.0,
-            to=2000.0,
+            to=0.0,
             increment=1.0,
             textvariable=self.motor_absolute_var,
             width=8,
@@ -1642,6 +1716,28 @@ class TestRunGui(tk.Tk):
             state=tk.DISABLED,
         )
         self.motor_stop_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        motor_center_controls = ttk.Frame(motor_group)
+        motor_center_controls.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(motor_center_controls, text="Center position").pack(side=tk.LEFT)
+        self.motor_center_position_spinbox = ttk.Spinbox(
+            motor_center_controls,
+            from_=-2000.0,
+            to=0.0,
+            increment=0.1,
+            textvariable=self.motor_center_position_var,
+            width=8,
+            state=tk.DISABLED,
+        )
+        self.motor_center_position_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(motor_center_controls, text="mm").pack(side=tk.LEFT)
+        self.motor_center_button = ttk.Button(
+            motor_center_controls,
+            text="Move center",
+            command=self._motor_move_center,
+            state=tk.DISABLED,
+        )
+        self.motor_center_button.pack(side=tk.LEFT, padx=(8, 0))
         self.motor_controls = [
             self.motor_enable_checkbutton,
             self.motor_home_button,
@@ -1652,6 +1748,8 @@ class TestRunGui(tk.Tk):
             self.motor_forward_button,
             self.motor_absolute_spinbox,
             self.motor_absolute_button,
+            self.motor_center_position_spinbox,
+            self.motor_center_button,
             self.motor_stop_button,
         ]
 
@@ -1778,21 +1876,33 @@ class TestRunGui(tk.Tk):
         )
         self.part_colibri_move_button.pack(side=tk.LEFT, padx=(12, 0))
         self.colibri_controls.append(self.part_colibri_move_button)
-        self.colibri_touch_button = ttk.Button(
+        self.colibri_probe_start_button = ttk.Button(
             colibri_geometry_controls,
-            text="Force touch-off...",
-            command=self._open_colibri_touch_dialog,
+            text="Start force probe",
+            command=self._start_colibri_force_touch,
             state=tk.DISABLED,
         )
-        self.colibri_touch_button.pack(side=tk.LEFT, padx=(12, 0))
-        self.colibri_controls.append(self.colibri_touch_button)
+        self.colibri_probe_start_button.pack(side=tk.LEFT, padx=(12, 0))
+        self.colibri_controls.append(self.colibri_probe_start_button)
+        self.colibri_probe_settings_button = ttk.Button(
+            colibri_geometry_controls,
+            text="Force probe settings...",
+            command=self._open_colibri_touch_dialog,
+        )
+        self.colibri_probe_settings_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.colibri_controls.append(self.colibri_probe_settings_button)
 
         force_controls = ttk.Frame(hardware_notebook, padding=(8, 6))
         hardware_notebook.add(force_controls, text="TAL221 sensors / QuantumX")
 
-        ttk.Label(force_controls, text="Force impulse threshold").pack(side=tk.LEFT)
+        force_settings_row = ttk.Frame(force_controls)
+        force_settings_row.pack(fill=tk.X)
+        force_values_row = ttk.Frame(force_controls)
+        force_values_row.pack(fill=tk.X, pady=(6, 0))
+
+        ttk.Label(force_settings_row, text="Force impulse threshold").pack(side=tk.LEFT)
         self.force_impulse_threshold_spinbox = ttk.Spinbox(
-            force_controls,
+            force_settings_row,
             from_=0.0,
             to=1000000.0,
             increment=0.01,
@@ -1801,24 +1911,43 @@ class TestRunGui(tk.Tk):
         )
         self.force_impulse_threshold_spinbox.pack(side=tk.LEFT, padx=(6, 4))
         self.force_impulse_threshold_button = ttk.Button(
-            force_controls,
+            force_settings_row,
             text="Apply threshold",
             command=self._apply_force_impulse_threshold,
         )
         self.force_impulse_threshold_button.pack(side=tk.LEFT, padx=(6, 0))
 
         self.calibration_button = ttk.Button(
-            force_controls,
+            force_settings_row,
             text="Calibration...",
             command=self._open_calibration_menu,
         )
         self.calibration_button.pack(side=tk.LEFT, padx=(14, 0))
-        ttk.Label(force_controls, textvariable=self.calibration_status_var).pack(
-            side=tk.LEFT, padx=(8, 0)
+        self.calibration_zero_button = ttk.Button(
+            force_settings_row,
+            text="Zero platform",
+            command=self._start_empty_platform_zero,
         )
-        ttk.Label(force_controls, textvariable=self.force_1_value_var).pack(side=tk.LEFT, padx=(18, 0))
-        ttk.Label(force_controls, textvariable=self.force_2_value_var).pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Label(force_controls, textvariable=self.force_value_var).pack(side=tk.LEFT, padx=(10, 0))
+        self.calibration_zero_button.pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Label(
+            force_values_row,
+            textvariable=self.calibration_status_var,
+        ).pack(side=tk.LEFT)
+        ttk.Label(
+            force_values_row,
+            textvariable=self.force_1_value_var,
+        ).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Label(
+            force_values_row,
+            textvariable=self.force_2_value_var,
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(
+            force_values_row,
+            textvariable=self.force_value_var,
+        ).pack(
+            side=tk.LEFT,
+            padx=(10, 0),
+        )
 
         part_group = ttk.Frame(hardware_notebook, padding=(8, 6))
         hardware_notebook.add(part_group, text="Part / Positioning")
@@ -2614,7 +2743,7 @@ class TestRunGui(tk.Tk):
 
     def _start_test(self):
         if self.colibri_touch_running:
-            messagebox.showwarning("Touch-off in progress", "Stop the force touch-off first.")
+            messagebox.showwarning("Force probe in progress", "Stop the force probe first.")
             return
         if self.calibration_session is not None:
             messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
@@ -2683,7 +2812,7 @@ class TestRunGui(tk.Tk):
 
     def _start_test_impulse(self):
         if self.colibri_touch_running:
-            messagebox.showwarning("Touch-off in progress", "Stop the force touch-off first.")
+            messagebox.showwarning("Force probe in progress", "Stop the force probe first.")
             return
         if self.calibration_session is not None:
             messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
@@ -3583,18 +3712,47 @@ class TestRunGui(tk.Tk):
         self._send("MOTOR_ZERO")
 
     def _motor_move_absolute(self):
+        self._motor_move_to_absolute_position(
+            self.motor_absolute_var,
+            "motor absolute position",
+            "absolute",
+        )
+
+    def _motor_move_center(self):
+        self._motor_move_to_absolute_position(
+            self.motor_center_position_var,
+            "motor center position",
+            "center",
+        )
+
+    def _motor_move_to_absolute_position(self, target_variable, value_name, mode_name):
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before moving.")
             return
 
-        target_mm = self._validated_float(self.motor_absolute_var, "motor absolute position", -2000.0, 2000.0)
+        target_mm = self._validated_float(
+            target_variable,
+            value_name,
+            -2000.0,
+            2000.0,
+        )
+        if target_mm is not None and target_mm > 0.0:
+            messagebox.showerror(
+                "Stepper target outside travel",
+                "After positive homing, absolute Stepper targets must be 0 mm or "
+                "negative. Positive targets lie beyond the home limit switch.",
+            )
+            return
         speed_steps_s = self._apply_motor_speed()
         if target_mm is None or speed_steps_s is None:
             return
 
         target_steps = self._mm_to_steps(target_mm)
-        self.mode_var.set(f"Mode: stepper absolute | {target_mm:.3f} mm")
-        self._write_debug_log(f"GUI stepper absolute target_mm={target_mm:.3f} steps={target_steps}")
+        self.mode_var.set(f"Mode: stepper {mode_name} | {target_mm:.3f} mm")
+        self._write_debug_log(
+            f"GUI stepper {mode_name} target_mm={target_mm:.3f} "
+            f"steps={target_steps}"
+        )
         self._send(f"MOTOR_ABS:{target_steps}")
 
     def _motor_jog(self, direction):
@@ -4092,7 +4250,7 @@ class TestRunGui(tk.Tk):
         self.colibri_position_var.set("Position: --")
         self.last_colibri_position_mm = None
         self.colibri_status_var.set("Colibri: disconnected")
-        self.colibri_touch_status_var.set("Touch-off: Colibri disconnected")
+        self.colibri_touch_status_var.set("Force probe: Colibri disconnected")
         self._update_colibri_touch_controls()
         self._update_connection_summary()
 
@@ -4111,7 +4269,7 @@ class TestRunGui(tk.Tk):
             return
         dialog = tk.Toplevel(self)
         self.colibri_touch_dialog = dialog
-        dialog.title("Force touch-off safety test")
+        dialog.title("Force probe settings")
         dialog.transient(self)
         dialog.resizable(False, False)
         dialog.protocol("WM_DELETE_WINDOW", self._close_colibri_touch_dialog)
@@ -4119,12 +4277,9 @@ class TestRunGui(tk.Tk):
         ttk.Label(
             dialog,
             text=(
-                "Separate hand test: the Colibri moves in the POSITIVE direction. "
-                f"The default mode uses {COLIBRI_TOUCH_STEP_MM:.3f} mm steps. "
-                "Press the platform gently by hand. "
-                f"When F total rises by {COLIBRI_TOUCH_FORCE_N:.3f} N above the measured "
-                "baseline, it stops and retracts by the configured distance in the "
-                "NEGATIVE direction."
+                "The Colibri approaches in the POSITIVE direction until the total force "
+                f"rises by {COLIBRI_TOUCH_FORCE_N:.3f} N above the measured baseline. "
+                "It then stops and retracts in the NEGATIVE direction."
             ),
             wraplength=590,
             justify=tk.LEFT,
@@ -4132,11 +4287,10 @@ class TestRunGui(tk.Tk):
         ttk.Label(
             dialog,
             text=(
-                "The test aborts on stale/invalid force data, Colibri errors, timeout, "
-                "travel limit, excessive baseline noise, or the configured approach limit."
+                "The probe aborts on stale or invalid force data, Colibri errors, the "
+                "configured timeout, excessive baseline noise, or a travel limit."
             ),
             wraplength=590,
-            foreground="#9a4d00",
             justify=tk.LEFT,
         ).pack(fill=tk.X, padx=16, pady=(0, 10))
 
@@ -4171,84 +4325,73 @@ class TestRunGui(tk.Tk):
         ttk.Label(settings, text="Constant approach speed").grid(
             row=2, column=0, sticky=tk.W, pady=3
         )
-        ttk.Label(
+        ttk.Spinbox(
             settings,
-            text=f"{COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}",
+            from_=COLIBRI_TOUCH_MIN_SPEED_MM_S,
+            to=COLIBRI_TOUCH_MAX_SPEED_MM_S,
+            increment=COLIBRI_TOUCH_SPEED_INCREMENT_MM_S,
+            textvariable=self.colibri_touch_speed_var,
+            width=8,
         ).grid(row=2, column=1, padx=(8, 4), pady=3)
         ttk.Label(settings, text="mm/s").grid(row=2, column=2, sticky=tk.W, pady=3)
 
-        continuous_row = ttk.Frame(dialog)
-        continuous_row.pack(fill=tk.X, padx=16, pady=(10, 0))
+        ttk.Label(settings, text="Safety timeout").grid(
+            row=3, column=0, sticky=tk.W, pady=3
+        )
+        ttk.Spinbox(
+            settings,
+            from_=COLIBRI_TOUCH_MIN_TIMEOUT_SECONDS,
+            to=COLIBRI_TOUCH_MAX_TIMEOUT_SECONDS,
+            increment=1.0,
+            textvariable=self.colibri_touch_timeout_var,
+            width=8,
+        ).grid(row=3, column=1, padx=(8, 4), pady=3)
+        ttk.Label(settings, text="s").grid(row=3, column=2, sticky=tk.W, pady=3)
+
         ttk.Checkbutton(
-            continuous_row,
-            text="Controller-continuous approach (experimental)",
+            settings,
+            text="Continuous approach",
             variable=self.colibri_touch_continuous_var,
-        ).pack(anchor=tk.W)
+        ).grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(8, 3))
         ttk.Label(
-            continuous_row,
+            settings,
             text=(
-                "Temporarily sets the Colibri to its minimum positioning speed, sends "
-                "one continuous move, and restores the original speed afterwards. "
-                "Verify stopping distance with the free hand test."
+                f"When disabled, the probe uses {COLIBRI_TOUCH_STEP_MM:.3f} mm "
+                "individual steps instead."
             ),
-            foreground="#9a4d00",
             wraplength=570,
             justify=tk.LEFT,
-        ).pack(anchor=tk.W, padx=(22, 0), pady=(2, 0))
+        ).grid(row=5, column=0, columnspan=3, sticky=tk.W, padx=(22, 0))
 
         ttk.Label(dialog, textvariable=self.colibri_touch_status_var, wraplength=590).pack(
             fill=tk.X, padx=16, pady=(12, 8)
         )
         buttons = ttk.Frame(dialog)
         buttons.pack(fill=tk.X, padx=16, pady=(4, 16))
-        self.colibri_touch_start_button = ttk.Button(
-            buttons,
-            text="Start hand test",
-            command=self._start_colibri_force_touch,
-        )
-        self.colibri_touch_start_button.pack(side=tk.LEFT)
-        self.colibri_touch_stop_button = ttk.Button(
-            buttons,
-            text="Stop and cancel",
-            command=self._cancel_colibri_force_touch,
-            state=tk.DISABLED,
-        )
-        self.colibri_touch_stop_button.pack(side=tk.LEFT, padx=8)
         ttk.Button(buttons, text="Close", command=self._close_colibri_touch_dialog).pack(
             side=tk.RIGHT
         )
         self._update_colibri_touch_controls()
 
     def _close_colibri_touch_dialog(self):
-        if self.colibri_touch_running:
-            messagebox.showwarning(
-                "Touch-off running",
-                "Stop the force touch-off before closing this window.",
-                parent=self.colibri_touch_dialog,
-            )
-            return
         if self.colibri_touch_dialog is not None:
             self.colibri_touch_dialog.destroy()
         self.colibri_touch_dialog = None
 
     def _update_colibri_touch_controls(self):
-        dialog_open = (
-            self.colibri_touch_dialog is not None
-            and self.colibri_touch_dialog.winfo_exists()
-        )
-        if not dialog_open:
-            return
         can_start = bool(
             self.colibri
             and not self.colibri_busy
             and not self.colibri_touch_running
         )
-        self.colibri_touch_start_button.configure(
-            state=tk.NORMAL if can_start else tk.DISABLED
-        )
-        self.colibri_touch_stop_button.configure(
-            state=tk.NORMAL if self.colibri_touch_running else tk.DISABLED
-        )
+        start_button = getattr(self, "colibri_probe_start_button", None)
+        if start_button is not None and start_button.winfo_exists():
+            start_button.configure(state=tk.NORMAL if can_start else tk.DISABLED)
+        settings_button = getattr(self, "colibri_probe_settings_button", None)
+        if settings_button is not None and settings_button.winfo_exists():
+            settings_button.configure(
+                state=tk.NORMAL if not self.colibri_touch_running else tk.DISABLED
+            )
 
     def _touch_force_value(self, sample):
         if sample is None or not sample.valid or sample.status != "ok":
@@ -4273,11 +4416,25 @@ class TestRunGui(tk.Tk):
         return sample, float(force_n)
 
     def _start_colibri_force_touch(self):
+        parent = (
+            self.colibri_touch_dialog
+            if self.colibri_touch_dialog is not None
+            and self.colibri_touch_dialog.winfo_exists()
+            else self
+        )
         if not self.colibri:
-            messagebox.showerror("Colibri disconnected", "Connect the Colibri axis first.")
+            messagebox.showerror(
+                "Colibri disconnected",
+                "Connect the Colibri axis first.",
+                parent=parent,
+            )
             return
         if self.colibri_busy or self.colibri_touch_running:
-            messagebox.showinfo("Colibri busy", "The Colibri axis is already moving.")
+            messagebox.showinfo(
+                "Colibri busy",
+                "The Colibri axis is already moving.",
+                parent=parent,
+            )
             return
         if (
             self.active_sequence_archive is not None
@@ -4287,22 +4444,22 @@ class TestRunGui(tk.Tk):
             or self.calibration_session is not None
         ):
             messagebox.showerror(
-                "Touch-off unavailable",
+                "Force probe unavailable",
                 "Finish the active impulse, sequence, or calibration first.",
-                parent=self.colibri_touch_dialog,
+                parent=parent,
             )
             return
         if self.platform_calibration is None or not self.calibration_zero_refreshed:
             messagebox.showerror(
                 "Fresh platform zero required",
                 "Load or create the platform calibration and run Zero empty platform "
-                "during the current QuantumX connection before this safety test.",
-                parent=self.colibri_touch_dialog,
+                "during the current QuantumX connection before probing.",
+                parent=parent,
             )
             return
         max_approach_mm = self._validated_float(
             self.colibri_touch_max_approach_var,
-            "maximum touch-off approach",
+            "maximum force probe approach",
             COLIBRI_TOUCH_STEP_MM,
             COLIBRI_TOUCH_MAX_APPROACH_MM,
         )
@@ -4310,17 +4467,56 @@ class TestRunGui(tk.Tk):
             return
         retract_mm = self._validated_float(
             self.colibri_touch_retract_var,
-            "touch-off retract distance",
+            "force probe retract distance",
             COLIBRI_TOUCH_MIN_RETRACT_MM,
             COLIBRI_TOUCH_MAX_RETRACT_MM,
         )
         if retract_mm is None:
             return
+        timeout_seconds = self._validated_float(
+            self.colibri_touch_timeout_var,
+            "force probe timeout",
+            COLIBRI_TOUCH_MIN_TIMEOUT_SECONDS,
+            COLIBRI_TOUCH_MAX_TIMEOUT_SECONDS,
+        )
+        if timeout_seconds is None:
+            return
         continuous_approach = bool(self.colibri_touch_continuous_var.get())
+        approach_speed_mm_s = COLIBRI_TOUCH_DEFAULT_SPEED_MM_S
+        approach_speed_setting = round(
+            approach_speed_mm_s / COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
+        )
+        if continuous_approach:
+            approach_speed_mm_s = self._validated_float(
+                self.colibri_touch_speed_var,
+                "force probe approach speed",
+                COLIBRI_TOUCH_MIN_SPEED_MM_S,
+                COLIBRI_TOUCH_MAX_SPEED_MM_S,
+            )
+            if approach_speed_mm_s is None:
+                return
+            approach_speed_setting = round(
+                approach_speed_mm_s / COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
+            )
+            actual_speed_mm_s = (
+                approach_speed_setting * COLIBRI_TOUCH_SPEED_INCREMENT_MM_S
+            )
+            if abs(actual_speed_mm_s - approach_speed_mm_s) > 1.0e-6:
+                messagebox.showerror(
+                    "Invalid force probe speed",
+                    "The Colibri speed must use 0.5 mm/s increments.",
+                    parent=parent,
+                )
+                return
+            approach_speed_mm_s = actual_speed_mm_s
         try:
             _sample, initial_force_n = self._current_touch_force_sample()
         except RuntimeError as exc:
-            messagebox.showerror("Force data unavailable", str(exc), parent=self.colibri_touch_dialog)
+            messagebox.showerror(
+                "Force data unavailable",
+                str(exc),
+                parent=parent,
+            )
             return
         if (
             initial_force_n <= COLIBRI_TOUCH_MIN_BASELINE_N
@@ -4331,37 +4527,15 @@ class TestRunGui(tk.Tk):
                 f"Current total force is {initial_force_n:.4f} N. Before starting it "
                 f"must be above {COLIBRI_TOUCH_MIN_BASELINE_N:.3f} N and no greater "
                 f"than +{COLIBRI_TOUCH_MAX_BASELINE_N:.3f} N.",
-                parent=self.colibri_touch_dialog,
+                parent=parent,
             )
-            return
-        if not messagebox.askyesno(
-            "Start force touch-off hand test?",
-            (
-                "Confirm all of the following:\n\n"
-                "- POSITIVE Colibri motion points toward the component.\n"
-                "- NEGATIVE motion moves safely away.\n"
-                "- Nothing rigid is currently below the platform.\n"
-                "- You will press the platform gently by hand to trigger the stop.\n\n"
-                f"Contact threshold: baseline + {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
-                f"Current baseline: {initial_force_n:.3f} N\n"
-                f"Approach mode: {f'CONTINUOUS / controller minimum / {COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f} mm/s' if continuous_approach else f'{COLIBRI_TOUCH_STEP_MM:.3f} mm steps'}\n"
-                f"Maximum approach: {max_approach_mm:.3f} mm\n"
-                f"Automatic retract: {retract_mm:.3f} mm"
-                + (
-                    "\n\nThe continuous mode temporarily changes the controller's global "
-                    "positioning speed. Keep the mechanism clear and trigger it by hand "
-                    "before testing against a component."
-                    if continuous_approach
-                    else ""
-                )
-            ),
-            parent=self.colibri_touch_dialog,
-        ):
             return
 
         self.colibri_touch_cancel_event = threading.Event()
         self.colibri_touch_running = True
-        self.colibri_touch_status_var.set("Touch-off: acquiring unloaded baseline...")
+        self.colibri_touch_status_var.set(
+            "Force probe: acquiring unloaded baseline..."
+        )
         self._update_colibri_touch_controls()
 
         def task():
@@ -4369,24 +4543,27 @@ class TestRunGui(tk.Tk):
                 max_approach_mm,
                 continuous_approach=continuous_approach,
                 retract_mm=retract_mm,
+                timeout_seconds=timeout_seconds,
+                approach_speed_setting=approach_speed_setting,
+                approach_speed_mm_s=approach_speed_mm_s,
             )
 
         mode_label = "controller-continuous" if continuous_approach else "stepped"
-        self._run_colibri_task(f"Force touch-off hand test ({mode_label})", task)
+        self._run_colibri_task(f"Force probe ({mode_label})", task)
 
     def _cancel_colibri_force_touch(self):
         event = self.colibri_touch_cancel_event
         if not self.colibri_touch_running or event is None:
             return
         event.set()
-        self.colibri_touch_status_var.set("Touch-off: stop requested...")
+        self.colibri_touch_status_var.set("Force probe: stop requested...")
 
         def stop_worker():
             try:
                 if self.colibri:
                     self.colibri.stop()
             except (OSError, serial.SerialException, TimeoutError, ColibriProtocolError) as exc:
-                self.messages.put(("colibri_error", f"Touch-off stop failed: {exc}"))
+                self.messages.put(("colibri_error", f"Force probe stop failed: {exc}"))
 
         threading.Thread(target=stop_worker, daemon=True).start()
 
@@ -4441,6 +4618,9 @@ class TestRunGui(tk.Tk):
         max_approach_mm,
         continuous_approach=False,
         retract_mm=COLIBRI_TOUCH_DEFAULT_RETRACT_MM,
+        timeout_seconds=COLIBRI_TOUCH_DEFAULT_TIMEOUT_SECONDS,
+        approach_speed_setting=COLIBRI_TOUCH_DEFAULT_SPEED_SETTING,
+        approach_speed_mm_s=COLIBRI_TOUCH_DEFAULT_SPEED_MM_S,
     ):
         trace = []
         trace_path = None
@@ -4456,7 +4636,7 @@ class TestRunGui(tk.Tk):
                     f"Colibri reports error 0x{status['error_byte']:02X}."
                 )
             if not status["referenced"]:
-                raise RuntimeError("Colibri must be referenced before force touch-off.")
+                raise RuntimeError("Colibri must be referenced before force probing.")
             if status["moving"]:
                 raise RuntimeError("Colibri is already moving.")
             start_steps = snapshot["position_steps"]
@@ -4466,7 +4646,7 @@ class TestRunGui(tk.Tk):
             positive_travel_limit_steps = self._colibri_mm_to_steps(COLIBRI_TRAVEL_MM)
             if start_steps + max_approach_steps > positive_travel_limit_steps:
                 raise RuntimeError(
-                    "Configured touch-off approach would exceed the positive Colibri travel limit."
+                    "Configured force probe approach would exceed the positive Colibri travel limit."
                 )
 
             self.colibri.set_remote()
@@ -4491,7 +4671,7 @@ class TestRunGui(tk.Tk):
                     COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
                     COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
                 )
-                if original_speed_setting < COLIBRI_TOUCH_MIN_SPEED_SETTING:
+                if original_speed_setting < 1:
                     raise RuntimeError(
                         "Colibri returned an invalid positioning-speed parameter "
                         f"({original_speed_setting})."
@@ -4499,23 +4679,23 @@ class TestRunGui(tk.Tk):
                 self.colibri.set_parameter(
                     COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
                     COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
-                    COLIBRI_TOUCH_MIN_SPEED_SETTING,
+                    approach_speed_setting,
                     COLIBRI_TOUCH_SPEED_PARAMETER_BYTES,
                 )
                 applied_speed_setting = self.colibri.parameter(
                     COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
                     COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
                 )
-                if applied_speed_setting != COLIBRI_TOUCH_MIN_SPEED_SETTING:
+                if applied_speed_setting != approach_speed_setting:
                     raise RuntimeError(
-                        "Colibri did not accept the minimum positioning speed "
+                        "Colibri did not accept the force probe positioning speed "
                         f"(read back {applied_speed_setting})."
                     )
                 self._write_debug_log(
                     "COLIBRI touch continuous speed "
                     f"original_setting={original_speed_setting} "
                     f"temporary_setting={applied_speed_setting} "
-                    f"temporary_speed_mm_s={COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}"
+                    f"temporary_speed_mm_s={approach_speed_mm_s:.3f}"
                 )
                 (
                     contact_snapshot,
@@ -4528,6 +4708,8 @@ class TestRunGui(tk.Tk):
                     max_approach_mm,
                     baseline_mean,
                     trace,
+                    timeout_seconds,
+                    approach_speed_mm_s,
                 )
                 if cancelled_snapshot is not None:
                     trace_path = (
@@ -4540,17 +4722,24 @@ class TestRunGui(tk.Tk):
                         if trace
                         else None
                     )
-                    message = "Touch-off cancelled and stopped."
+                    message = "Force probe cancelled and stopped."
                     if trace_path is not None:
                         message += f" Trace: {trace_path}"
                     self.messages.put(("touch_off_progress", message))
                     return cancelled_snapshot
             else:
+                approach_deadline = time.monotonic() + timeout_seconds
                 step_size_steps = max(
                     1, self._colibri_mm_to_steps(COLIBRI_TOUCH_STEP_MM)
                 )
                 command_count = 0
                 while step_count < max_approach_steps:
+                    if time.monotonic() >= approach_deadline:
+                        self.colibri.stop()
+                        raise TimeoutError(
+                            "Stepped force probe timed out after "
+                            f"{timeout_seconds:.1f} s."
+                        )
                     cancel_event = self.colibri_touch_cancel_event
                     if cancel_event is None or cancel_event.is_set():
                         self.colibri.stop()
@@ -4565,7 +4754,7 @@ class TestRunGui(tk.Tk):
                             if trace
                             else None
                         )
-                        message = "Touch-off cancelled and stopped."
+                        message = "Force probe cancelled and stopped."
                         if trace_path is not None:
                             message += f" Trace: {trace_path}"
                         self.messages.put(("touch_off_progress", message))
@@ -4650,7 +4839,7 @@ class TestRunGui(tk.Tk):
                     self.messages.put(
                         (
                             "touch_off_progress",
-                            "No contact detected; returning to the touch-off start position...",
+                            "No contact detected; returning to the force probe start position...",
                         )
                     )
                     self._set_colibri_motion_direction(-1)
@@ -4801,15 +4990,14 @@ class TestRunGui(tk.Tk):
         max_approach_mm,
         baseline_mean_n,
         trace,
+        configured_timeout_seconds,
+        approach_speed_mm_s,
     ):
         target_steps = start_steps + max_approach_steps
         expected_duration_seconds = (
-            max_approach_mm / COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S
+            max_approach_mm / approach_speed_mm_s
         )
-        timeout_seconds = min(
-            COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS,
-            expected_duration_seconds * 1.5 + 2.0,
-        )
+        timeout_seconds = configured_timeout_seconds
         deadline = time.monotonic() + timeout_seconds
         last_sample_id = None
         sample_count = 0
@@ -4819,7 +5007,9 @@ class TestRunGui(tk.Tk):
             f"start_mm={self._colibri_steps_to_mm(start_steps):.3f} "
             f"target_mm={self._colibri_steps_to_mm(target_steps):.3f} "
             f"max_approach_mm={max_approach_mm:.3f} "
-            f"controller_speed_mm_s={COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}"
+            f"controller_speed_mm_s={approach_speed_mm_s:.3f} "
+            f"configured_timeout_s={configured_timeout_seconds:.1f} "
+            f"nominal_move_duration_s={expected_duration_seconds:.1f}"
         )
 
         def read_force(position_steps, phase):
@@ -4910,7 +5100,7 @@ class TestRunGui(tk.Tk):
                     max_approach_steps,
                     round(
                         elapsed_seconds
-                        * COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S
+                        * approach_speed_mm_s
                         * COLIBRI_STEPS_PER_MM
                     ),
                 )
@@ -4933,7 +5123,7 @@ class TestRunGui(tk.Tk):
         ):
             return None, None, sample_count, None
         raise TimeoutError(
-            "Controller-continuous touch-off approach timed out after "
+            "Controller-continuous force probe approach timed out after "
             f"{timeout_seconds:.1f} s at "
             f"{stopped_snapshot['position_mm']:.3f} mm; target "
             f"{self._colibri_steps_to_mm(target_steps):.3f} mm."
@@ -4949,7 +5139,7 @@ class TestRunGui(tk.Tk):
         data_dir = Path(__file__).with_name("Data")
         data_dir.mkdir(parents=True, exist_ok=True)
         timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        path = data_dir / f"force_touch_off_{timestamp}.csv"
+        path = data_dir / f"force_probe_{timestamp}.csv"
         with open(path, "w", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(
@@ -5546,7 +5736,7 @@ class TestRunGui(tk.Tk):
         )
 
     def _mm_to_steps(self, distance_mm):
-        return max(1, round(distance_mm * MOTOR_STEPS_PER_MM))
+        return round(distance_mm * MOTOR_STEPS_PER_MM)
 
     def _steps_to_mm(self, steps):
         return steps * MOTOR_MM_PER_STEP
@@ -5658,14 +5848,14 @@ class TestRunGui(tk.Tk):
                 self.colibri_status_var.set(f"Colibri: {value}")
                 self.status_var.set(value)
                 if self.colibri_touch_running:
-                    self.colibri_touch_status_var.set(f"Touch-off failed: {value}")
+                    self.colibri_touch_status_var.set(f"Force probe failed: {value}")
             elif kind == "colibri_force_safety_stop":
                 message = f"Positive Colibri motion stopped: {value}"
                 self.colibri_status_var.set(f"Colibri: FORCE SAFETY STOP | {value}")
                 self.status_var.set(message)
                 if self.colibri_touch_running:
                     self.colibri_touch_status_var.set(
-                        f"Touch-off safety stop: {value}"
+                        f"Force probe safety stop: {value}"
                     )
                 messagebox.showwarning("Colibri force safety stop", message)
             elif kind == "colibri_done":
@@ -5676,7 +5866,7 @@ class TestRunGui(tk.Tk):
                 self._set_colibri_controls_enabled(True)
                 self._update_colibri_touch_controls()
             elif kind == "touch_off_progress":
-                self.colibri_touch_status_var.set(f"Touch-off: {value}")
+                self.colibri_touch_status_var.set(f"Force probe: {value}")
                 self.status_var.set(value)
             elif kind == "touch_off_result":
                 trace_path = value.get("trace_path")
@@ -5691,12 +5881,12 @@ class TestRunGui(tk.Tk):
                 if trace_path is not None:
                     result_text += f"\n\nTrace: {trace_path}"
                 self.colibri_touch_status_var.set(
-                    f"Touch-off complete: contact {value['contact_force_n']:.4f} N, "
+                    f"Force probe complete: contact {value['contact_force_n']:.4f} N, "
                     f"rise {value['contact_delta_n']:+.4f} N, "
                     f"retracted to {value['final_position_mm']:.3f} mm"
                 )
                 messagebox.showinfo(
-                    "Force touch-off complete",
+                    "Force probe complete",
                     result_text,
                     parent=(
                         self.colibri_touch_dialog

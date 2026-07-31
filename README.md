@@ -225,6 +225,7 @@ The current local values in `user_presets.json` are:
 | Nozzle offset | `125.41 mm` |
 | Test stand height | `150.00 mm` |
 | Holder height | `43.53 mm` |
+| Stepper center position after positive homing | `-7.00 mm` |
 
 These values describe the current fixture geometry, not universal test-stand constants. The GUI can save changed values back to `user_presets.json` when it closes.
 
@@ -466,16 +467,13 @@ COLIBRI RX ff 06 84 70 1a 00 00 13
 
 The position is a signed little-endian 32-bit integer. `70 1a 00 00` is 6768 steps, or `33.84 mm` at `0.005 mm/step`.
 
-### Force touch-off
+### Force probe
 
-The force touch-off dialog offers two deliberately separate approach modes:
+**Start force probe** begins the configured probing cycle. **Force probe settings...** configures the approach mode, speed, maximum positive distance, retract distance, and safety timeout. The defaults are continuous motion at `1.000 mm/s`, a maximum approach of `10.0 mm`, a `30 s` safety timeout, and a `0.050 mm` retract. The controller accepts speed increments of `0.5 mm/s`; the GUI limits probing speeds to `0.5...5.0 mm/s`.
 
-- **Stepped** advances in small relative moves and checks the QuantumX force between moves.
-- **Controller-continuous (experimental)** temporarily changes BAC parameter `3:2` (maximum positioning speed) to its minimum value `1`, verifies the value by reading it back, and sends one positive relative move. With the installed `0.005 mm/step` axis scale and the controller parameter unit of `100 steps/s`, the nominal approach speed is `0.500 mm/s`.
+The continuous mode temporarily changes BAC parameter `3:2` (maximum positioning speed) to value `2`, verifies the value by reading it back, and sends one positive relative move. With the installed `0.005 mm/step` axis scale and the controller parameter unit of `100 steps/s`, this is nominally `1.000 mm/s`. Setting `1` (`0.500 mm/s`) caused noticeably rough motor operation near the lower speed limit.
 
-The continuous mode polls the force independently while the move is running. Contact stops the current move and retracts from the measured contact position by the distance selected in the dialog. The original BAC speed parameter is restored and verified after success, cancellation, no-contact return, or an error.
-
-Commission this mode only with the free hand test first. Use a short maximum approach, keep the mechanism clear, verify the stopping distance and retract direction, and do not rely on the software force limit as the only protection against a collision.
+The force is polled independently while the move is running. Contact stops the current move and retracts from the measured contact position by the configured distance. The original BAC speed parameter is restored and verified after success, cancellation, no-contact return, or an error. The stepped approach remains available in the settings as a fallback.
 
 ### Known Colibri observations
 

@@ -34,6 +34,49 @@ def measurement(weight_g, placement, force_1, force_2):
 
 
 class PlatformCalibrationTests(unittest.TestCase):
+    def test_stepper_mm_to_steps_preserves_absolute_position_sign(self):
+        self.assertEqual(TestRunGui._mm_to_steps(None, 0.0), 0)
+        self.assertEqual(TestRunGui._mm_to_steps(None, -7.0), -701)
+        self.assertEqual(TestRunGui._mm_to_steps(None, 7.0), 701)
+
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self):
+                return self.value
+
+            def set(self, value):
+                self.value = value
+
+        class DummyGui:
+            _motor_move_center = TestRunGui._motor_move_center
+            _motor_move_to_absolute_position = (
+                TestRunGui._motor_move_to_absolute_position
+            )
+            _validated_float = TestRunGui._validated_float
+            _mm_to_steps = TestRunGui._mm_to_steps
+
+            def __init__(self):
+                self.motor_enabled_var = Variable(True)
+                self.motor_center_position_var = Variable(-7.0)
+                self.mode_var = Variable("")
+                self.commands = []
+
+            def _apply_motor_speed(self):
+                return 500
+
+            def _write_debug_log(self, _message):
+                pass
+
+            def _send(self, command):
+                self.commands.append(command)
+                return True
+
+        gui = DummyGui()
+        gui._motor_move_center()
+        self.assertEqual(gui.commands, ["MOTOR_ABS:-701"])
+
     def test_weight_parser_accepts_decimal_comma(self):
         self.assertEqual(parse_weight_grams("50,15"), 50.15)
         self.assertEqual(validate_weight_list(["200,52", "50.15"]), [0.0, 50.15, 200.52])
@@ -289,7 +332,7 @@ class PlatformCalibrationTests(unittest.TestCase):
             message_kinds.append(gui.messages.get_nowait()[0])
         self.assertIn("touch_off_result", message_kinds)
 
-    def test_continuous_touch_off_uses_minimum_speed_and_restores_it(self):
+    def test_continuous_force_probe_uses_configured_speed_and_restores_it(self):
         class ForceSampleStub:
             def __init__(self, sample_id, force_n):
                 self.sample_id = ("quantumx", sample_id, sample_id)
@@ -392,7 +435,7 @@ class PlatformCalibrationTests(unittest.TestCase):
         )
 
         self.assertEqual(gui.colibri.moves, [20, -10])
-        self.assertEqual(gui.colibri.speed_writes, [(1, 2), (24, 2)])
+        self.assertEqual(gui.colibri.speed_writes, [(2, 2), (24, 2)])
         self.assertEqual(gui.colibri.speed_setting, 24)
         self.assertAlmostEqual(result["position_mm"], 0.05)
 
@@ -408,10 +451,25 @@ class PlatformCalibrationTests(unittest.TestCase):
         self.assertGreaterEqual(cancelled_gui.colibri.stop_count, 2)
         self.assertEqual(
             cancelled_gui.colibri.speed_writes,
-            [(1, 2), (24, 2)],
+            [(2, 2), (24, 2)],
         )
         self.assertEqual(cancelled_gui.colibri.speed_setting, 24)
         self.assertAlmostEqual(cancelled_result["position_mm"], 0.1)
+
+        custom_speed_gui = DummyTouchGui()
+        custom_speed_gui._perform_colibri_force_touch(
+            0.1,
+            continuous_approach=True,
+            retract_mm=0.05,
+            timeout_seconds=30.0,
+            approach_speed_setting=3,
+            approach_speed_mm_s=1.5,
+        )
+        self.assertEqual(
+            custom_speed_gui.colibri.speed_writes,
+            [(3, 2), (24, 2)],
+        )
+        self.assertEqual(custom_speed_gui.colibri.speed_setting, 24)
 
 
 if __name__ == "__main__":
