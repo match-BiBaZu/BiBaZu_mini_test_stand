@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "profile_id": "305ba1b8-b079-41ae-8bc9-b0232a8ae2d7",
+  "name": "Platform calibration",
+  "created_utc": "2026-07-30T18:33:13.839+00:00",
+  "device_ip": "192.168.10.20",
+  "channels": [
+    {
+      "logical_name": "force_1",
+      "mx_channel": 3,
+      "sensor": "TAL221 A",
+      "mx_profile": "TAL221_A_500g"
+    },
+    {
+      "logical_name": "force_2",
+      "mx_channel": 4,
+      "sensor": "TAL221 B",
+      "mx_profile": "TAL221_B_500g"
+    }
+  ],
+  "gravity_m_s2": 9.80665,
+  "gain": 0.9940730491631526,
+  "tare_1_n": -0.6769678287329203,
+  "tare_2_n": -0.5502177184946888,
+  "settle_seconds": 1.0,
+  "acquisition_seconds": 1.0,
+  "placement_repeats": 3,
+  "measurements": [
+    {
+      "weight_g": 0.0,
+      "placement_index": 1,
+      "sample_count": 2401,
+      "force_1_mean_n": -0.2157415897833313,
+      "force_2_mean_n": 0.20331802258562018,
+      "total_mean_n": -0.012423567197711108,
+      "total_std_n": 0.0008227695492763483
+    },
+    {
+      "weight_g": 50.15,
+      "placement_index": 1,
+      "sample_count": 2400,
+      "force_1_mean_n": 0.054042108880045514,
+      "force_2_mean_n": 0.4302659345169862,
+      "total_mean_n": 0.4843080433970317,
+      "total_std_n": 0.000980223010780179
+    },
+    {
+      "weight_g": 50.15,
+      "placement_index": 2,
+      "sample_count": 2401,
+      "force_1_mean_n": 0.055762878585388045,
+      "force_2_mean_n": 0.42839650138871266,
+      "total_mean_n": 0.4841593799741007,
+      "total_std_n": 0.0010530215481664698
+    },
+    {
+      "weight_g": 50.15,
+      "placement_index": 3,
+      "sample_count": 2520,
+      "force_1_mean_n": 0.06235127176734663,
+      "force_2_mean_n": 0.42164625698138797,
+      "total_mean_n": 0.4839975287487346,
+      "total_std_n": 0.0009369844906538728
+    },
+    {
+      "weight_g": 100.26,
+      "placement_index": 1,
+      "sample_count": 2384,
+      "force_1_mean_n": 0.31357267488969254,
+      "force_2_mean_n": 0.6640053232694232,
+      "total_mean_n": 0.9775779981591157,
+      "total_std_n": 0.0016255989402004052
+    },
+    {
+      "weight_g": 100.26,
+      "placement_index": 2,
+      "sample_count": 2512,
+      "force_1_mean_n": 0.32267879854863996,
+      "force_2_mean_n": 0.6542852637684269,
+      "total_mean_n": 0.9769640623170669,
+      "total_std_n": 0.0018164343783753326
+    },
+    {
+      "weight_g": 100.26,
+      "placement_index": 3,
+      "sample_count": 2396,
+      "force_1_mean_n": 0.33787209980923666,
+      "force_2_mean_n": 0.6389679530128612,
+      "total_mean_n": 0.976840052822098,
+      "total_std_n": 0.00152339547174766
+    },
+    {
+      "weight_g": 200.52,
+      "placement_index": 1,
+      "sample_count": 2282,
+      "force_1_mean_n": 0.826557831713027,
+      "force_2_mean_n": 1.1386544628690776,
+      "total_mean_n": 1.9652122945821044,
+      "total_std_n": 0.0020980166867019317
+    },
+    {
+      "weight_g": 200.52,
+      "placement_index": 2,
+      "sample_count": 2519,
+      "force_1_mean_n": 0.8536311278933805,
+      "force_2_mean_n": 1.111913884949618,
+      "total_mean_n": 1.9655450128429983,
+      "total_std_n": 0.0019179100118050304
+    },
+    {
+      "weight_g": 200.52,
+      "placement_index": 3,
+      "sample_count": 2399,
+      "force_1_mean_n": 0.844996084492124,
+      "force_2_mean_n": 1.1193370959718012,
+      "total_mean_n": 1.9643331804639252,
+      "total_std_n": 0.0018934387952721076
+    }
+  ],
+  "quality": {
+    "rmse_n": 0.0012164351008315257,
+    "max_abs_error_n": 0.001984009259639874,
+    "residuals_n": [
+      0.001984009259639874,
+      0.0018362269575078471,
+      0.001675335016397328,
+      0.0009191457505549616,
+      0.00030884867605884825,
+      0.0001855741792698984,
+      -0.0005149467461398327,
+      -0.00018420049002076944,
+      -0.0013888503981605016
+    ],
+    "r_squared": 0.9999960630979332,
+    "position_spread_n_by_weight_g": {
+      "50.15": 0.000308674243242546,
+      "100.26": 0.0007335715712850632,
+      "200.52": 0.0012046499081397322
+    },
+    "max_position_spread_n": 0.0012046499081397322,
+    "warnings": []
+  },
+  "zeroed_utc": "2026-07-30T19:29:33.555+00:00"
+}
