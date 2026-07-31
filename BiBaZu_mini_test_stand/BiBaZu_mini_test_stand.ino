@@ -38,6 +38,7 @@ const int stepperStepActiveSignal = LOW;
 const int stepperStepIdleSignal = HIGH;
 const int stepperPositiveDirSignal = HIGH;
 const int stepperNegativeDirSignal = LOW;
+const int stepperHomeDirection = 1;
 const int stepperEnableSignal = HIGH;
 const int stepperDisableSignal = LOW;
 const unsigned int stepperPulseWidthMicros = 5;
@@ -553,7 +554,7 @@ void startStepperHome() {
   }
 
   stepperHoming = true;
-  beginStepperMove(-2147483647L);
+  beginStepperMove(2147483647L);
   Serial.print("MOTOR;HOME;SPEED;");
   Serial.println(stepperSpeed);
 }
@@ -582,7 +583,11 @@ void updateStepper(unsigned long currentMicros) {
   }
   lastStepperLimitPressed = limitPressed;
 
-  if (limitPressed && stepperRemainingSteps > 0 && stepperMoveDirection < 0) {
+  if (
+    limitPressed
+    && stepperRemainingSteps > 0
+    && stepperMoveDirection == stepperHomeDirection
+  ) {
     stepperRemainingSteps = 0;
     stepperPulseActive = false;
     digitalWrite(stepperStepPin, stepperStepIdleSignal);

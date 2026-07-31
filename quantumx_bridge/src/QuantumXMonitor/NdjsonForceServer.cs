@@ -13,9 +13,12 @@ namespace QuantumXMonitor
         private readonly TcpListener _listener;
         private readonly List<TcpClient> _clients = new List<TcpClient>();
         private readonly object _clientsLock = new object();
+        private readonly object _statusLock = new object();
         private Thread _acceptThread;
         private volatile bool _running;
         private long _sequence;
+        private string _lastStatus;
+        private long _lastStatusTicks;
 
         public NdjsonForceServer(int port)
         {
@@ -63,8 +66,47 @@ namespace QuantumXMonitor
                 channel_1_status = "ok",
                 channel_2_status = "ok"
             }) + "\n";
-            byte[] payload = new UTF8Encoding(false).GetBytes(line);
+            Broadcast(line);
+        }
 
+        public void PublishStatus(string status, string detail)
+        {
+            long nowTicks = DateTime.UtcNow.Ticks;
+            lock (_statusLock)
+            {
+                if (string.Equals(status, _lastStatus, StringComparison.Ordinal) &&
+                    nowTicks - _lastStatusTicks < TimeSpan.TicksPerSecond / 5)
+                {
+                    return;
+                }
+
+                _lastStatus = status;
+                _lastStatusTicks = nowTicks;
+            }
+
+            long sequence = Interlocked.Increment(ref _sequence);
+            string channelStatus = status == "stale" ? "stale" :
+                status == "overrange" ? "overrange" : "disconnected";
+            string line = JsonConvert.SerializeObject(new
+            {
+                schema_version = 1,
+                sequence,
+                timestamp_utc_ns =
+                    (DateTime.UtcNow.Ticks - 621355968000000000L) * 100L,
+                force_1_n = (double?)null,
+                force_2_n = (double?)null,
+                force_total_n = (double?)null,
+                status,
+                channel_1_status = channelStatus,
+                channel_2_status = channelStatus,
+                detail
+            }) + "\n";
+            Broadcast(line);
+        }
+
+        private void Broadcast(string line)
+        {
+            byte[] payload = new UTF8Encoding(false).GetBytes(line);
             lock (_clientsLock)
             {
                 for (int index = _clients.Count - 1; index >= 0; index--)

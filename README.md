@@ -28,8 +28,8 @@ The software and firmware currently expect the following components. Where the e
 | Regulator feedback signal | Measures actual regulator pressure | Arduino A2; current conversion assumes `0-5 V` represents `0-6 bar`; the VEAB black output wire is noted in the firmware |
 | Flow sensor | Measures the pulse flow and integrated volume | Arduino A1; unidirectional `1-5 V`, configured for `0-200 l/min` |
 | Four valves/nozzles | Produce selectable pneumatic pulses | Arduino D4-D7, active HIGH; each nozzle can be enabled separately |
-| Stepper axis and driver | Generic Y-axis positioning | STEP D8, DIR D9, ENABLE D10, negative limit switch D11 |
-| Negative limit switch | References the stepper axis | Arduino D11 with `INPUT_PULLUP`, active LOW |
+| Stepper axis and driver | Generic Y-axis positioning | STEP D8, DIR D9, ENABLE D10, positive limit switch D11 |
+| Positive limit switch | References the stepper axis | Arduino D11 with `INPUT_PULLUP`, active LOW |
 | Colibri linear axis | Second positioning axis, used as the Z axis by the part-position calculation | MPT7512-AK-S-1 with GSM17 / Gunda Colibri Kompakt 17 and integrated BAC controller |
 | DEDITEC USB-RS485 adapter | Connects the PC to the Colibri BAC interface | FTDI VID:PID `0403:6001`, serial `FT30KWBI`; BAC at `9600` baud |
 | Serial force sensor/amplifier | Measures force during each impulse | Separate serial port, default `38400` baud; configured range `2 N`; accepts the supported binary frame or ASCII values |
@@ -53,7 +53,7 @@ The exact valve, pressure-sensor, flow-sensor, stepper-driver, and force-amplifi
 | D8 | Stepper STEP | Active LOW, 5 microsecond pulse |
 | D9 | Stepper DIR | HIGH is positive; LOW is negative |
 | D10 | Stepper ENABLE | HIGH enables the driver |
-| D11 | Stepper negative limit | `INPUT_PULLUP`, active LOW |
+| D11 | Stepper positive limit | `INPUT_PULLUP`, active LOW |
 
 The Arduino and external devices must share the required signal reference. Check the permissible voltage levels before connecting a replacement sensor or driver; the Arduino analog inputs must not be exposed directly to a 10 V signal.
 
@@ -194,7 +194,7 @@ The GUI sends these ASCII command families to the Arduino:
 | `MOTOR_SPEED:<steps/s>` | Set stepper speed |
 | `MOTOR_MOVE:<steps>` | Relative stepper move |
 | `MOTOR_ABS:<steps>` | Absolute stepper move |
-| `MOTOR_HOME` | Reference toward the negative limit switch |
+| `MOTOR_HOME` | Reference toward the positive limit switch |
 | `MOTOR_ZERO` | Set the current stepper position to zero |
 | `MOTOR_POS` | Request the stepper position |
 | `MOTOR_STOP` | Stop stepper motion |
@@ -465,6 +465,17 @@ COLIBRI RX ff 06 84 70 1a 00 00 13
 ```
 
 The position is a signed little-endian 32-bit integer. `70 1a 00 00` is 6768 steps, or `33.84 mm` at `0.005 mm/step`.
+
+### Force touch-off
+
+The force touch-off dialog offers two deliberately separate approach modes:
+
+- **Stepped** advances in small relative moves and checks the QuantumX force between moves.
+- **Controller-continuous (experimental)** temporarily changes BAC parameter `3:2` (maximum positioning speed) to its minimum value `1`, verifies the value by reading it back, and sends one positive relative move. With the installed `0.005 mm/step` axis scale and the controller parameter unit of `100 steps/s`, the nominal approach speed is `0.500 mm/s`.
+
+The continuous mode polls the force independently while the move is running. Contact stops the current move and retracts from the measured contact position by the distance selected in the dialog. The original BAC speed parameter is restored and verified after success, cancellation, no-contact return, or an error.
+
+Commission this mode only with the free hand test first. Use a short maximum approach, keep the mechanism clear, verify the stopping distance and retract direction, and do not rely on the software force limit as the only protection against a collision.
 
 ### Known Colibri observations
 

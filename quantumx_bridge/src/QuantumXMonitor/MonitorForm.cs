@@ -18,11 +18,13 @@ namespace QuantumXMonitor
         private readonly Button _zeroBothButton;
         private readonly Button _reconnectButton;
         private readonly NdjsonForceServer _forceServer;
+        private readonly System.Windows.Forms.Timer _reconnectTimer;
         private readonly int _force1ChannelNumber;
         private readonly int _force2ChannelNumber;
         private CancellationTokenSource _cancellation;
         private Task _readerTask;
         private QuantumXReader _reader;
+        private bool _closing;
 
         public MonitorForm(bool serverOnly = false)
         {
@@ -129,6 +131,12 @@ namespace QuantumXMonitor
 
             _forceServer = new NdjsonForceServer(5500);
             _forceServer.Start();
+            _reconnectTimer = new System.Windows.Forms.Timer { Interval = 3000 };
+            _reconnectTimer.Tick += (sender, args) =>
+            {
+                _reconnectTimer.Stop();
+                StartReader();
+            };
 
             Shown += (sender, args) => StartReader();
             FormClosing += OnFormClosing;
@@ -173,6 +181,13 @@ namespace QuantumXMonitor
                 return;
             }
 
+            _reconnectTimer.Stop();
+            if (_cancellation != null)
+            {
+                _cancellation.Dispose();
+                _cancellation = null;
+            }
+
             _reconnectButton.Enabled = false;
             _zeroBothButton.Enabled = false;
             _force1Value.Text = "— N";
@@ -188,11 +203,15 @@ namespace QuantumXMonitor
                 _force2ChannelNumber);
             _reader = reader;
             long lastUiUpdateTicks = 0;
-            reader.StatusChanged += status => PostToUi(() =>
+            reader.StatusChanged += status =>
             {
-                SetStatus(status, StatusColor(status));
-                UpdateZeroButton(status);
-            });
+                PublishReaderStatus(status);
+                PostToUi(() =>
+                {
+                    SetStatus(status, StatusColor(status));
+                    UpdateZeroButton(status);
+                });
+            };
             reader.SampleReceived += sample =>
             {
                 _forceServer.Publish(sample);
@@ -215,6 +234,7 @@ namespace QuantumXMonitor
                 string message = task.Exception == null
                     ? "Measurement stopped"
                     : "Error: " + task.Exception.GetBaseException().Message;
+                _forceServer.PublishStatus("disconnected", message);
                 if (task.Exception != null)
                 {
                     WriteLog(task.Exception.GetBaseException().ToString());
@@ -225,8 +245,27 @@ namespace QuantumXMonitor
                     SetStatus(message, Color.Firebrick);
                     _zeroBothButton.Enabled = false;
                     _reconnectButton.Enabled = true;
+                    if (!_closing)
+                    {
+                        SetStatus(message + " Retrying in 3 s ...", Color.Firebrick);
+                        _reconnectTimer.Start();
+                    }
                 });
             }, TaskScheduler.Default);
+        }
+
+        private void PublishReaderStatus(string message)
+        {
+            if (message.StartsWith("Overrange", StringComparison.OrdinalIgnoreCase))
+            {
+                _forceServer.PublishStatus("overrange", message);
+            }
+            else if (message.StartsWith("Initializing", StringComparison.OrdinalIgnoreCase) ||
+                     message.StartsWith("Searching", StringComparison.OrdinalIgnoreCase) ||
+                     message.StartsWith("Fallback", StringComparison.OrdinalIgnoreCase))
+            {
+                _forceServer.PublishStatus("stale", message);
+            }
         }
 
         private void ZeroBothSensors()
@@ -326,6 +365,9 @@ namespace QuantumXMonitor
 
         private void OnFormClosing(object sender, FormClosingEventArgs eventArgs)
         {
+            _closing = true;
+            _reconnectTimer.Stop();
+            _reconnectTimer.Dispose();
             _forceServer.Dispose();
             if (_cancellation == null)
             {

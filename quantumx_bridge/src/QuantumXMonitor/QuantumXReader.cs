@@ -20,6 +20,7 @@ namespace QuantumXMonitor
         private const int AverageWindowSize = 100;
         private const int FastAverageWindowSize = 20;
         private const int ZeroBalanceSampleCount = 100;
+        private const int ValidSampleTimeoutMilliseconds = 3000;
         private readonly string _ipAddress;
         private readonly int _force1ChannelNumber;
         private readonly int _force2ChannelNumber;
@@ -117,6 +118,8 @@ namespace QuantumXMonitor
                 var fastAverageTotal = new RollingAverage(FastAverageWindowSize);
                 double? measurementTimestampAnchor = null;
                 long utcTimestampAnchorNs = 0;
+                var validSampleWatchdog = Stopwatch.StartNew();
+                bool invalidValuesSeen = false;
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -140,10 +143,15 @@ namespace QuantumXMonitor
                             daqStarted = true;
                             measurementTimestampAnchor = null;
                             utcTimestampAnchorNs = 0;
+                            validSampleWatchdog.Restart();
+                            invalidValuesSeen = false;
                         }
                     }
 
-                    measurement.FillMeasurementValues(true);
+                    // Use the same non-blocking update call as HBK's installed
+                    // Common API demo. A blocking overload can remain stuck when
+                    // a stream stops delivering valid measurement values.
+                    measurement.FillMeasurementValues();
 
                     int count1 = signal1.ContinuousMeasurementValues.UpdatedValueCount;
                     int count2 = signal2.ContinuousMeasurementValues.UpdatedValueCount;
@@ -163,6 +171,7 @@ namespace QuantumXMonitor
                             signal2.ContinuousMeasurementValues.States[index] != MeasurementValueState.Valid)
                         {
                             overflow = true;
+                            invalidValuesSeen = true;
                             continue;
                         }
 
@@ -201,6 +210,8 @@ namespace QuantumXMonitor
                             WindowSize = averageTotal.Capacity,
                             SampleRateHz = (double)signal1.SampleRate
                         });
+                        validSampleWatchdog.Restart();
+                        invalidValuesSeen = false;
                     }
 
                     if (overflow)
@@ -208,6 +219,7 @@ namespace QuantumXMonitor
                         OnStatus("Overrange - invalid values are excluded from averaging");
                     }
 
+                    ThrowIfValidSamplesTimedOut(validSampleWatchdog, invalidValuesSeen);
                     cancellationToken.WaitHandle.WaitOne(20);
                 }
             }
@@ -265,7 +277,9 @@ namespace QuantumXMonitor
             var fastAverage2 = new RollingAverage(FastAverageWindowSize);
             var fastAverageTotal = new RollingAverage(FastAverageWindowSize);
             var rateTimer = Stopwatch.StartNew();
+            var validSampleWatchdog = Stopwatch.StartNew();
             double displayedRate = 0.0;
+            bool invalidValuesSeen = false;
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -318,15 +332,37 @@ namespace QuantumXMonitor
                         WindowSize = averageTotal.Capacity,
                         SampleRateHz = displayedRate
                     });
+                    validSampleWatchdog.Restart();
+                    invalidValuesSeen = false;
                 }
                 else
                 {
+                    invalidValuesSeen = true;
                     OnStatus("Overrange - invalid values are excluded from averaging");
                 }
 
+                ThrowIfValidSamplesTimedOut(validSampleWatchdog, invalidValuesSeen);
                 rateTimer.Restart();
                 cancellationToken.WaitHandle.WaitOne(20);
             }
+        }
+
+        private static void ThrowIfValidSamplesTimedOut(
+            Stopwatch validSampleWatchdog,
+            bool invalidValuesSeen)
+        {
+            if (validSampleWatchdog.ElapsedMilliseconds < ValidSampleTimeoutMilliseconds)
+            {
+                return;
+            }
+
+            string reason = invalidValuesSeen
+                ? "the channel state remained invalid/overrange"
+                : "the data stream stopped";
+            throw new InvalidOperationException(
+                "No valid QuantumX force samples for " +
+                (ValidSampleTimeoutMilliseconds / 1000.0).ToString("0.0") +
+                " s because " + reason + ".");
         }
 
         private static long UtcNowNs()

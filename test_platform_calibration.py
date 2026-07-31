@@ -273,15 +273,145 @@ class PlatformCalibrationTests(unittest.TestCase):
             def _write_colibri_touch_trace(self, *_args):
                 return Path("touch.csv")
 
+            def _set_colibri_motion_direction(self, _direction):
+                pass
+
+            def _clear_colibri_motion_direction(self, **_kwargs):
+                pass
+
         gui = DummyTouchGui()
         result = gui._perform_colibri_force_touch(0.1)
-        self.assertEqual(gui.colibri.moves, [1, -10])
+        self.assertEqual(gui.colibri.moves, [2, -10])
         self.assertGreaterEqual(gui.colibri.stop_count, 1)
-        self.assertAlmostEqual(result["position_mm"], -0.045)
+        self.assertAlmostEqual(result["position_mm"], -0.04)
         message_kinds = []
         while not gui.messages.empty():
             message_kinds.append(gui.messages.get_nowait()[0])
         self.assertIn("touch_off_result", message_kinds)
+
+    def test_continuous_touch_off_uses_minimum_speed_and_restores_it(self):
+        class ForceSampleStub:
+            def __init__(self, sample_id, force_n):
+                self.sample_id = ("quantumx", sample_id, sample_id)
+                self.force_total_n = force_n
+
+        class FakeColibri:
+            def __init__(self):
+                self.steps = 0
+                self.moves = []
+                self.stop_count = 0
+                self.speed_setting = 24
+                self.speed_writes = []
+
+            def set_remote(self):
+                pass
+
+            def enable(self):
+                pass
+
+            def stop(self):
+                self.stop_count += 1
+
+            def position_steps(self):
+                return self.steps
+
+            def move_relative_steps(self, steps):
+                self.steps += steps
+                self.moves.append(steps)
+
+            def parameter(self, index, subindex):
+                self.assert_speed_parameter(index, subindex)
+                return self.speed_setting
+
+            def set_parameter(self, index, subindex, value, byte_count):
+                self.assert_speed_parameter(index, subindex)
+                self.speed_setting = value
+                self.speed_writes.append((value, byte_count))
+
+            @staticmethod
+            def assert_speed_parameter(index, subindex):
+                if (index, subindex) != (3, 2):
+                    raise AssertionError((index, subindex))
+
+        class DummyTouchGui:
+            _colibri_mm_to_steps = TestRunGui._colibri_mm_to_steps
+            _colibri_steps_to_mm = TestRunGui._colibri_steps_to_mm
+            _perform_colibri_force_touch = TestRunGui._perform_colibri_force_touch
+            _perform_continuous_touch_approach = (
+                TestRunGui._perform_continuous_touch_approach
+            )
+
+            def __init__(self):
+                self.colibri = FakeColibri()
+                self.colibri_touch_cancel_event = threading.Event()
+                self.messages = queue.Queue()
+                self.platform_calibration = None
+                self.force_index = 0
+
+            def _read_colibri_snapshot(self):
+                return {
+                    "status": {
+                        "error_byte": 0,
+                        "referenced": True,
+                        "moving": False,
+                    },
+                    "position_steps": self.colibri.steps,
+                    "position_mm": self._colibri_steps_to_mm(self.colibri.steps),
+                }
+
+            def _acquire_touch_baseline(self):
+                return 0.0, 0.001, 25
+
+            def _current_touch_force_sample(self):
+                self.force_index += 1
+                force_n = 0.11 if self.force_index == 1 else 0.0
+                return ForceSampleStub(self.force_index, force_n), force_n
+
+            def _wait_for_colibri_move(self, target_steps, **_kwargs):
+                if self.colibri.steps != target_steps:
+                    raise AssertionError((self.colibri.steps, target_steps))
+                return self._read_colibri_snapshot()
+
+            def _write_colibri_touch_trace(self, *_args):
+                return Path("touch.csv")
+
+            def _write_debug_log(self, _message):
+                pass
+
+            def _set_colibri_motion_direction(self, _direction):
+                pass
+
+            def _clear_colibri_motion_direction(self, **_kwargs):
+                pass
+
+        gui = DummyTouchGui()
+        result = gui._perform_colibri_force_touch(
+            0.1,
+            continuous_approach=True,
+            retract_mm=0.05,
+        )
+
+        self.assertEqual(gui.colibri.moves, [20, -10])
+        self.assertEqual(gui.colibri.speed_writes, [(1, 2), (24, 2)])
+        self.assertEqual(gui.colibri.speed_setting, 24)
+        self.assertAlmostEqual(result["position_mm"], 0.05)
+
+        cancelled_gui = DummyTouchGui()
+        cancelled_gui.colibri_touch_cancel_event.set()
+        cancelled_result = cancelled_gui._perform_colibri_force_touch(
+            0.1,
+            continuous_approach=True,
+            retract_mm=0.05,
+        )
+
+        self.assertEqual(cancelled_gui.colibri.moves, [20])
+        self.assertGreaterEqual(cancelled_gui.colibri.stop_count, 2)
+        self.assertEqual(
+            cancelled_gui.colibri.speed_writes,
+            [(1, 2), (24, 2)],
+        )
+        self.assertEqual(cancelled_gui.colibri.speed_setting, 24)
+        self.assertAlmostEqual(cancelled_result["position_mm"], 0.1)
 
 
 if __name__ == "__main__":

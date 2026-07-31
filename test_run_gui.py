@@ -73,10 +73,16 @@ COLIBRI_TOUCH_MIN_RETRACT_MM = COLIBRI_MM_PER_STEP
 COLIBRI_TOUCH_MAX_RETRACT_MM = 5.0
 COLIBRI_TOUCH_DEFAULT_MAX_APPROACH_MM = 1.0
 COLIBRI_TOUCH_MAX_APPROACH_MM = 5.0
-COLIBRI_TOUCH_DEFAULT_PACED_SPEED_MM_S = 0.1
-COLIBRI_TOUCH_MIN_PACED_SPEED_MM_S = 0.01
-COLIBRI_TOUCH_MAX_PACED_SPEED_MM_S = 1.0
-COLIBRI_TOUCH_PACED_SEGMENT_MM = 0.01
+COLIBRI_TOUCH_SPEED_PARAMETER_INDEX = 3
+COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX = 2
+COLIBRI_TOUCH_SPEED_PARAMETER_BYTES = 2
+COLIBRI_TOUCH_MIN_SPEED_SETTING = 1
+COLIBRI_TOUCH_SPEED_SETTING_HZ = 100.0
+COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S = (
+    COLIBRI_TOUCH_MIN_SPEED_SETTING
+    * COLIBRI_TOUCH_SPEED_SETTING_HZ
+    * COLIBRI_MM_PER_STEP
+)
 COLIBRI_TOUCH_SAMPLE_MAX_AGE_SECONDS = 0.25
 COLIBRI_TOUCH_BASELINE_SECONDS = 0.4
 COLIBRI_TOUCH_BASELINE_MAX_SECONDS = 1.5
@@ -438,9 +444,6 @@ class TestRunGui(tk.Tk):
         )
         self.colibri_touch_retract_var = tk.DoubleVar(
             value=COLIBRI_TOUCH_DEFAULT_RETRACT_MM
-        )
-        self.colibri_touch_paced_speed_var = tk.DoubleVar(
-            value=COLIBRI_TOUCH_DEFAULT_PACED_SPEED_MM_S
         )
         self.colibri_touch_continuous_var = tk.BooleanVar(value=False)
         self.colibri_touch_status_var = tk.StringVar(value="Touch-off: idle")
@@ -1551,7 +1554,7 @@ class TestRunGui(tk.Tk):
 
         self.motor_home_button = ttk.Button(
             motor_controls,
-            text="Home -",
+            text="Home +",
             command=self._motor_home,
             state=tk.DISABLED,
         )
@@ -3571,8 +3574,8 @@ class TestRunGui(tk.Tk):
         if speed_steps_s is None:
             return
 
-        self.mode_var.set("Mode: stepper homing")
-        self._write_debug_log("GUI stepper home")
+        self.mode_var.set("Mode: stepper homing +")
+        self._write_debug_log("GUI stepper home positive")
         self._send("MOTOR_HOME")
 
     def _motor_set_zero(self):
@@ -4165,16 +4168,12 @@ class TestRunGui(tk.Tk):
         ).grid(row=1, column=1, padx=(8, 4), pady=3)
         ttk.Label(settings, text="mm").grid(row=1, column=2, sticky=tk.W, pady=3)
 
-        ttk.Label(settings, text="Paced approach speed").grid(
+        ttk.Label(settings, text="Constant approach speed").grid(
             row=2, column=0, sticky=tk.W, pady=3
         )
-        ttk.Spinbox(
+        ttk.Label(
             settings,
-            from_=COLIBRI_TOUCH_MIN_PACED_SPEED_MM_S,
-            to=COLIBRI_TOUCH_MAX_PACED_SPEED_MM_S,
-            increment=0.01,
-            textvariable=self.colibri_touch_paced_speed_var,
-            width=8,
+            text=f"{COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}",
         ).grid(row=2, column=1, padx=(8, 4), pady=3)
         ttk.Label(settings, text="mm/s").grid(row=2, column=2, sticky=tk.W, pady=3)
 
@@ -4182,14 +4181,15 @@ class TestRunGui(tk.Tk):
         continuous_row.pack(fill=tk.X, padx=16, pady=(10, 0))
         ttk.Checkbutton(
             continuous_row,
-            text="Software-paced approach (experimental)",
+            text="Controller-continuous approach (experimental)",
             variable=self.colibri_touch_continuous_var,
         ).pack(anchor=tk.W)
         ttk.Label(
             continuous_row,
             text=(
-                f"Uses {COLIBRI_TOUCH_PACED_SEGMENT_MM:.3f} mm motion segments at the "
-                "selected average speed. Verify stopping distance with the free hand test."
+                "Temporarily sets the Colibri to its minimum positioning speed, sends "
+                "one continuous move, and restores the original speed afterwards. "
+                "Verify stopping distance with the free hand test."
             ),
             foreground="#9a4d00",
             wraplength=570,
@@ -4316,14 +4316,6 @@ class TestRunGui(tk.Tk):
         )
         if retract_mm is None:
             return
-        paced_speed_mm_s = self._validated_float(
-            self.colibri_touch_paced_speed_var,
-            "touch-off paced speed",
-            COLIBRI_TOUCH_MIN_PACED_SPEED_MM_S,
-            COLIBRI_TOUCH_MAX_PACED_SPEED_MM_S,
-        )
-        if paced_speed_mm_s is None:
-            return
         continuous_approach = bool(self.colibri_touch_continuous_var.get())
         try:
             _sample, initial_force_n = self._current_touch_force_sample()
@@ -4352,12 +4344,12 @@ class TestRunGui(tk.Tk):
                 "- You will press the platform gently by hand to trigger the stop.\n\n"
                 f"Contact threshold: baseline + {COLIBRI_TOUCH_FORCE_N:.3f} N\n"
                 f"Current baseline: {initial_force_n:.3f} N\n"
-                f"Approach mode: {f'SOFTWARE-PACED / {paced_speed_mm_s:.3f} mm/s' if continuous_approach else f'{COLIBRI_TOUCH_STEP_MM:.3f} mm steps'}\n"
+                f"Approach mode: {f'CONTINUOUS / controller minimum / {COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f} mm/s' if continuous_approach else f'{COLIBRI_TOUCH_STEP_MM:.3f} mm steps'}\n"
                 f"Maximum approach: {max_approach_mm:.3f} mm\n"
                 f"Automatic retract: {retract_mm:.3f} mm"
                 + (
-                    "\n\nThe software-paced mode uses short motion segments to limit "
-                    "its average speed. Keep the mechanism clear and trigger it by hand "
+                    "\n\nThe continuous mode temporarily changes the controller's global "
+                    "positioning speed. Keep the mechanism clear and trigger it by hand "
                     "before testing against a component."
                     if continuous_approach
                     else ""
@@ -4377,10 +4369,9 @@ class TestRunGui(tk.Tk):
                 max_approach_mm,
                 continuous_approach=continuous_approach,
                 retract_mm=retract_mm,
-                paced_speed_mm_s=paced_speed_mm_s,
             )
 
-        mode_label = "software-paced" if continuous_approach else "stepped"
+        mode_label = "controller-continuous" if continuous_approach else "stepped"
         self._run_colibri_task(f"Force touch-off hand test ({mode_label})", task)
 
     def _cancel_colibri_force_touch(self):
@@ -4450,13 +4441,13 @@ class TestRunGui(tk.Tk):
         max_approach_mm,
         continuous_approach=False,
         retract_mm=COLIBRI_TOUCH_DEFAULT_RETRACT_MM,
-        paced_speed_mm_s=COLIBRI_TOUCH_DEFAULT_PACED_SPEED_MM_S,
     ):
         trace = []
         trace_path = None
         baseline_mean = None
         baseline_std = None
         contact_force_n = None
+        original_speed_setting = None
         try:
             snapshot = self._read_colibri_snapshot()
             status = snapshot["status"]
@@ -4496,6 +4487,36 @@ class TestRunGui(tk.Tk):
             contact_snapshot = None
             step_count = 0
             if continuous_approach:
+                original_speed_setting = self.colibri.parameter(
+                    COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                )
+                if original_speed_setting < COLIBRI_TOUCH_MIN_SPEED_SETTING:
+                    raise RuntimeError(
+                        "Colibri returned an invalid positioning-speed parameter "
+                        f"({original_speed_setting})."
+                    )
+                self.colibri.set_parameter(
+                    COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                    COLIBRI_TOUCH_MIN_SPEED_SETTING,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_BYTES,
+                )
+                applied_speed_setting = self.colibri.parameter(
+                    COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                    COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                )
+                if applied_speed_setting != COLIBRI_TOUCH_MIN_SPEED_SETTING:
+                    raise RuntimeError(
+                        "Colibri did not accept the minimum positioning speed "
+                        f"(read back {applied_speed_setting})."
+                    )
+                self._write_debug_log(
+                    "COLIBRI touch continuous speed "
+                    f"original_setting={original_speed_setting} "
+                    f"temporary_setting={applied_speed_setting} "
+                    f"temporary_speed_mm_s={COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}"
+                )
                 (
                     contact_snapshot,
                     contact_force_n,
@@ -4506,7 +4527,6 @@ class TestRunGui(tk.Tk):
                     max_approach_steps,
                     max_approach_mm,
                     baseline_mean,
-                    paced_speed_mm_s,
                     trace,
                 )
                 if cancelled_snapshot is not None:
@@ -4741,6 +4761,38 @@ class TestRunGui(tk.Tk):
                 except OSError:
                     pass
             raise
+        finally:
+            if original_speed_setting is not None and self.colibri:
+                try:
+                    self.colibri.stop()
+                    self.colibri.set_parameter(
+                        COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                        COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                        original_speed_setting,
+                        COLIBRI_TOUCH_SPEED_PARAMETER_BYTES,
+                    )
+                    restored_speed_setting = self.colibri.parameter(
+                        COLIBRI_TOUCH_SPEED_PARAMETER_INDEX,
+                        COLIBRI_TOUCH_SPEED_PARAMETER_SUBINDEX,
+                    )
+                    if restored_speed_setting != original_speed_setting:
+                        raise RuntimeError(
+                            "Colibri positioning speed restore verification failed "
+                            f"(expected {original_speed_setting}, read "
+                            f"{restored_speed_setting})."
+                        )
+                    self._write_debug_log(
+                        "COLIBRI touch continuous speed restored "
+                        f"setting={restored_speed_setting}"
+                    )
+                except Exception as exc:
+                    self.messages.put(
+                        (
+                            "colibri_error",
+                            "Could not restore the original Colibri positioning "
+                            f"speed: {exc}",
+                        )
+                    )
 
     def _perform_continuous_touch_approach(
         self,
@@ -4748,31 +4800,26 @@ class TestRunGui(tk.Tk):
         max_approach_steps,
         max_approach_mm,
         baseline_mean_n,
-        paced_speed_mm_s,
         trace,
     ):
         target_steps = start_steps + max_approach_steps
-        expected_duration_seconds = max_approach_mm / paced_speed_mm_s
-        timeout_seconds = max(
+        expected_duration_seconds = (
+            max_approach_mm / COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S
+        )
+        timeout_seconds = min(
             COLIBRI_TOUCH_CONTINUOUS_TIMEOUT_SECONDS,
-            expected_duration_seconds * 2.0 + 5.0,
+            expected_duration_seconds * 1.5 + 2.0,
         )
         deadline = time.monotonic() + timeout_seconds
-        segment_steps = max(
-            1, self._colibri_mm_to_steps(COLIBRI_TOUCH_PACED_SEGMENT_MM)
-        )
-        approached_steps = 0
-        segment_count = 0
         last_sample_id = None
         sample_count = 0
 
         self._write_debug_log(
-            "COLIBRI touch paced start "
+            "COLIBRI touch continuous start "
             f"start_mm={self._colibri_steps_to_mm(start_steps):.3f} "
             f"target_mm={self._colibri_steps_to_mm(target_steps):.3f} "
             f"max_approach_mm={max_approach_mm:.3f} "
-            f"paced_speed_mm_s={paced_speed_mm_s:.3f} "
-            f"segment_mm={COLIBRI_TOUCH_PACED_SEGMENT_MM:.3f}"
+            f"controller_speed_mm_s={COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S:.3f}"
         )
 
         def read_force(position_steps, phase):
@@ -4827,7 +4874,7 @@ class TestRunGui(tk.Tk):
             self.colibri.stop()
             contact_snapshot = self._read_colibri_snapshot()
             self._write_debug_log(
-                "COLIBRI touch paced contact "
+                "COLIBRI touch continuous contact "
                 f"baseline_force_n={baseline_mean_n:.6f} "
                 f"filtered_force_n={force_n:.6f} "
                 f"filtered_delta_n={force_delta_n:.6f} "
@@ -4848,7 +4895,9 @@ class TestRunGui(tk.Tk):
 
         self._set_colibri_motion_direction(1)
         try:
-            while approached_steps < max_approach_steps:
+            move_start = time.monotonic()
+            self.colibri.move_relative_steps(max_approach_steps)
+            while time.monotonic() < deadline:
                 if time.monotonic() >= deadline:
                     break
                 cancel_event = self.colibri_touch_cancel_event
@@ -4856,83 +4905,38 @@ class TestRunGui(tk.Tk):
                     self.colibri.stop()
                     return None, None, sample_count, self._read_colibri_snapshot()
 
-                current_steps = self.colibri.position_steps()
-                force_values = read_force(current_steps, "paced_wait")
-                if force_values[4] or force_values[5]:
-                    return finish_contact(current_steps, force_values)
-
-                move_steps = min(
-                    segment_steps,
-                    max_approach_steps - approached_steps,
+                elapsed_seconds = time.monotonic() - move_start
+                estimated_travel_steps = min(
+                    max_approach_steps,
+                    round(
+                        elapsed_seconds
+                        * COLIBRI_TOUCH_MIN_CONSTANT_SPEED_MM_S
+                        * COLIBRI_STEPS_PER_MM
+                    ),
                 )
-                target_segment_steps = current_steps + move_steps
-                segment_start = time.monotonic()
-                self.colibri.move_relative_steps(move_steps)
-                segment_snapshot = self._wait_for_colibri_move(
-                    target_segment_steps,
-                    timeout_seconds=2.0,
-                    tolerance_steps=1,
-                )
-                approached_steps += move_steps
-                segment_count += 1
-
+                estimated_steps = start_steps + estimated_travel_steps
                 force_values = read_force(
-                    segment_snapshot["position_steps"],
-                    "paced_approach",
+                    estimated_steps,
+                    "continuous_position_estimated",
                 )
                 if force_values[4] or force_values[5]:
-                    return finish_contact(
-                        segment_snapshot["position_steps"],
-                        force_values,
-                    )
-                force_n = force_values[0]
-                force_delta_n = force_values[2]
-                if segment_count == 1 or segment_count % 5 == 0:
-                    travelled_mm = self._colibri_steps_to_mm(approached_steps)
-                    self.messages.put(
-                        (
-                            "touch_off_progress",
-                            f"Paced approach {travelled_mm:.3f} / "
-                            f"{max_approach_mm:.3f} mm | force {force_n:.4f} N | "
-                            f"rise {force_delta_n:+.4f} N",
-                        )
-                    )
-
-                segment_duration_seconds = (
-                    self._colibri_steps_to_mm(move_steps) / paced_speed_mm_s
-                )
-                next_segment_time = segment_start + segment_duration_seconds
-                while time.monotonic() < next_segment_time:
-                    cancel_event = self.colibri_touch_cancel_event
-                    if cancel_event is None or cancel_event.is_set():
-                        self.colibri.stop()
-                        return (
-                            None,
-                            None,
-                            sample_count,
-                            self._read_colibri_snapshot(),
-                        )
-                    force_values = read_force(
-                        segment_snapshot["position_steps"],
-                        "paced_wait",
-                    )
-                    if force_values[4] or force_values[5]:
-                        return finish_contact(
-                            segment_snapshot["position_steps"],
-                            force_values,
-                        )
-                    time.sleep(COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS)
-
-            if approached_steps >= max_approach_steps:
-                self.colibri.stop()
-                return None, None, sample_count, None
+                    return finish_contact(estimated_steps, force_values)
+                time.sleep(COLIBRI_TOUCH_CONTINUOUS_POLL_SECONDS)
         finally:
             self._clear_colibri_motion_direction(expected_direction=1)
 
         self.colibri.stop()
+        stopped_snapshot = self._read_colibri_snapshot()
+        if (
+            abs(stopped_snapshot["position_steps"] - target_steps)
+            <= 2
+        ):
+            return None, None, sample_count, None
         raise TimeoutError(
-            "Software-paced touch-off approach timed out after "
-            f"{timeout_seconds:.1f} s."
+            "Controller-continuous touch-off approach timed out after "
+            f"{timeout_seconds:.1f} s at "
+            f"{stopped_snapshot['position_mm']:.3f} mm; target "
+            f"{self._colibri_steps_to_mm(target_steps):.3f} mm."
         )
 
     def _write_colibri_touch_trace(
@@ -6450,10 +6454,12 @@ class TestRunGui(tk.Tk):
             self.status_var.set("Stepper zero reference set")
         elif event == "HOME_DONE":
             self.mode_var.set("Mode: stepper homed")
-            self.status_var.set("Stepper homed at limit switch")
+            self.status_var.set("Stepper homed at positive limit switch")
         elif event in ("LIMIT", "LIMIT_STOP"):
             self.mode_var.set("Mode: stepper limit switch")
-            self.status_var.set("Stepper limit switch active; zero reference set")
+            self.status_var.set(
+                "Stepper positive limit switch active; zero reference set"
+            )
         elif event == "DONE":
             self.mode_var.set("Mode: stepper done")
             self.status_var.set(f"Stepper move complete at {position_mm:.3f} mm")
