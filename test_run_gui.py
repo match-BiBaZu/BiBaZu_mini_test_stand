@@ -1679,14 +1679,14 @@ class TestRunGui(tk.Tk):
 
         self.motor_reverse_button = ttk.Button(
             motor_motion_controls,
-            text="Jog -",
+            text="Jog up",
             command=self._motor_jog_reverse,
             state=tk.DISABLED,
         )
         self.motor_reverse_button.pack(side=tk.LEFT, padx=(18, 0))
         self.motor_forward_button = ttk.Button(
             motor_motion_controls,
-            text="Jog +",
+            text="Jog down",
             command=self._motor_jog_forward,
             state=tk.DISABLED,
         )
@@ -1817,14 +1817,14 @@ class TestRunGui(tk.Tk):
 
         self.colibri_reverse_button = ttk.Button(
             colibri_motion_controls,
-            text="Jog -",
+            text="Jog up",
             command=self._colibri_jog_reverse,
             state=tk.DISABLED,
         )
         self.colibri_reverse_button.pack(side=tk.LEFT, padx=(8, 0))
         self.colibri_forward_button = ttk.Button(
             colibri_motion_controls,
-            text="Jog +",
+            text="Jog down",
             command=self._colibri_jog_forward,
             state=tk.DISABLED,
         )
