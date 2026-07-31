@@ -475,6 +475,8 @@ The continuous mode temporarily changes BAC parameter `3:2` (maximum positioning
 
 The force is polled independently while the move is running. Contact stops the current move and retracts from the measured contact position by the configured distance. The original BAC speed parameter is restored and verified after success, cancellation, no-contact return, or an error. The stepped approach remains available in the settings as a fallback.
 
+The configured maximum approach is a per-run search limit. If less positive Colibri travel remains, the GUI uses only that remaining distance for the current probe without changing the saved setting. For example, a `10 mm` request starting at `66 mm` is reduced to `9 mm`; a later probe starting at `63 mm` can use the full `10 mm` again.
+
 ### Known Colibri observations
 
 - Communication, status, and position queries work at `9600` baud.

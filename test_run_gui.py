@@ -4640,13 +4640,37 @@ class TestRunGui(tk.Tk):
             if status["moving"]:
                 raise RuntimeError("Colibri is already moving.")
             start_steps = snapshot["position_steps"]
-            max_approach_steps = max(
+            requested_approach_steps = max(
                 1, self._colibri_mm_to_steps(max_approach_mm)
             )
             positive_travel_limit_steps = self._colibri_mm_to_steps(COLIBRI_TRAVEL_MM)
-            if start_steps + max_approach_steps > positive_travel_limit_steps:
+            remaining_positive_steps = positive_travel_limit_steps - start_steps
+            if remaining_positive_steps <= 0:
                 raise RuntimeError(
-                    "Configured force probe approach would exceed the positive Colibri travel limit."
+                    "Force probing cannot start because the Colibri is already at "
+                    "the positive travel limit."
+                )
+            max_approach_steps = min(
+                requested_approach_steps,
+                remaining_positive_steps,
+            )
+            effective_max_approach_mm = self._colibri_steps_to_mm(
+                max_approach_steps
+            )
+            if max_approach_steps < requested_approach_steps:
+                self.messages.put(
+                    (
+                        "touch_off_progress",
+                        f"Requested approach {max_approach_mm:.3f} mm reduced once "
+                        f"to the remaining travel {effective_max_approach_mm:.3f} mm.",
+                    )
+                )
+                self._write_debug_log(
+                    "COLIBRI force probe approach clamped "
+                    f"start_mm={snapshot['position_mm']:.3f} "
+                    f"requested_mm={max_approach_mm:.3f} "
+                    f"effective_mm={effective_max_approach_mm:.3f} "
+                    f"positive_limit_mm={COLIBRI_TRAVEL_MM:.3f}"
                 )
 
             self.colibri.set_remote()
@@ -4705,7 +4729,7 @@ class TestRunGui(tk.Tk):
                 ) = self._perform_continuous_touch_approach(
                     start_steps,
                     max_approach_steps,
-                    max_approach_mm,
+                    effective_max_approach_mm,
                     baseline_mean,
                     trace,
                     timeout_seconds,
@@ -4812,7 +4836,7 @@ class TestRunGui(tk.Tk):
                             (
                                 "touch_off_progress",
                                 f"Approach {self._colibri_steps_to_mm(step_count):.3f} / "
-                                f"{max_approach_mm:.3f} mm | force {force_n:.4f} N | "
+                                f"{effective_max_approach_mm:.3f} mm | force {force_n:.4f} N | "
                                 f"rise {force_delta_n:+.4f} N",
                             )
                         )
@@ -4865,7 +4889,7 @@ class TestRunGui(tk.Tk):
                         )
                     )
                 raise RuntimeError(
-                    f"No contact detected within {max_approach_mm:.3f} mm; "
+                    f"No contact detected within {effective_max_approach_mm:.3f} mm; "
                     "the axis returned to the start position."
                 )
 

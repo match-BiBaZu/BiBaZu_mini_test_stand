@@ -471,6 +471,25 @@ class PlatformCalibrationTests(unittest.TestCase):
         )
         self.assertEqual(custom_speed_gui.colibri.speed_setting, 24)
 
+        clamped_gui = DummyTouchGui()
+        clamped_gui.colibri.steps = clamped_gui._colibri_mm_to_steps(66.0)
+        clamped_result = clamped_gui._perform_colibri_force_touch(
+            10.0,
+            continuous_approach=True,
+            retract_mm=0.05,
+            timeout_seconds=30.0,
+        )
+        self.assertEqual(clamped_gui.colibri.moves, [1800, -10])
+        self.assertAlmostEqual(clamped_result["position_mm"], 74.95)
+        progress_messages = []
+        while not clamped_gui.messages.empty():
+            kind, value = clamped_gui.messages.get_nowait()
+            if kind == "touch_off_progress":
+                progress_messages.append(str(value))
+        self.assertTrue(
+            any("remaining travel 9.000 mm" in item for item in progress_messages)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
