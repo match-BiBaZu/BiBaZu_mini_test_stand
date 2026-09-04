@@ -24,6 +24,7 @@ from platform_calibration import (
     utc_now_iso,
     validate_weight_list,
 )
+from twincat_ads import AdsTarget, AdsTransportError, TwinCatAdsClient
 
 try:
     import serial
@@ -32,15 +33,7 @@ except ImportError:
     serial = None
     list_ports = None
 
-try:
-    import pysoem
-except ImportError:
-    pysoem = None
-
-
-BAUD_RATE = 230400
 SERIAL_WRITE_TIMEOUT = 1.0
-SERIAL_COMMAND_SPACING_SECONDS = 0.08
 MAX_LOG_LINES = 400
 MAX_QUEUE_DRAIN_PER_TICK = 250
 FLOW_DELAY_CAPTURE_MS = 500.0
@@ -57,6 +50,8 @@ REGULATOR_MAX_PRESSURE_BAR = 6.0
 TEST_PRESSURE_STEP_BAR = 0.1
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
+# Arduino default: 400 full steps per second.
+MOTOR_LEGACY_DEFAULT_SPEED_MM_S = 400.0 * MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
 COLIBRI_BAUD_RATE = 9600
 COLIBRI_SLAVE_ADDRESS = 0xFF
@@ -394,11 +389,9 @@ class TestRunGui(tk.Tk):
 
         self.user_presets_path = Path(__file__).with_name("user_presets.json")
         self.user_presets = self._load_user_presets()
-        self.serial_port = None
-        self.reader_thread = None
-        self.writer_thread = None
-        self.reader_running = False
-        self.writer_running = False
+        # The pneumatic/stepper path is now a TwinCAT ADS client.  Serial is
+        # still used independently by the Colibri BAC controller below.
+        self.plc_controller = None
         self.force_serial_port = None
         self.force_reader_thread = None
         self.force_reader_running = False
@@ -434,11 +427,7 @@ class TestRunGui(tk.Tk):
         self.current_impulse = None
         self.last_valves_open = False
         self.messages = queue.Queue()
-        self.commands = queue.Queue()
         self.port_devices = {}
-        self.ethercat_adapters = {}
-        self.ethercat_master = None
-        self.ethercat_busy = False
         self.closing = False
         self.colibri = None
         self.colibri_busy = False
@@ -488,10 +477,17 @@ class TestRunGui(tk.Tk):
         self.debug_log_path = None
         self.debug_log_lock = threading.Lock()
 
-        self.port_var = tk.StringVar()
         self.colibri_port_var = tk.StringVar()
         self.force_port_var = tk.StringVar()
-        self.ethercat_adapter_var = tk.StringVar()
+        self.ads_net_id_var = tk.StringVar(
+            value=str(self.user_presets.get("twincat_ams_net_id", "5.75.145.248.1.1"))
+        )
+        self.ads_ip_address_var = tk.StringVar(
+            value=str(self.user_presets.get("twincat_ip_address", ""))
+        )
+        self.ads_port_var = tk.IntVar(
+            value=self._preset_int("twincat_ads_port", 851, 1, 65535)
+        )
         self.quantumx_host_var = tk.StringVar(
             value=str(self.user_presets.get("quantumx_host", QUANTUMX_HOST))
         )
@@ -499,7 +495,6 @@ class TestRunGui(tk.Tk):
             value=self._preset_int("quantumx_port", QUANTUMX_PORT, 1, 65535)
         )
         self.connection_summary_var = tk.StringVar(value="Connections: initializing")
-        self.ethercat_status_var = tk.StringVar(value="EtherCAT: disconnected")
         self.force_baud_var = tk.IntVar(value=FORCE_BAUD_RATE)
         self.force_scale_var = tk.DoubleVar(value=self.force_scaling)
         self.force_impulse_threshold_var = tk.DoubleVar(value=self.force_impulse_threshold)
@@ -535,13 +530,14 @@ class TestRunGui(tk.Tk):
         self.motor_center_position_var = tk.DoubleVar(
             value=self._preset_float(
                 "motor_center_position_mm",
-                -7.0,
-                -2000.0,
+                7.0,
+                0.0,
                 2000.0,
             )
         )
-        self.motor_speed_var = tk.DoubleVar(value=5.0)
+        self.motor_speed_var = tk.DoubleVar(value=MOTOR_LEGACY_DEFAULT_SPEED_MM_S)
         self.motor_position_var = tk.StringVar(value="Stepper position: --")
+        self.motor_motion_busy = False
         self.last_motor_position_mm = None
         self.colibri_enabled_var = tk.BooleanVar(value=False)
         self.colibri_distance_var = tk.DoubleVar(value=1.0)
@@ -565,7 +561,7 @@ class TestRunGui(tk.Tk):
         self.part_stepper_position_var = tk.StringVar(value="Stepper target: --")
         self.part_colibri_position_var = tk.StringVar(value="Colibri target: --")
         self.part_colibri_target_mm = None
-        self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(4)]
+        self.nozzle_vars = [tk.BooleanVar(value=True) for _ in range(6)]
         self.nozzle_checkbuttons = []
         self.motor_controls = []
         self.colibri_controls = []
@@ -585,6 +581,7 @@ class TestRunGui(tk.Tk):
         saved_sequence_root = str(self.user_presets.get("sequence_save_root", "")).strip()
         self.sequence_save_root = Path(saved_sequence_root) if saved_sequence_root else None
         self.active_sequence_archive = None
+        self.sequence_finalize_after_id = None
         self.increment_dialog = None
         self.increment_dialog_controls = []
         self.increment_dialog_pulse_buttons = []
@@ -601,7 +598,6 @@ class TestRunGui(tk.Tk):
         ):
             variable.trace_add("write", self._part_input_changed)
         self._refresh_ports()
-        self._refresh_ethercat_adapters()
         self.after(50, self._drain_messages)
         self.after(100, self._connect_force_sensor)
 
@@ -690,6 +686,9 @@ class TestRunGui(tk.Tk):
                 "force_impulse_threshold": float(self.force_impulse_threshold_var.get()),
                 "quantumx_host": self.quantumx_host_var.get().strip(),
                 "quantumx_port": int(self.quantumx_port_var.get()),
+                "twincat_ams_net_id": self.ads_net_id_var.get().strip(),
+                "twincat_ip_address": self.ads_ip_address_var.get().strip(),
+                "twincat_ads_port": int(self.ads_port_var.get()),
                 "nozzle_offset_mm": float(self.nozzle_offset_var.get()),
                 "colibri_plate_distance_mm": float(self.colibri_plate_distance_var.get()),
                 "motor_center_position_mm": float(
@@ -1356,7 +1355,7 @@ class TestRunGui(tk.Tk):
             text="Connection settings…",
             command=self._open_connection_settings,
         ).pack(side=tk.LEFT)
-        ttk.Label(connection_controls, text="Arduino").pack(side=tk.LEFT, padx=(16, 4))
+        ttk.Label(connection_controls, text="TwinCAT PLC").pack(side=tk.LEFT, padx=(16, 4))
         self.connect_button = ttk.Button(connection_controls, text="Connect", command=self._toggle_connection)
         self.connect_button.pack(side=tk.LEFT)
         ttk.Label(connection_controls, text="Colibri").pack(side=tk.LEFT, padx=(12, 4))
@@ -1366,13 +1365,6 @@ class TestRunGui(tk.Tk):
             command=self._toggle_colibri_connection,
         )
         self.colibri_connect_button.pack(side=tk.LEFT)
-        ttk.Label(connection_controls, text="EtherCAT").pack(side=tk.LEFT, padx=(12, 4))
-        self.ethercat_connect_button = ttk.Button(
-            connection_controls,
-            text="Connect",
-            command=self._toggle_ethercat_connection,
-        )
-        self.ethercat_connect_button.pack(side=tk.LEFT)
         ttk.Label(connection_controls, text="QuantumX").pack(side=tk.LEFT, padx=(12, 4))
         self.force_connect_button = ttk.Button(
             connection_controls,
@@ -1387,10 +1379,7 @@ class TestRunGui(tk.Tk):
 
         # Persistent, non-visible selectors hold the values used by connection
         # routines. The user-facing selectors live in the settings dialog.
-        self.port_combo = ttk.Combobox(root, textvariable=self.port_var, state="readonly")
         self.colibri_port_combo = ttk.Combobox(root, textvariable=self.colibri_port_var, state="readonly")
-        self.ethercat_adapter_combo = ttk.Combobox(root, textvariable=self.ethercat_adapter_var, state="readonly")
-        self.ethercat_refresh_button = ttk.Button(root, command=self._refresh_ethercat_adapters)
 
         controls = ttk.LabelFrame(root, text="Test sequence", padding=(8, 6))
         controls.pack(fill=tk.X, pady=(0, 6))
@@ -1632,7 +1621,7 @@ class TestRunGui(tk.Tk):
 
         self.motor_home_button = ttk.Button(
             motor_controls,
-            text="Home +",
+            text="Home",
             command=self._motor_home,
             state=tk.DISABLED,
         )
@@ -1695,8 +1684,8 @@ class TestRunGui(tk.Tk):
         ttk.Label(motor_motion_controls, text="Absolute").pack(side=tk.LEFT, padx=(18, 0))
         self.motor_absolute_spinbox = ttk.Spinbox(
             motor_motion_controls,
-            from_=-2000.0,
-            to=0.0,
+            from_=0.0,
+            to=2000.0,
             increment=1.0,
             textvariable=self.motor_absolute_var,
             width=8,
@@ -2052,7 +2041,7 @@ class TestRunGui(tk.Tk):
             "target_pressure": "Target pressure",
             "pressure_before": "Pressure before valve",
             "regulator_feedback": "Actual regulator pressure",
-            "regulator_pwm": "Regulator PWM",
+            "regulator_pwm": "EL4102 raw command",
             "valves_open": "Valves open",
             "flow": "Flow",
             "force": "Force total",
@@ -2085,17 +2074,33 @@ class TestRunGui(tk.Tk):
         body = ttk.Frame(dialog, padding=16)
         body.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(body, text="Arduino COM port").grid(row=0, column=0, sticky=tk.W, pady=5)
-        arduino_combo = ttk.Combobox(
+        ttk.Label(body, text="C9020 AMS Net ID").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(
             body,
-            textvariable=self.port_var,
-            values=list(self.port_devices),
-            width=52,
-            state=tk.DISABLED if self.serial_port else "readonly",
-        )
-        arduino_combo.grid(row=0, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+            textvariable=self.ads_net_id_var,
+            width=28,
+            state=tk.DISABLED if self.plc_controller else tk.NORMAL,
+        ).grid(row=0, column=1, sticky=tk.W, padx=(12, 0), pady=5)
 
-        ttk.Label(body, text="Colibri COM port").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(body, text="C9020 IP address").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(
+            body,
+            textvariable=self.ads_ip_address_var,
+            width=28,
+            state=tk.DISABLED if self.plc_controller else tk.NORMAL,
+        ).grid(row=1, column=1, sticky=tk.W, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="TwinCAT PLC ADS port").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(
+            body,
+            from_=1,
+            to=65535,
+            textvariable=self.ads_port_var,
+            width=10,
+            state=tk.DISABLED if self.plc_controller else tk.NORMAL,
+        ).grid(row=2, column=1, sticky=tk.W, padx=(12, 0), pady=5)
+
+        ttk.Label(body, text="Colibri COM port").grid(row=3, column=0, sticky=tk.W, pady=5)
         colibri_combo = ttk.Combobox(
             body,
             textvariable=self.colibri_port_var,
@@ -2103,33 +2108,23 @@ class TestRunGui(tk.Tk):
             width=52,
             state=tk.DISABLED if self.colibri else "readonly",
         )
-        colibri_combo.grid(row=1, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
+        colibri_combo.grid(row=3, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
 
-        ttk.Label(body, text="EtherCAT adapter").grid(row=2, column=0, sticky=tk.W, pady=5)
-        ethercat_combo = ttk.Combobox(
-            body,
-            textvariable=self.ethercat_adapter_var,
-            values=list(self.ethercat_adapters),
-            width=52,
-            state=tk.DISABLED if self.ethercat_master else "readonly",
-        )
-        ethercat_combo.grid(row=2, column=1, sticky=tk.EW, padx=(12, 0), pady=5)
-
-        ttk.Label(body, text="QuantumX host").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(body, text="QuantumX host").grid(row=4, column=0, sticky=tk.W, pady=5)
         ttk.Entry(
             body,
             textvariable=self.quantumx_host_var,
             width=24,
             state=tk.DISABLED if self.force_client else tk.NORMAL,
         ).grid(
-            row=3,
+            row=4,
             column=1,
             sticky=tk.W,
             padx=(12, 0),
             pady=5,
         )
 
-        ttk.Label(body, text="QuantumX port").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Label(body, text="QuantumX port").grid(row=5, column=0, sticky=tk.W, pady=5)
         ttk.Spinbox(
             body,
             from_=1,
@@ -2137,27 +2132,25 @@ class TestRunGui(tk.Tk):
             textvariable=self.quantumx_port_var,
             width=10,
             state=tk.DISABLED if self.force_client else tk.NORMAL,
-        ).grid(row=4, column=1, sticky=tk.W, padx=(12, 0), pady=5)
+        ).grid(row=5, column=1, sticky=tk.W, padx=(12, 0), pady=5)
 
         ttk.Label(
             body,
             text=(
-                "Auto-detect uses the device descriptions and avoids assigning Arduino and "
-                "Colibri to the same COM port. Changes take effect on the next connection."
+                "TwinCAT owns the EtherCAT terminals. This GUI talks only to the PLC through "
+                "ADS (normally port 851); it does not scan or open the EtherCAT adapter. "
+                "Auto-detect below is for the separate Colibri COM port."
             ),
             wraplength=560,
             foreground="#555555",
-        ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(10, 4))
+        ).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(10, 4))
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=6, column=0, columnspan=2, sticky=tk.E, pady=(12, 0))
+        buttons.grid(row=7, column=0, columnspan=2, sticky=tk.E, pady=(12, 0))
 
         def auto_detect():
             self._refresh_ports()
-            self._refresh_ethercat_adapters()
-            arduino_combo["values"] = list(self.port_devices)
             colibri_combo["values"] = list(self.port_devices)
-            ethercat_combo["values"] = list(self.ethercat_adapters)
             self._update_connection_summary()
 
         ttk.Button(buttons, text="Auto-detect", command=auto_detect).pack(side=tk.LEFT, padx=(0, 8))
@@ -2272,7 +2265,7 @@ class TestRunGui(tk.Tk):
         dialog.focus_force()
 
     def _update_increment_dialog_state(self):
-        enabled = bool(self.serial_port) and not self.pulse_in_progress
+        enabled = self._plc_connected() and not self.pulse_in_progress
         state = tk.NORMAL if enabled else tk.DISABLED
         for control in self.increment_dialog_controls:
             if control.winfo_exists():
@@ -2280,157 +2273,6 @@ class TestRunGui(tk.Tk):
         for button in self.increment_dialog_pulse_buttons:
             if button.winfo_exists():
                 button.configure(state=state)
-
-    def _refresh_ethercat_adapters(self):
-        if pysoem is None:
-            self.ethercat_status_var.set("EtherCAT: install pysoem and Npcap first")
-            self.ethercat_adapter_combo["values"] = ()
-            return
-        if self.ethercat_master or self.ethercat_busy:
-            return
-
-        try:
-            adapters = pysoem.find_adapters()
-        except Exception as exc:
-            self.ethercat_adapters = {}
-            self.ethercat_adapter_combo["values"] = ()
-            self.ethercat_status_var.set(f"EtherCAT adapter scan failed: {exc}")
-            return
-
-        self.ethercat_adapters = {}
-        for adapter in adapters:
-            name = self._ethercat_adapter_text(getattr(adapter, "name", ""))
-            description = self._ethercat_adapter_text(
-                getattr(adapter, "desc", "") or "Network adapter"
-            )
-            if not name:
-                continue
-            label = f"{description} — {name}"
-            self.ethercat_adapters[label] = name
-
-        labels = list(self.ethercat_adapters)
-        self.ethercat_adapter_combo["values"] = labels
-        if labels and self.ethercat_adapter_var.get() not in labels:
-            self.ethercat_adapter_var.set(labels[0])
-        if labels:
-            self.ethercat_status_var.set(f"EtherCAT: {len(labels)} adapter(s) available")
-        else:
-            self.ethercat_adapter_var.set("")
-            self.ethercat_status_var.set("EtherCAT: no Npcap-compatible adapter found")
-        self._update_connection_summary()
-
-    @staticmethod
-    def _ethercat_adapter_text(value):
-        if isinstance(value, bytes):
-            return value.decode("utf-8", errors="replace")
-        return str(value)
-
-    def _toggle_ethercat_connection(self):
-        if self.ethercat_master:
-            self._disconnect_ethercat()
-        else:
-            self._connect_ethercat()
-
-    def _connect_ethercat(self):
-        if pysoem is None:
-            messagebox.showerror(
-                "Missing EtherCAT dependency",
-                "Install PySOEM and Npcap first. During Npcap setup, enable\n"
-                "'Install Npcap in WinPcap API-compatible Mode'.",
-            )
-            return
-        self._refresh_ethercat_adapters()
-        adapter_name = self.ethercat_adapters.get(self.ethercat_adapter_var.get())
-        if not adapter_name:
-            messagebox.showerror("No adapter selected", "Select the Ethernet adapter connected to the EK1100.")
-            return
-
-        self.ethercat_busy = True
-        self.ethercat_status_var.set("EtherCAT: scanning bus...")
-        self.ethercat_connect_button.configure(state=tk.DISABLED)
-        self.ethercat_refresh_button.configure(state=tk.DISABLED)
-        self.ethercat_adapter_combo.configure(state=tk.DISABLED)
-        threading.Thread(
-            target=self._scan_ethercat_bus,
-            args=(adapter_name,),
-            daemon=True,
-        ).start()
-
-    def _scan_ethercat_bus(self, adapter_name):
-        master = pysoem.Master()
-        try:
-            master.open(adapter_name)
-            device_count = master.config_init()
-            if device_count <= 0:
-                master.close()
-                self.messages.put(("ethercat_error", "No EtherCAT devices found on the selected adapter."))
-                return
-
-            devices = []
-            for position, slave in enumerate(master.slaves, start=1):
-                devices.append({
-                    "position": position,
-                    "name": str(getattr(slave, "name", "") or "Unknown EtherCAT device"),
-                    "vendor_id": int(getattr(slave, "man", 0)),
-                    "product_code": int(getattr(slave, "id", 0)),
-                    "revision": int(getattr(slave, "rev", 0)),
-                })
-            if self.closing:
-                master.close()
-                return
-            self.messages.put(("ethercat_connected", (master, adapter_name, devices)))
-        except Exception as exc:
-            try:
-                master.close()
-            except Exception:
-                pass
-            self.messages.put(("ethercat_error", str(exc)))
-
-    def _handle_ethercat_connected(self, value):
-        master, adapter_name, devices = value
-        if self.closing:
-            master.close()
-            return
-        self.ethercat_master = master
-        self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Disconnect", state=tk.NORMAL)
-        self.ethercat_status_var.set(f"EtherCAT: connected, {len(devices)} device(s) in PRE-OP")
-        self.status_var.set(f"EtherCAT bus found on {adapter_name}: {len(devices)} device(s)")
-        self._update_connection_summary()
-        self._write_debug_log(f"ETHERCAT connected adapter={adapter_name!r} devices={len(devices)}")
-        for device in devices:
-            line = (
-                f"EtherCAT [{device['position']}] {device['name']} | "
-                f"vendor 0x{device['vendor_id']:08X}, product 0x{device['product_code']:08X}, "
-                f"revision 0x{device['revision']:08X}"
-            )
-            self._append_log_line(line)
-            self._write_debug_log(line)
-
-    def _handle_ethercat_error(self, error):
-        self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
-        self.ethercat_refresh_button.configure(state=tk.NORMAL)
-        self.ethercat_adapter_combo.configure(state="readonly")
-        self.ethercat_status_var.set(f"EtherCAT: {error}")
-        self.status_var.set(f"EtherCAT connection failed: {error}")
-        self._update_connection_summary()
-        self._write_debug_log(f"ETHERCAT error {error}")
-
-    def _disconnect_ethercat(self):
-        if self.ethercat_master:
-            try:
-                self.ethercat_master.close()
-            except Exception as exc:
-                self._write_debug_log(f"ETHERCAT close error {exc}")
-        self.ethercat_master = None
-        self.ethercat_busy = False
-        self.ethercat_connect_button.configure(text="Connect", state=tk.NORMAL)
-        self.ethercat_refresh_button.configure(state=tk.NORMAL)
-        self.ethercat_adapter_combo.configure(state="readonly")
-        self.ethercat_status_var.set("EtherCAT: disconnected")
-        self._update_connection_summary()
-        self._write_debug_log("ETHERCAT disconnected")
 
     def _refresh_ports(self):
         if list_ports is None:
@@ -2443,27 +2285,14 @@ class TestRunGui(tk.Tk):
             for port in ports
         }
         labels = list(self.port_devices)
-        self.port_combo["values"] = labels
         self.colibri_port_combo["values"] = labels
-        if labels and self.port_var.get() not in labels:
-            self.port_var.set(self._preferred_port_label(labels, ("arduino", "ttyacm")) or labels[0])
         if labels and self.colibri_port_var.get() not in labels:
             self.colibri_port_var.set(
                 self._preferred_port_label(labels, ("dedi", "ftdi", "rs485", "ttyusb")) or labels[0]
             )
-        if (
-            len(labels) > 1
-            and self.colibri_port_var.get() == self.port_var.get()
-        ):
-            unused_labels = [label for label in labels if label != self.port_var.get()]
-            self.colibri_port_var.set(
-                self._preferred_port_label(unused_labels, ("dedi", "ftdi", "rs485", "ttyusb"))
-                or unused_labels[0]
-            )
         if not labels:
-            self.port_var.set("")
             self.colibri_port_var.set("")
-            self.status_var.set("No serial ports found. Check the USB cable, driver, and Arduino IDE Serial Monitor.")
+            self.status_var.set("No serial ports found. Check the Colibri USB/RS485 cable and driver.")
         else:
             self.status_var.set(f"Found {len(labels)} serial port(s).")
         self._update_connection_summary()
@@ -2476,9 +2305,8 @@ class TestRunGui(tk.Tk):
         return None
 
     def _update_connection_summary(self):
-        arduino = "connected" if self.serial_port else "off"
+        plc = "connected" if self._plc_connected() else "off"
         colibri = "connected" if self.colibri else "off"
-        ethercat = "connected" if self.ethercat_master else "off"
         with self.force_lock:
             quantumx = self.latest_force_status
         if quantumx == "ok":
@@ -2488,43 +2316,36 @@ class TestRunGui(tk.Tk):
         else:
             quantumx = "off" if not self.force_client else quantumx
         self.connection_summary_var.set(
-            f"Arduino {arduino} | Colibri {colibri} | EtherCAT {ethercat} | QuantumX {quantumx}"
+            f"TwinCAT {plc} | Colibri {colibri} | QuantumX {quantumx}"
         )
 
+    def _plc_connected(self):
+        return bool(self.plc_controller and self.plc_controller.connected)
+
     def _toggle_connection(self):
-        if self.serial_port:
+        if self._plc_connected():
             self._disconnect()
         else:
             self._connect()
 
     def _connect(self):
-        if serial is None:
-            messagebox.showerror("Missing dependency", "Install pyserial first:\npython -m pip install pyserial")
-            return
-
-        self._refresh_ports()
-        port = self._selected_port_device()
-        if not port:
-            messagebox.showerror("No port selected", "Select the Arduino serial port.")
-            return
-        if self.force_serial_port and port == self._selected_force_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the force sensor.")
-            return
-
         try:
-            self.serial_port = serial.Serial(port, BAUD_RATE, timeout=0.1, write_timeout=SERIAL_WRITE_TIMEOUT)
-            time.sleep(2.0)
-        except serial.SerialException as exc:
-            self.serial_port = None
-            messagebox.showerror("Connection failed", str(exc))
+            target = AdsTarget(
+                self.ads_net_id_var.get().strip(),
+                self.ads_ip_address_var.get().strip(),
+                int(self.ads_port_var.get()),
+            )
+            controller = TwinCatAdsClient(
+                target,
+                on_message=self.messages.put,
+                debug_logger=self._write_debug_log if self.debug_log_file else None,
+            )
+            controller.open()
+        except (AdsTransportError, ValueError, tk.TclError) as exc:
+            messagebox.showerror("TwinCAT ADS connection failed", str(exc))
             return
 
-        self.reader_running = True
-        self.writer_running = True
-        self.reader_thread = threading.Thread(target=self._read_serial, daemon=True)
-        self.writer_thread = threading.Thread(target=self._write_serial, daemon=True)
-        self.reader_thread.start()
-        self.writer_thread.start()
+        self.plc_controller = controller
         self.connect_button.configure(text="Disconnect")
         self.start_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.NORMAL)
@@ -2546,18 +2367,22 @@ class TestRunGui(tk.Tk):
         self._set_pulse_buttons_enabled(True)
         self._set_motor_controls_enabled(True)
         self.mode_var.set("Mode: connected")
-        self.status_var.set(f"Connected to {port} at {BAUD_RATE} baud")
+        self.status_var.set(f"Connected to TwinCAT ADS at {self._selected_plc_endpoint()}")
         self._update_connection_summary()
-        self._write_debug_log(f"ARDUINO connected port={port} baud={BAUD_RATE}")
-        self._apply_pressure_settings()
+        self._write_debug_log(f"TWINCAT ADS connected endpoint={self._selected_plc_endpoint()}")
+        # Deliberately do not apply the displayed pressure on connection.
+        # Outputs remain inhibited until the operator clicks Apply pressure,
+        # starts a pulse/test, or explicitly enables the motor.
         self._apply_flow_threshold_setting()
         self._apply_pulse_duration_setting()
         self._apply_stream_setting()
         self._send("MOTOR_POS")
 
-    def _selected_port_device(self):
-        selected = self.port_var.get()
-        return self.port_devices.get(selected, selected)
+    def _selected_plc_endpoint(self):
+        return (
+            f"{self.ads_net_id_var.get().strip()} @ "
+            f"{self.ads_ip_address_var.get().strip()}:{self.ads_port_var.get()}"
+        )
 
     def _selected_colibri_port_device(self):
         selected = self.colibri_port_var.get()
@@ -2597,7 +2422,7 @@ class TestRunGui(tk.Tk):
         self.debug_log_button.configure(text="Stop debug log")
         self.debug_log_var.set(f"Debug log: {path}")
         self._write_debug_log("LOG started")
-        self._write_debug_log(f"GUI Arduino port label={self.port_var.get()!r} device={self._selected_port_device()!r}")
+        self._write_debug_log(f"GUI TwinCAT ADS endpoint={self._selected_plc_endpoint()!r}")
         self._write_debug_log(
             f"GUI Colibri port label={self.colibri_port_var.get()!r} device={self._selected_colibri_port_device()!r}"
         )
@@ -2626,24 +2451,20 @@ class TestRunGui(tk.Tk):
             self.debug_log_file.write(f"{timestamp} {message}\n")
             self.debug_log_file.flush()
 
-    def _disconnect(self):
-        self._write_debug_log("ARDUINO disconnect requested")
+    def _disconnect(self, status_message="Disconnected"):
+        self._write_debug_log("TWINCAT ADS disconnect requested")
+        if self.sequence_finalize_after_id is not None:
+            self.after_cancel(self.sequence_finalize_after_id)
+            self.sequence_finalize_after_id = None
         if self.active_sequence_archive is not None:
             if self.current_impulse is not None:
                 self._finalize_impulse(self.current_impulse.get("capture_end_time_ms"))
             self._finish_sequence_archive("disconnected")
-        self.writer_running = False
-        self.commands.put(None)
-        if self.writer_thread:
-            self.writer_thread.join(timeout=0.5)
-        self.reader_running = False
-        if self.reader_thread:
-            self.reader_thread.join(timeout=0.5)
-        if self.serial_port:
-            self.serial_port.close()
-        self.serial_port = None
+        controller = self.plc_controller
+        self.plc_controller = None
+        if controller:
+            controller.close()
         self._cancel_test_impulse_capture()
-        self._clear_pending_commands()
         self.connect_button.configure(text="Connect")
         self.start_button.configure(state=tk.DISABLED)
         self.stop_button.configure(state=tk.DISABLED)
@@ -2663,6 +2484,7 @@ class TestRunGui(tk.Tk):
         self.pressure_increment_spinbox.configure(state=tk.DISABLED)
         self.reset_increment_button.configure(state=tk.DISABLED)
         self._set_pulse_buttons_enabled(False)
+        self.motor_motion_busy = False
         self._set_motor_controls_enabled(False)
         self.motor_enabled_var.set(False)
         self.last_motor_speed_steps_s = None
@@ -2677,9 +2499,18 @@ class TestRunGui(tk.Tk):
         self.current_impulse = None
         self.last_valves_open = False
         self.mode_var.set("Mode: disconnected")
-        self.status_var.set("Disconnected")
+        self.status_var.set(status_message)
         self._update_connection_summary()
-        self._write_debug_log("ARDUINO disconnected")
+        self._write_debug_log("TWINCAT ADS disconnected")
+
+    def _handle_ads_lost(self, message):
+        """Return the GUI to its safe disconnected state after an ADS fault."""
+        self._write_debug_log(f"TWINCAT ADS lost: {message}")
+        if self.plc_controller:
+            self._disconnect(status_message=message)
+        else:
+            self.status_var.set(message)
+            self._update_connection_summary()
 
     def _choose_sequence_save_folder(self):
         initial_dir = None
@@ -2746,6 +2577,12 @@ class TestRunGui(tk.Tk):
         return True
 
     def _start_test(self):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current sequence and wait for its PLC flow capture to finish before starting another one.",
+            )
+            return
         if self.colibri_touch_running:
             messagebox.showwarning("Force probe in progress", "Stop the force probe first.")
             return
@@ -2772,8 +2609,6 @@ class TestRunGui(tk.Tk):
         if not self._apply_pulse_duration_setting():
             return
 
-        if self.active_sequence_archive is not None:
-            self._finish_sequence_archive("replaced_by_new_sequence")
         if not self._prepare_sequence_archive(start_pressure, end_pressure, repeats, mask):
             return
 
@@ -2792,8 +2627,28 @@ class TestRunGui(tk.Tk):
         self._send("STOP")
 
     def _finalize_sequence_after_stop(self):
+        self.sequence_finalize_after_id = None
         if self.current_impulse is not None:
-            capture_end_time_ms = self.current_impulse.get("capture_end_time_ms")
+            pulse_start = self.current_impulse.get("pulse_start_monotonic")
+            pulse_duration_ms = self.current_impulse.get("plc_valve_open_duration_ms")
+            if pulse_duration_ms is None:
+                pulse_duration_ms = VALVE_PULSE_DURATION_MS
+            if pulse_start is not None:
+                capture_deadline = (
+                    pulse_start
+                    + (float(pulse_duration_ms) + FLOW_DELAY_CAPTURE_MS) / 1000.0
+                )
+                remaining_seconds = capture_deadline - time.monotonic()
+                if remaining_seconds > 0.0:
+                    self.sequence_finalize_after_id = self.after(
+                        max(1, math.ceil(remaining_seconds * 1000.0)),
+                        self._finalize_sequence_after_stop,
+                    )
+                    return
+            # FLOW_DONE freezes the PLC-authoritative flow summary before the
+            # GUI's post-pulse capture window has elapsed.  Use the intended
+            # window boundary rather than the final PLC flow sample timestamp.
+            capture_end_time_ms = self._flow_capture_end_time_ms(self.current_impulse)
             self._finalize_impulse(capture_end_time_ms)
         archive = self.active_sequence_archive
         if archive is None:
@@ -2815,6 +2670,15 @@ class TestRunGui(tk.Tk):
         )
 
     def _start_test_impulse(self):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current sequence and wait for completion before running a manual test impulse.",
+            )
+            return
+        if self.pulse_in_progress:
+            messagebox.showwarning("Pulse active", "Wait for the current pulse to finish first.")
+            return
         if self.colibri_touch_running:
             messagebox.showwarning("Force probe in progress", "Stop the force probe first.")
             return
@@ -2866,7 +2730,7 @@ class TestRunGui(tk.Tk):
 
     def _start_test_impulse_after_settle(self):
         self.test_impulse_settle_after_id = None
-        if self.test_impulse_capture is None or not self.serial_port:
+        if self.test_impulse_capture is None or not self._plc_connected():
             self.pulse_in_progress = False
             self._cancel_test_impulse_capture("Test impulse cancelled before the pressure settled.")
             return
@@ -2880,7 +2744,7 @@ class TestRunGui(tk.Tk):
         test_pressure = self.test_impulse_capture["pressure_bar"]
         self.mode_var.set("Mode: test impulse recording | waiting for valve start")
         self.status_var.set(
-            f"Test impulse armed at {test_pressure:.2f} bar; recording ends with the Arduino flow capture."
+            f"Test impulse armed at {test_pressure:.2f} bar; recording ends with the PLC flow capture."
         )
 
     def _test_impulse_start_timeout(self):
@@ -2988,7 +2852,7 @@ class TestRunGui(tk.Tk):
             self.status_var.set("Test impulse finished, but no pressure samples were recorded.")
             messagebox.showwarning(
                 "No pressure samples",
-                "The pulse completed, but the recording contains no Arduino pressure samples.",
+                "The pulse completed, but the recording contains no TwinCAT pressure samples.",
             )
             return
 
@@ -3494,6 +3358,15 @@ class TestRunGui(tk.Tk):
         self._start_pulse(increment_direction=-1)
 
     def _start_pulse(self, increment_direction):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current sequence and wait for completion before sending a manual pulse.",
+            )
+            return False
+        if self.pulse_in_progress:
+            messagebox.showwarning("Pulse active", "Wait for the current pulse to finish first.")
+            return False
         mask = self._selected_nozzle_mask()
         if mask == 0:
             messagebox.showerror("No nozzle selected", "Select at least one nozzle for the pulse.")
@@ -3564,7 +3437,7 @@ class TestRunGui(tk.Tk):
         return mask
 
     def _set_pulse_buttons_enabled(self, enabled):
-        state = tk.NORMAL if enabled and self.serial_port and not self.pulse_in_progress else tk.DISABLED
+        state = tk.NORMAL if enabled and self._plc_connected() and not self.pulse_in_progress else tk.DISABLED
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
         self.pulse_duration_spinbox.configure(state=state)
@@ -3583,6 +3456,12 @@ class TestRunGui(tk.Tk):
         self._apply_pressure_settings()
 
     def _apply_pressure_settings(self):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Pressure is controlled by the active PLC sequence. Stop it before applying a manual target.",
+            )
+            return False
         try:
             target_pressure = float(self.target_pressure_var.get())
         except (tk.TclError, ValueError):
@@ -3597,6 +3476,12 @@ class TestRunGui(tk.Tk):
         return True
 
     def _apply_flow_threshold_setting(self):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current sequence before changing its flow threshold.",
+            )
+            return False
         try:
             flow_threshold = float(self.flow_threshold_var.get())
         except (tk.TclError, ValueError):
@@ -3622,6 +3507,12 @@ class TestRunGui(tk.Tk):
         return duration_ms
 
     def _apply_pulse_duration_setting(self):
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current sequence before changing its pulse duration.",
+            )
+            return False
         duration_ms = self._validated_pulse_duration()
         if duration_ms is None:
             return False
@@ -3671,9 +3562,32 @@ class TestRunGui(tk.Tk):
         self._send("STREAM_ON" if self.stream_var.get() else "STREAM_OFF")
 
     def _set_motor_controls_enabled(self, enabled):
-        state = tk.NORMAL if enabled and self.serial_port else tk.DISABLED
+        controls_available = enabled and self._plc_connected()
+        state = tk.NORMAL if controls_available else tk.DISABLED
         for control in self.motor_controls:
             control.configure(state=state)
+
+        # A second motion command while an MC_* function block is Busy is
+        # rejected by MAIN with PLC error 22.  Keep Stop and Enable usable so
+        # the operator can stop or de-energise the axis, but prevent a second
+        # Home/Jog/Zero/absolute command until the PLC reports Busy = FALSE.
+        if controls_available and self.motor_motion_busy:
+            for control in self.motor_controls:
+                if control not in (self.motor_enable_checkbutton, self.motor_stop_button):
+                    control.configure(state=tk.DISABLED)
+
+    def _set_motor_motion_busy(self, busy):
+        busy = bool(busy)
+        if self.motor_motion_busy == busy:
+            return
+        self.motor_motion_busy = busy
+        self._set_motor_controls_enabled(True)
+
+    def _motor_command_allowed(self):
+        if not self.motor_motion_busy:
+            return True
+        self.status_var.set("Stepper is still busy; wait for it to finish or press Stop motor.")
+        return False
 
     def _apply_motor_enable(self):
         self._write_debug_log(f"GUI stepper enable={self.motor_enabled_var.get()}")
@@ -3693,12 +3607,16 @@ class TestRunGui(tk.Tk):
         return speed_steps_s
 
     def _motor_jog_forward(self):
-        self._motor_jog(direction=1)
-
-    def _motor_jog_reverse(self):
+        # The mechanical convention for the Beckhoff stepper is Up = positive
+        # axis travel.  Keep the visible button label and ADS/PLC sign aligned.
         self._motor_jog(direction=-1)
 
+    def _motor_jog_reverse(self):
+        self._motor_jog(direction=1)
+
     def _motor_home(self):
+        if not self._motor_command_allowed():
+            return
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before homing.")
             return
@@ -3707,13 +3625,17 @@ class TestRunGui(tk.Tk):
         if speed_steps_s is None:
             return
 
-        self.mode_var.set("Mode: stepper homing +")
-        self._write_debug_log("GUI stepper home positive")
-        self._send("MOTOR_HOME")
+        self.mode_var.set("Mode: stepper homing")
+        self._write_debug_log("GUI stepper home")
+        if self._send("MOTOR_HOME"):
+            self._set_motor_motion_busy(True)
 
     def _motor_set_zero(self):
+        if not self._motor_command_allowed():
+            return
         self._write_debug_log("GUI stepper set zero")
-        self._send("MOTOR_ZERO")
+        if self._send("MOTOR_ZERO"):
+            self._set_motor_motion_busy(True)
 
     def _motor_move_absolute(self):
         self._motor_move_to_absolute_position(
@@ -3730,6 +3652,8 @@ class TestRunGui(tk.Tk):
         )
 
     def _motor_move_to_absolute_position(self, target_variable, value_name, mode_name):
+        if not self._motor_command_allowed():
+            return
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before moving.")
             return
@@ -3737,16 +3661,9 @@ class TestRunGui(tk.Tk):
         target_mm = self._validated_float(
             target_variable,
             value_name,
-            -2000.0,
+            0.0,
             2000.0,
         )
-        if target_mm is not None and target_mm > 0.0:
-            messagebox.showerror(
-                "Stepper target outside travel",
-                "After positive homing, absolute Stepper targets must be 0 mm or "
-                "negative. Positive targets lie beyond the home limit switch.",
-            )
-            return
         speed_steps_s = self._apply_motor_speed()
         if target_mm is None or speed_steps_s is None:
             return
@@ -3757,9 +3674,12 @@ class TestRunGui(tk.Tk):
             f"GUI stepper {mode_name} target_mm={target_mm:.3f} "
             f"steps={target_steps}"
         )
-        self._send(f"MOTOR_ABS:{target_steps}")
+        if self._send(f"MOTOR_ABS:{target_steps}"):
+            self._set_motor_motion_busy(True)
 
     def _motor_jog(self, direction):
+        if not self._motor_command_allowed():
+            return
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before jogging.")
             return
@@ -3775,7 +3695,8 @@ class TestRunGui(tk.Tk):
         self._write_debug_log(
             f"GUI stepper jog distance_mm={direction * distance_mm:.3f} steps={signed_steps}"
         )
-        self._send(f"MOTOR_MOVE:{signed_steps}")
+        if self._send(f"MOTOR_MOVE:{signed_steps}"):
+            self._set_motor_motion_busy(True)
 
     def _motor_stop(self):
         self._write_debug_log("GUI stepper stop")
@@ -4211,9 +4132,6 @@ class TestRunGui(tk.Tk):
         port = self._selected_colibri_port_device()
         if not port:
             messagebox.showerror("No port selected", "Select the Colibri serial port.")
-            return
-        if self.serial_port and port == self._selected_port_device():
-            messagebox.showerror("Port already in use", "Select a separate serial port for the Colibri axis.")
             return
         if self.force_serial_port and port == self._selected_force_port_device():
             messagebox.showerror("Port already in use", "Select a separate serial port for the force sensor.")
@@ -5813,47 +5731,14 @@ class TestRunGui(tk.Tk):
         return speed_steps_s * MOTOR_MM_PER_STEP
 
     def _send(self, command, flush_live_backlog=False):
-        if not self.serial_port or not self.writer_running:
+        if not self._plc_connected():
             return False
         if flush_live_backlog:
             self._clear_pending_live_messages()
-        self.commands.put(command)
-        self.status_var.set(f"Queued {command}")
-        return True
-
-    def _clear_pending_commands(self):
-        while True:
-            try:
-                self.commands.get_nowait()
-            except queue.Empty:
-                break
-
-    def _write_serial(self):
-        while self.writer_running and self.serial_port:
-            try:
-                command = self.commands.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            if command is None:
-                break
-
-            try:
-                self._write_debug_log(f"ARDUINO TX {command}")
-                self.serial_port.write(f"{command}\n".encode("ascii"))
-                self.serial_port.flush()
-            except serial.SerialTimeoutException:
-                self._write_debug_log(f"ARDUINO TX timeout {command}")
-                self.messages.put(("status", f"Serial write timed out while sending {command}"))
-            except serial.SerialException as exc:
-                self._write_debug_log(f"ARDUINO TX error {exc}")
-                self.messages.put(("status", f"Serial write failed: {exc}"))
-                break
-            else:
-                self.messages.put(("status", f"Sent {command}"))
-                time.sleep(SERIAL_COMMAND_SPACING_SECONDS)
-
-        self.writer_running = False
+        sent = self.plc_controller.send_legacy(command)
+        if sent:
+            self.status_var.set(f"Queued for TwinCAT: {command}")
+        return sent
 
     def _clear_pending_live_messages(self):
         kept_messages = []
@@ -5869,26 +5754,6 @@ class TestRunGui(tk.Tk):
         for message in kept_messages:
             self.messages.put(message)
 
-        if self.serial_port:
-            try:
-                self.serial_port.reset_input_buffer()
-            except serial.SerialException:
-                pass
-
-    def _read_serial(self):
-        while self.reader_running and self.serial_port:
-            try:
-                line = self.serial_port.readline().decode("utf-8", errors="replace").strip()
-            except serial.SerialException as exc:
-                self._write_debug_log(f"ARDUINO RX error {exc}")
-                self.messages.put(("status", f"Serial error: {exc}"))
-                break
-            if line:
-                received_monotonic = time.monotonic()
-                received_utc_ns = time.time_ns()
-                self._write_debug_log(f"ARDUINO RX {line}")
-                self.messages.put(("line", (line, received_monotonic, received_utc_ns)))
-
     def _drain_messages(self):
         drained_count = 0
         while drained_count < MAX_QUEUE_DRAIN_PER_TICK:
@@ -5900,10 +5765,8 @@ class TestRunGui(tk.Tk):
             if kind == "status":
                 self._write_debug_log(f"GUI STATUS {value}")
                 self.status_var.set(value)
-            elif kind == "ethercat_connected":
-                self._handle_ethercat_connected(value)
-            elif kind == "ethercat_error":
-                self._handle_ethercat_error(value)
+            elif kind == "ads_lost":
+                self._handle_ads_lost(value)
             elif kind == "colibri_snapshot":
                 label, snapshot = value
                 self._write_debug_log(f"GUI COLIBRI snapshot {label}: {snapshot}")
@@ -6054,8 +5917,11 @@ class TestRunGui(tk.Tk):
         if parts[0] == "STOPPED":
             self.mode_var.set("Mode: idle")
             self.active_test_mask = ""
-            if self.active_sequence_archive is not None:
-                self.after(250, self._finalize_sequence_after_stop)
+            if (
+                self.active_sequence_archive is not None
+                and self.sequence_finalize_after_id is None
+            ):
+                self.sequence_finalize_after_id = self.after(0, self._finalize_sequence_after_stop)
             return
 
         if parts[0] == "PULSE":
@@ -6174,9 +6040,9 @@ class TestRunGui(tk.Tk):
         return float(value)
 
     def _flow_capture_end_time_ms(self, impulse):
-        arduino_duration_ms = impulse.get("arduino_valve_open_duration_ms")
-        if arduino_duration_ms is not None:
-            return impulse["start_time_ms"] + arduino_duration_ms + FLOW_DELAY_CAPTURE_MS
+        plc_duration_ms = impulse.get("plc_valve_open_duration_ms")
+        if plc_duration_ms is not None:
+            return impulse["start_time_ms"] + plc_duration_ms + FLOW_DELAY_CAPTURE_MS
 
         close_time_ms = impulse.get("valve_close_time_ms")
         if close_time_ms is None:
@@ -6213,7 +6079,7 @@ class TestRunGui(tk.Tk):
             "read_stepper_y_offset": read_stepper_y_offset,
             "read_colibri_z_offset": read_colibri_z_offset,
             "valve_mask": valve_mask,
-            "arduino_valve_open_duration_ms": self.pending_pulse_duration_ms,
+            "plc_valve_open_duration_ms": self.pending_pulse_duration_ms,
             "start_time_ms": sample["time_ms"],
             "valve_close_time_ms": None,
             "capture_end_time_ms": sample["time_ms"],
@@ -6236,6 +6102,9 @@ class TestRunGui(tk.Tk):
             "last_flow_time_ms": None,
             "last_flow_l_min": None,
             "volume_l": 0.0,
+            # The PLC's FLOW_DONE event is authoritative for samples, peak,
+            # and volume.  Do not let later GUI display samples overwrite it.
+            "plc_flow_complete": False,
         }
         self.pending_flip_angle = -1
         self.pending_pulse_mask = ""
@@ -6302,6 +6171,8 @@ class TestRunGui(tk.Tk):
                 self.current_impulse["regulator_pressure_count"] += 1
 
     def _add_flow_sample(self, sample):
+        if self.current_impulse.get("plc_flow_complete", False):
+            return
         flow = sample["flow"]
         time_ms = sample["time_ms"]
         if flow is None:
@@ -6339,7 +6210,7 @@ class TestRunGui(tk.Tk):
         valve_close_time_ms = impulse["valve_close_time_ms"]
         if valve_close_time_ms is None:
             valve_close_time_ms = impulse["capture_end_time_ms"]
-        valve_open_duration_ms = impulse["arduino_valve_open_duration_ms"]
+        valve_open_duration_ms = impulse["plc_valve_open_duration_ms"]
         if valve_open_duration_ms is None:
             valve_open_duration_ms = VALVE_PULSE_DURATION_MS
 
@@ -6402,9 +6273,9 @@ class TestRunGui(tk.Tk):
         try:
             mask_value = int(float(mask))
         except (TypeError, ValueError):
-            return ["", "", "", ""]
+            return ["", "", "", "", "", ""]
 
-        return [1 if mask_value & (1 << index) else 0 for index in range(4)]
+        return [1 if mask_value & (1 << index) else 0 for index in range(6)]
 
     def _format_csv_number(self, value, digits=3):
         if value is None or value == "":
@@ -6461,7 +6332,7 @@ class TestRunGui(tk.Tk):
             setpoint = parts[3]
             pwm = parts[5]
             self.mode_var.set(f"Mode: manual pressure | target {setpoint} bar | PWM {pwm}")
-            self.status_var.set(f"Arduino applied manual pressure: {setpoint} bar, PWM {pwm}")
+            self.status_var.set(f"TwinCAT applied manual pressure: {setpoint} bar, raw output {pwm}")
 
     def _handle_flow_threshold_line(self, parts):
         if len(parts) >= 3 and parts[1] == "SET":
@@ -6536,6 +6407,7 @@ class TestRunGui(tk.Tk):
             self._complete_test_impulse_from_flow_done(parts)
 
         if self.current_impulse:
+            self.current_impulse["plc_flow_complete"] = True
             if flow_sample_count is not None:
                 self.current_impulse["flow_sample_count"] = int(round(flow_sample_count))
             if max_flow is not None:
@@ -6553,7 +6425,7 @@ class TestRunGui(tk.Tk):
             if volume_l is not None:
                 self.impulse_rows[-1][17] = self._format_csv_number(volume_l, digits=6)
             if flow_sample_count is not None:
-                self.impulse_rows[-1][24] = int(round(flow_sample_count))
+                self.impulse_rows[-1][26] = int(round(flow_sample_count))
 
     def _complete_test_impulse_from_flow_done(self, parts):
         capture = self.test_impulse_capture
@@ -6610,7 +6482,7 @@ class TestRunGui(tk.Tk):
             return
 
         if self.current_impulse:
-            self.current_impulse["arduino_valve_open_duration_ms"] = duration_ms
+            self.current_impulse["plc_valve_open_duration_ms"] = duration_ms
             return
 
         if self.impulse_rows:
@@ -6634,7 +6506,7 @@ class TestRunGui(tk.Tk):
         if self.impulse_rows:
             self.impulse_rows[-1][1] = flip_angle
             if self.impulse_rows[-1][18] == "":
-                self.impulse_rows[-1][18:22] = self._nozzle_mask_flags(valve_mask)
+                self.impulse_rows[-1][18:24] = self._nozzle_mask_flags(valve_mask)
             return
 
         self.pending_flip_angle = flip_angle
@@ -6644,6 +6516,19 @@ class TestRunGui(tk.Tk):
         if len(parts) >= 3 and parts[1] == "ENABLED":
             self.motor_enabled_var.set(parts[2] not in ("0", "FALSE"))
             self.status_var.set(f"Stepper enabled: {self.motor_enabled_var.get()}")
+            return
+
+        if len(parts) >= 3 and parts[1] == "BUSY":
+            busy = parts[2] not in ("0", "FALSE")
+            self._set_motor_motion_busy(busy)
+            if busy:
+                self.status_var.set("Stepper moving; motion controls are locked (Stop remains available).")
+            return
+
+        if len(parts) >= 3 and parts[1] == "REJECTED":
+            busy = parts[2] not in ("0", "FALSE")
+            self._set_motor_motion_busy(busy)
+            self.status_var.set(";".join(parts[3:]) if len(parts) > 3 else "Stepper command rejected")
             return
 
         if len(parts) >= 3 and parts[1] == "SPEED":
@@ -6674,16 +6559,19 @@ class TestRunGui(tk.Tk):
             return
 
         if len(parts) >= 2 and parts[1] == "DONE":
+            self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper done")
             self.status_var.set("Stepper move complete")
             return
 
         if len(parts) >= 2 and parts[1] == "STOPPED":
+            self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper stopped")
             self.status_var.set("Stepper stopped")
             return
 
         if len(parts) >= 3 and parts[1] == "ERROR":
+            self._set_motor_motion_busy(False)
             self.status_var.set(";".join(parts))
 
     def _handle_motor_position_line(self, parts):
@@ -6705,17 +6593,20 @@ class TestRunGui(tk.Tk):
 
         event = parts[1] if len(parts) > 1 else "POSITION"
         if event == "ZERO":
+            self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper zero set")
             self.status_var.set("Stepper zero reference set")
         elif event == "HOME_DONE":
+            self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper homed")
-            self.status_var.set("Stepper homed at positive limit switch")
+            self.status_var.set("Stepper homed at lower limit switch")
         elif event in ("LIMIT", "LIMIT_STOP"):
-            self.mode_var.set("Mode: stepper limit switch")
-            self.status_var.set(
-                "Stepper positive limit switch active; zero reference set"
-            )
+            # DI1 is only the stop trigger.  Keep motion controls locked until
+            # the PLC reports HOME_DONE (home + zero) or STOPPED (plain jog).
+            self.mode_var.set("Mode: stepper lower limit switch")
+            self.status_var.set("Stepper lower limit switch active; stopping")
         elif event == "DONE":
+            self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper done")
             self.status_var.set(f"Stepper move complete at {position_mm:.3f} mm")
         elif event == "POSITION":
@@ -6782,7 +6673,7 @@ class TestRunGui(tk.Tk):
                 "start time ms",
                 "valve close time ms",
                 "capture end time ms",
-                "arduino valve open duration ms",
+                "plc valve open duration ms",
                 "target regulator pressure",
                 "average actual regulator pressure",
                 "average pressure before valve",
@@ -6795,6 +6686,8 @@ class TestRunGui(tk.Tk):
                 "nozzle 2 used",
                 "nozzle 3 used",
                 "nozzle 4 used",
+                "nozzle 5 used",
+                "nozzle 6 used",
                 "valve open sample count",
                 "pressure sample count",
                 "flow sample count",
@@ -6858,7 +6751,7 @@ class TestRunGui(tk.Tk):
             round((archive["end_pressure_bar"] - archive["start_pressure_bar"]) / archive["pressure_step_bar"])
         ) + 1
         selected_nozzles = ",".join(
-            str(index + 1) for index in range(4) if archive["nozzle_mask"] & (1 << index)
+            str(index + 1) for index in range(6) if archive["nozzle_mask"] & (1 << index)
         )
         rows = [
             ("sequence id", archive["session_id"], "stable identifier used in all sequence CSV files"),
@@ -6888,7 +6781,7 @@ class TestRunGui(tk.Tk):
             ("nozzle mask", archive["nozzle_mask"], ""),
             ("selected nozzles", selected_nozzles, ""),
             ("configured valve pulse duration", self.pulse_duration_var.get(), "ms"),
-            ("Arduino sample interval", SAMPLE_INTERVAL_MS, "ms"),
+            ("PLC task interval", SAMPLE_INTERVAL_MS, "ms"),
             ("flow detection threshold", self.flow_threshold_var.get(), "l/min"),
             ("force standard filter", 20, "samples, rolling mean"),
             ("force impulse threshold", self.force_impulse_threshold, "N"),
@@ -6908,7 +6801,7 @@ class TestRunGui(tk.Tk):
                 "N",
             ),
             ("QuantumX endpoint", f"{self.quantumx_host_var.get()}:{self.quantumx_port_var.get()}", ""),
-            ("Arduino port", self._selected_port_device(), ""),
+            ("TwinCAT ADS endpoint", self._selected_plc_endpoint(), ""),
             ("Colibri port", self._selected_colibri_port_device(), ""),
             ("plate reference contact", COLIBRI_PLATE_CONTACT_POSITION_MM, "mm"),
             ("nozzle offset", self.nozzle_offset_var.get(), "mm"),
@@ -7242,7 +7135,6 @@ class TestRunGui(tk.Tk):
 
     def destroy(self):
         self.closing = True
-        self._disconnect_ethercat()
         self._disconnect_force_sensor()
         if self.quantumx_monitor_process and self.quantumx_monitor_process.poll() is None:
             self.quantumx_monitor_process.terminate()

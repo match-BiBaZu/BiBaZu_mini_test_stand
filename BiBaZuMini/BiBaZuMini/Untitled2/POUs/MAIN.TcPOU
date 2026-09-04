@@ -1,0 +1,817 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="MAIN" Id="{e8c46bfa-d835-4f89-a02b-b978faa0ab5d}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+    // -----------------------------------------------------------------------
+    // Physical I/O.  These names deliberately stay unchanged because the
+    // existing System Manager links point at them.
+    // -----------------------------------------------------------------------
+    bReadLimitSwitch AT %I* : BOOL := FALSE;
+    iReadNozzlePressure AT %I* : INT := 0;
+    iReadNozzleFlow AT %I* : INT := 0;
+    // Link this to EL3164 Channel 3, Value (terminal point 3 / GND 4).
+    // It is the VPPM actual-value signal, not the EL4102 setpoint output.
+    iReadRegulatorFeedback AT %I* : INT := 0;
+
+    bSetNozzleOn1 AT %Q* : BOOL := FALSE;
+    bSetNozzleOn2 AT %Q* : BOOL := FALSE;
+    bSetNozzleOn3 AT %Q* : BOOL := FALSE;
+    bSetNozzleOn4 AT %Q* : BOOL := FALSE;
+    bSetNozzleOn5 AT %Q* : BOOL := FALSE;
+    bSetNozzleOn6 AT %Q* : BOOL := FALSE;
+    iSetRegulatorPressure AT %Q* : INT := 0;
+
+    // -----------------------------------------------------------------------
+    // Public ADS command mailbox.  A client writes every payload first, then
+    // nCmdType and increments udCmdSeq LAST.  MAIN consumes each sequence
+    // number once and echoes it in udCmdAckSeq.  Do not write physical I/O or
+    // Axis1 directly from ADS.
+    // -----------------------------------------------------------------------
+    bCmdOutputsEnable : BOOL := FALSE;
+    udCmdHeartbeat : UDINT := 0;
+    udCmdSeq : UDINT := 0;
+    udCmdAckSeq : UDINT := 0;
+    nCmdType : USINT := 0;
+
+    fCmdTargetPressureBar : LREAL := 0.0;
+    byCmdNozzleMask : USINT := 0;
+    udCmdPulseDurationMs : UDINT := 50;
+    fCmdFlowThresholdNlMin : LREAL := 2.0;
+
+    fCmdTestStartPressureBar : LREAL := 0.5;
+    fCmdTestEndPressureBar : LREAL := 0.8;
+    byCmdTestNozzleMask : USINT := 0;
+    uiCmdTestRepeats : UINT := 10;
+    udCmdTestInitialSettleMs : UDINT := 5000;
+    udCmdTestRepeatSettleMs : UDINT := 2000;
+
+    bCmdMotorEnable : BOOL := FALSE;
+    fCmdMotorRelativeMm : LREAL := 10.0;
+    fCmdMotorAbsoluteMm : LREAL := 0.0;
+    // Arduino default was 400 full steps/s.  At 0.009985846 mm/full-step
+    // this is exactly 3.9943384 mm/s.
+    fCmdMotorVelocityMmS : LREAL := 3.9943384;
+    fCmdMotorAccelerationMmS2 : LREAL := 20.0;
+    fCmdMotorDecelerationMmS2 : LREAL := 20.0;
+
+    // -----------------------------------------------------------------------
+    // Public status / telemetry.  The GUI reads these symbols in one ADS
+    // batch.  Regulator feedback remains explicitly unavailable until the
+    // VPPM pink actual-value wire is mapped to an EL3164 channel.
+    // -----------------------------------------------------------------------
+    bStatusReady : BOOL := FALSE;
+    bStatusOutputsPermitted : BOOL := FALSE;
+    bStatusWatchdogExpired : BOOL := TRUE;
+    udStatusCycleCounter : UDINT := 0;
+    nStatusError : USINT := 0;
+    udStatusErrorId : UDINT := 0;
+
+    iStatusNozzlePressureRaw : INT := 0;
+    iStatusNozzleFlowRaw : INT := 0;
+    iStatusRegulatorFeedbackRaw : INT := 0;
+    fStatusNozzlePressureVoltageV : LREAL := 0.0;
+    fStatusNozzleFlowVoltageV : LREAL := 0.0;
+    fStatusRegulatorFeedbackVoltageV : LREAL := 0.0;
+    fStatusNozzlePressureBar : LREAL := 0.0;
+    fStatusFlowNlMin : LREAL := 0.0;
+    fStatusTargetPressureBar : LREAL := 0.0;
+    bStatusRegulatorFeedbackAvailable : BOOL := FALSE;
+    fStatusRegulatorFeedbackBar : LREAL := 0.0;
+    fStatusRegulatorCommandVoltageV : LREAL := 0.0;
+    iStatusRegulatorOutputRaw : INT := 0;
+
+    bStatusValvesOpen : BOOL := FALSE;
+    bStatusPulseBusy : BOOL := FALSE;
+    bStatusFlowCaptureActive : BOOL := FALSE;
+    bStatusTestRunning : BOOL := FALSE;
+    byStatusActiveNozzleMask : USINT := 0;
+    byStatusLastPulseMask : USINT := 0;
+    udStatusPulseStarted : UDINT := 0;
+    udStatusPulseDone : UDINT := 0;
+    udStatusFlowDone : UDINT := 0;
+    udStatusPulseDurationMs : UDINT := 0;
+    udStatusFlowSamples : UDINT := 0;
+    udStatusFlowDurationMs : UDINT := 0;
+    fStatusFlowBaselineNlMin : LREAL := 0.0;
+    fStatusFlowMaxNlMin : LREAL := 0.0;
+    fStatusFlowVolumeL : LREAL := 0.0;
+    udStatusTestStarted : UDINT := 0;
+    udStatusTestStopped : UDINT := 0;
+
+    bStatusLimitSwitch : BOOL := FALSE;
+    bStatusMotorEnabled : BOOL := FALSE;
+    bStatusMotorBusy : BOOL := FALSE;
+    bStatusMotorReferenced : BOOL := FALSE;
+    bStatusMotorError : BOOL := FALSE;
+    udStatusMotorErrorId : UDINT := 0;
+    fStatusMotorPositionMm : LREAL := 0.0;
+    udStatusMotorDone : UDINT := 0;
+    udStatusMotorHomeDone : UDINT := 0;
+    udStatusMotorZeroDone : UDINT := 0;
+    udStatusMotorStopped : UDINT := 0;
+
+    // -----------------------------------------------------------------------
+    // Commissioning configuration.  Defaults reproduce the old Arduino
+    // sensor ranges, but must be verified against the installed sensor labels.
+    // The old PWM converter correction is disabled because EL4102 drives the
+    // VPPM directly; enable and re-calibrate it only after a pressure check.
+    // -----------------------------------------------------------------------
+    // Festo SPAN nozzle-pressure sensor: 0..10 V = 0..10 bar.
+    fConfigPressureMinVoltageV : LREAL := 0.0;
+    fConfigPressureMaxVoltageV : LREAL := 10.0;
+    fConfigPressureMinBar : LREAL := 0.0;
+    fConfigPressureMaxBar : LREAL := 10.0;
+    fConfigFlowMinVoltageV : LREAL := 1.0;
+    fConfigFlowMaxVoltageV : LREAL := 5.0;
+    fConfigFlowMinNlMin : LREAL := 0.0;
+    fConfigFlowMaxNlMin : LREAL := 200.0;
+    fConfigRegulatorMaxPressureBar : LREAL := 6.0;
+    // Enable only after EL3164 Channel 3 has been physically wired and linked
+    // to iReadRegulatorFeedback.  The VPPM 0L6 feedback is 0..10 V = 0..6 bar.
+    bConfigRegulatorFeedbackEnabled : BOOL := TRUE;
+    fConfigRegulatorFeedbackMinVoltageV : LREAL := 0.0;
+    fConfigRegulatorFeedbackMaxVoltageV : LREAL := 10.0;
+    fConfigRegulatorFeedbackMinBar : LREAL := 0.0;
+    fConfigRegulatorFeedbackMaxBar : LREAL := 6.0;
+    bConfigUseRegulatorCorrection : BOOL := FALSE;
+    fConfigRegulatorGain : LREAL := 1.125664;
+    fConfigRegulatorOffsetBar : LREAL := 0.049987;
+    bConfigLimitSwitchPressedHigh : BOOL := TRUE;
+    bConfigMotionEnabled : BOOL := FALSE;
+    bConfigHomingEnabled : BOOL := FALSE;
+    // Machine coordinate convention: home/lower limit is 0 mm and motion
+    // upwards is positive.  Commission the physical travel length before
+    // allowing production moves beyond this conservative 2000 mm limit.
+    fConfigMotorMinPositionMm : LREAL := 0.0;
+    fConfigMotorMaxPositionMm : LREAL := 2000.0;
+
+    // NC axis.  Axis1.PlcToNc and Axis1.NcToPlc must both be linked to
+    // "Achse 1" in the System Manager before the MC_* calls can operate.
+    Axis1 : AXIS_REF;
+    fbPower : MC_Power;
+    fbMoveRelative : MC_MoveRelative;
+    fbMoveAbsolute : MC_MoveAbsolute;
+    fbHomeJog : MC_MoveVelocity;
+    fbSetZero : MC_Home;
+    fbStop : MC_Stop;
+    fbReset : MC_Reset;
+    stHomingOptions : ST_HomingOptions;
+
+    // Private state.
+    udConsumedCmdSeq : UDINT := 0;
+    udLastHeartbeat : UDINT := 0;
+    udWatchdogTicks : UDINT := 0;
+    bHeartbeatSeen : BOOL := FALSE;
+    udPulseDurationMs : UDINT := 50;
+    udPulseTicksTarget : UDINT := 0;
+    udPulseTicksElapsed : UDINT := 0;
+    byRequestedPulseMask : USINT := 0;
+    byTestValveMask : USINT := 0;
+    uiTestStartStep : UINT := 0;
+    uiTestEndStep : UINT := 0;
+    uiTestCurrentStep : UINT := 0;
+    uiTestPulseCount : UINT := 0;
+    uiTestRepeats : UINT := 10;
+    udTestWaitTicks : UDINT := 0;
+    udTestWaitElapsed : UDINT := 0;
+    fFlowThresholdNlMin : LREAL := 2.0;
+    udFlowQuietCount : UDINT := 0;
+    bFlowPeakSeen : BOOL := FALSE;
+    bTestWaiting : BOOL := FALSE;
+    bTestFinishPending : BOOL := FALSE;
+    bStartPulseRequest : BOOL := FALSE;
+    bPulseStartedThisScan : BOOL := FALSE;
+    bPulseFinishedThisScan : BOOL := FALSE;
+    bExecMoveRelative : BOOL := FALSE;
+    bExecMoveAbsolute : BOOL := FALSE;
+    bExecHomeJog : BOOL := FALSE;
+    bExecZero : BOOL := FALSE;
+    bExecStop : BOOL := FALSE;
+    bExecReset : BOOL := FALSE;
+    bLimitSwitchPressed : BOOL := FALSE;
+    bLimitStopIssued : BOOL := FALSE;
+    // 0 = idle, 1 = jogging down, 2 = stopping at home switch,
+    // 3 = setting the home position to zero.
+    nHomingState : USINT := 0;
+    bStopBelongsToHome : BOOL := FALSE;
+    bHomeStopConsumedThisScan : BOOL := FALSE;
+    fCorrectedFlowNlMin : LREAL := 0.0;
+    fCorrectedCommandBar : LREAL := 0.0;
+    fCommandVoltageV : LREAL := 0.0;
+    uiTemporaryStep : UINT := 0;
+END_VAR
+VAR CONSTANT
+    cTaskMs : UDINT := 5;
+    cTaskSeconds : LREAL := 0.005;
+    cAllValveMask : USINT := 16#3F;
+    cCmdSetPressure : USINT := 1;
+    cCmdPulse : USINT := 2;
+    cCmdStartTest : USINT := 3;
+    cCmdStopAll : USINT := 4;
+    cCmdMotorPower : USINT := 5;
+    cCmdMoveRelative : USINT := 6;
+    cCmdMoveAbsolute : USINT := 7;
+    cCmdHome : USINT := 8;
+    cCmdZero : USINT := 9;
+    cCmdMotorStop : USINT := 10;
+    cCmdMotorReset : USINT := 11;
+    cCmdApplyPulseSettings : USINT := 12;
+    cWatchdogTicks : UDINT := 400; // 2 seconds at a 5 ms PLC task.
+    cFlowCaptureMaxSamples : UDINT := 100; // 500 ms at a 5 ms PLC task.
+    cFlowCaptureMinSamples : UDINT := 8;
+    cFlowCaptureQuietSamples : UDINT := 3;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// This POU is written for a 5 ms PlcTask.  Keep cTaskMs/cTaskSeconds in
+// step with the actual task period if the task is deliberately changed.
+
+bPulseStartedThisScan := FALSE;
+bPulseFinishedThisScan := FALSE;
+bStartPulseRequest := FALSE;
+bExecMoveRelative := FALSE;
+bExecMoveAbsolute := FALSE;
+bExecHomeJog := FALSE;
+bExecZero := FALSE;
+bExecStop := FALSE;
+bExecReset := FALSE;
+bHomeStopConsumedThisScan := FALSE;
+udStatusCycleCounter := udStatusCycleCounter + 1;
+bStatusReady := TRUE;
+
+// Refresh NC state before command validation.  Motion remains disabled by
+// default until scaling, limits, and homing are commissioned.
+Axis1.ReadStatus();
+fStatusMotorPositionMm := Axis1.NcToPlc.ActPos;
+bStatusMotorReferenced := Axis1.Status.Homed;
+
+// Scale the two EL3164 channels.  0..32767 represents 0..10 V for the
+// terminal's default 0..10 V process image.
+iStatusNozzlePressureRaw := iReadNozzlePressure;
+iStatusNozzleFlowRaw := iReadNozzleFlow;
+iStatusRegulatorFeedbackRaw := iReadRegulatorFeedback;
+fStatusNozzlePressureVoltageV := INT_TO_LREAL(iReadNozzlePressure) * 10.0 / 32767.0;
+fStatusNozzleFlowVoltageV := INT_TO_LREAL(iReadNozzleFlow) * 10.0 / 32767.0;
+fStatusRegulatorFeedbackVoltageV := INT_TO_LREAL(iReadRegulatorFeedback) * 10.0 / 32767.0;
+
+IF fConfigPressureMaxVoltageV > fConfigPressureMinVoltageV THEN
+    fStatusNozzlePressureBar := LIMIT(
+        fConfigPressureMinBar,
+        fConfigPressureMinBar +
+        (fStatusNozzlePressureVoltageV - fConfigPressureMinVoltageV) *
+        (fConfigPressureMaxBar - fConfigPressureMinBar) /
+        (fConfigPressureMaxVoltageV - fConfigPressureMinVoltageV),
+        fConfigPressureMaxBar
+    );
+ELSE
+    fStatusNozzlePressureBar := 0.0;
+END_IF
+
+IF fConfigFlowMaxVoltageV > fConfigFlowMinVoltageV THEN
+    fStatusFlowNlMin := LIMIT(
+        fConfigFlowMinNlMin,
+        fConfigFlowMinNlMin +
+        (fStatusNozzleFlowVoltageV - fConfigFlowMinVoltageV) *
+        (fConfigFlowMaxNlMin - fConfigFlowMinNlMin) /
+        (fConfigFlowMaxVoltageV - fConfigFlowMinVoltageV),
+        fConfigFlowMaxNlMin
+    );
+ELSE
+    fStatusFlowNlMin := 0.0;
+END_IF
+
+// VPPM actual-value feedback: EL3164 Channel 3, 0..10 V = 0..6 bar for the
+// VPPM-8L-1-G14-0L6H-V1N-S1.  Keep it explicitly unavailable until its
+// dedicated Channel 3 input has been wired and linked.
+bStatusRegulatorFeedbackAvailable := bConfigRegulatorFeedbackEnabled AND
+                                      (fConfigRegulatorFeedbackMaxVoltageV > fConfigRegulatorFeedbackMinVoltageV);
+IF bStatusRegulatorFeedbackAvailable THEN
+    fStatusRegulatorFeedbackBar := LIMIT(
+        fConfigRegulatorFeedbackMinBar,
+        fConfigRegulatorFeedbackMinBar +
+        (fStatusRegulatorFeedbackVoltageV - fConfigRegulatorFeedbackMinVoltageV) *
+        (fConfigRegulatorFeedbackMaxBar - fConfigRegulatorFeedbackMinBar) /
+        (fConfigRegulatorFeedbackMaxVoltageV - fConfigRegulatorFeedbackMinVoltageV),
+        fConfigRegulatorFeedbackMaxBar
+    );
+ELSE
+    fStatusRegulatorFeedbackBar := 0.0;
+END_IF
+
+// ADS heartbeat watchdog.  Losing the GUI connection forces all outputs off
+// in the following output-image update, even if an old ADS value is retained.
+IF udCmdHeartbeat <> udLastHeartbeat THEN
+    udLastHeartbeat := udCmdHeartbeat;
+    udWatchdogTicks := 0;
+    bHeartbeatSeen := TRUE;
+    bStatusWatchdogExpired := FALSE;
+ELSIF NOT bHeartbeatSeen THEN
+    // Do not give a retained bCmdOutputsEnable a startup grace period.
+    // A newly activated PLC must observe an actual GUI heartbeat first.
+    bStatusWatchdogExpired := TRUE;
+ELSIF udWatchdogTicks < cWatchdogTicks THEN
+    udWatchdogTicks := udWatchdogTicks + 1;
+    bStatusWatchdogExpired := FALSE;
+ELSE
+    bStatusWatchdogExpired := TRUE;
+END_IF
+bStatusOutputsPermitted := bCmdOutputsEnable AND NOT bStatusWatchdogExpired;
+
+// The EL1014 is normally TRUE when a 24 V input is present.  Negative jogs
+// are allowed before referencing only to approach this lower/home switch.
+IF bConfigLimitSwitchPressedHigh THEN
+    bLimitSwitchPressed := bReadLimitSwitch;
+ELSE
+    bLimitSwitchPressed := NOT bReadLimitSwitch;
+END_IF
+bStatusLimitSwitch := bLimitSwitchPressed;
+
+// MC_Stop must receive a falling Execute edge after the axis reaches
+// standstill, otherwise it keeps the NC axis locked.  Re-arm this one-shot
+// only after the mechanics have left the lower/home switch.
+IF NOT bLimitSwitchPressed AND (nHomingState = 0) AND NOT fbStop.Busy THEN
+    bLimitStopIssued := FALSE;
+END_IF
+
+// Process an ADS transaction once.  All new command errors are reported in
+// nStatusError; a nonzero udStatusErrorId provides the detail/MC error code.
+IF udCmdSeq <> udConsumedCmdSeq THEN
+    // The GUI waits for udCmdAckSeq before submitting the next transaction.
+    // Reject a jump instead of applying a potentially overwritten payload.
+    IF udCmdSeq <> (udConsumedCmdSeq + UDINT#1) THEN
+        udConsumedCmdSeq := udCmdSeq;
+        nStatusError := 4; // non-successor mailbox sequence: fail safe
+        udStatusErrorId := udCmdSeq;
+        bCmdOutputsEnable := FALSE;
+        bCmdMotorEnable := FALSE;
+        bStatusOutputsPermitted := FALSE;
+        bStatusTestRunning := FALSE;
+        bTestWaiting := FALSE;
+        bTestFinishPending := FALSE;
+        bStatusPulseBusy := FALSE;
+        bStatusFlowCaptureActive := FALSE;
+        byStatusActiveNozzleMask := 0;
+        fStatusTargetPressureBar := 0.0;
+        // Publish acknowledgement only after the command result is complete.
+        udCmdAckSeq := udCmdSeq;
+    ELSE
+        udConsumedCmdSeq := udCmdSeq;
+        nStatusError := 0;
+        udStatusErrorId := 0;
+
+        CASE nCmdType OF
+        cCmdApplyPulseSettings:
+            udPulseDurationMs := LIMIT(UDINT#10, udCmdPulseDurationMs, UDINT#500);
+            fFlowThresholdNlMin := LIMIT(0.0, fCmdFlowThresholdNlMin, 200.0);
+
+        cCmdSetPressure:
+            IF bStatusTestRunning OR bStatusPulseBusy OR bStatusFlowCaptureActive THEN
+                nStatusError := 2; // explicitly STOP before replacing an active run
+            ELSE
+                fStatusTargetPressureBar := LIMIT(0.0, fCmdTargetPressureBar, fConfigRegulatorMaxPressureBar);
+            END_IF
+
+        cCmdPulse:
+            IF NOT bStatusOutputsPermitted THEN
+                nStatusError := 3; // outputs are not armed or ADS watchdog expired
+            ELSIF (byCmdNozzleMask AND cAllValveMask) = 0 THEN
+                nStatusError := 1; // no valve selected
+            ELSIF bStatusTestRunning OR bStatusPulseBusy OR bStatusFlowCaptureActive THEN
+                nStatusError := 2; // a pulse/flow capture is already active
+            ELSE
+                bStatusTestRunning := FALSE;
+                bTestWaiting := FALSE;
+                bTestFinishPending := FALSE;
+                byRequestedPulseMask := byCmdNozzleMask AND cAllValveMask;
+                bStartPulseRequest := TRUE;
+            END_IF
+
+        cCmdStartTest:
+            IF NOT bStatusOutputsPermitted THEN
+                nStatusError := 3;
+            ELSIF (byCmdTestNozzleMask AND cAllValveMask) = 0 THEN
+                nStatusError := 1;
+            ELSIF bStatusTestRunning OR bStatusPulseBusy OR bStatusFlowCaptureActive THEN
+                nStatusError := 2;
+            ELSE
+                uiTestStartStep := LREAL_TO_UINT(LIMIT(0.0, fCmdTestStartPressureBar, fConfigRegulatorMaxPressureBar) * 10.0 + 0.5);
+                uiTestEndStep := LREAL_TO_UINT(LIMIT(0.0, fCmdTestEndPressureBar, fConfigRegulatorMaxPressureBar) * 10.0 + 0.5);
+                IF uiTestEndStep < uiTestStartStep THEN
+                    uiTemporaryStep := uiTestStartStep;
+                    uiTestStartStep := uiTestEndStep;
+                    uiTestEndStep := uiTemporaryStep;
+                END_IF
+                byTestValveMask := byCmdTestNozzleMask AND cAllValveMask;
+                uiTestCurrentStep := uiTestStartStep;
+                uiTestPulseCount := 0;
+                uiTestRepeats := LIMIT(UINT#1, uiCmdTestRepeats, UINT#100);
+                fStatusTargetPressureBar := UINT_TO_LREAL(uiTestCurrentStep) / 10.0;
+                udTestWaitTicks := MAX(UDINT#1, udCmdTestInitialSettleMs / cTaskMs);
+                udTestWaitElapsed := 0;
+                bTestWaiting := TRUE;
+                bTestFinishPending := FALSE;
+                bStatusTestRunning := TRUE;
+                udStatusTestStarted := udStatusTestStarted + 1;
+            END_IF
+
+        cCmdStopAll:
+            // STOP is itself a fail-safe command.  Do not rely on the ADS
+            // client having cleared these held enables before issuing it.
+            bCmdOutputsEnable := FALSE;
+            bCmdMotorEnable := FALSE;
+            bStatusOutputsPermitted := FALSE;
+            IF bStatusTestRunning THEN
+                udStatusTestStopped := udStatusTestStopped + 1;
+            END_IF
+            bStatusTestRunning := FALSE;
+            bTestWaiting := FALSE;
+            bTestFinishPending := FALSE;
+            bStatusPulseBusy := FALSE;
+            bStatusFlowCaptureActive := FALSE;
+            byStatusActiveNozzleMask := 0;
+            fStatusTargetPressureBar := 0.0;
+            nHomingState := 0;
+            bStopBelongsToHome := FALSE;
+
+        cCmdMotorPower:
+            // bCmdMotorEnable is held, not pulsed.  fbPower uses it cyclically.
+            IF bCmdMotorEnable AND NOT bConfigMotionEnabled THEN
+                bCmdMotorEnable := FALSE;
+                nStatusError := 20; // NC scaling/limits not commissioned
+            END_IF
+            IF NOT bCmdMotorEnable THEN
+                nHomingState := 0;
+                bStopBelongsToHome := FALSE;
+            END_IF
+
+        cCmdMoveRelative:
+            IF NOT bConfigMotionEnabled THEN
+                nStatusError := 20; // NC scaling/limits not commissioned
+            ELSIF NOT bStatusOutputsPermitted OR NOT bCmdMotorEnable THEN
+                nStatusError := 21; // motor not enabled/armed
+            ELSIF bStatusMotorBusy THEN
+                nStatusError := 22; // an MC motion command is already busy
+            ELSIF bLimitSwitchPressed AND (fCmdMotorRelativeMm < 0.0) THEN
+                nStatusError := 26; // do not command farther into the home switch
+            // Relative commissioning jogs are allowed before a reference is
+            // established.  Software travel limits are meaningful only once
+            // the lower/home position has been set.
+            ELSIF bStatusMotorReferenced AND
+                  ((fStatusMotorPositionMm + fCmdMotorRelativeMm < fConfigMotorMinPositionMm) OR
+                   (fStatusMotorPositionMm + fCmdMotorRelativeMm > fConfigMotorMaxPositionMm)) THEN
+                nStatusError := 23; // software travel range violation
+            ELSE
+                bExecMoveRelative := TRUE;
+            END_IF
+
+        cCmdMoveAbsolute:
+            IF NOT bConfigMotionEnabled THEN
+                nStatusError := 20;
+            ELSIF NOT bStatusOutputsPermitted OR NOT bCmdMotorEnable THEN
+                nStatusError := 21;
+            ELSIF NOT bStatusMotorReferenced THEN
+                nStatusError := 25;
+            ELSIF bStatusMotorBusy THEN
+                nStatusError := 22;
+            ELSIF bLimitSwitchPressed AND (fCmdMotorAbsoluteMm < fStatusMotorPositionMm) THEN
+                nStatusError := 26;
+            ELSIF (fCmdMotorAbsoluteMm < fConfigMotorMinPositionMm) OR
+                  (fCmdMotorAbsoluteMm > fConfigMotorMaxPositionMm) THEN
+                nStatusError := 23;
+            ELSE
+                bExecMoveAbsolute := TRUE;
+            END_IF
+
+        cCmdHome:
+            IF NOT bConfigMotionEnabled OR NOT bConfigHomingEnabled THEN
+                nStatusError := 24; // verify limit polarity + NC homing first
+            ELSIF NOT bStatusOutputsPermitted OR NOT bCmdMotorEnable THEN
+                nStatusError := 21;
+            ELSIF bStatusMotorBusy THEN
+                nStatusError := 22;
+            ELSIF bLimitSwitchPressed THEN
+                // The lower/home switch is already active.  Never start a
+                // search away from it; establish the commanded home point.
+                bExecZero := TRUE;
+                nHomingState := 3;
+            ELSE
+                // Homing is an endless low-speed negative jog owned by the
+                // PLC.  DI1 or an explicit motor stop terminates it.
+                bExecHomeJog := TRUE;
+                nHomingState := 1;
+            END_IF
+
+        cCmdZero:
+            IF NOT bConfigMotionEnabled THEN
+                nStatusError := 20;
+            ELSIF NOT bStatusOutputsPermitted OR NOT bCmdMotorEnable THEN
+                nStatusError := 21;
+            ELSIF bStatusMotorBusy THEN
+                nStatusError := 22;
+            ELSE
+                bExecZero := TRUE;
+            END_IF
+
+        cCmdMotorStop:
+            // Cancelling a home must not set zero afterwards.  The operator
+            // can restart Home deliberately after resolving the cause.
+            nHomingState := 0;
+            bStopBelongsToHome := FALSE;
+            bExecStop := TRUE;
+
+        cCmdMotorReset:
+            bExecReset := TRUE;
+
+        ELSE
+            nStatusError := 255; // unsupported command type
+        END_CASE
+        // Publish acknowledgement only after the command result is complete.
+        udCmdAckSeq := udCmdSeq;
+    END_IF
+END_IF
+
+// The watchdog and output-enable bit dominate any retained command state.
+IF NOT bStatusOutputsPermitted THEN
+    // Latch a watchdog/output-permit loss safe.  A fresh GUI transaction must
+    // deliberately arm outputs again; merely resuming a retained heartbeat
+    // must never restore motor power or regulator output.
+    bCmdOutputsEnable := FALSE;
+    bCmdMotorEnable := FALSE;
+    IF bStatusTestRunning THEN
+        udStatusTestStopped := udStatusTestStopped + 1;
+    END_IF
+    bStatusTestRunning := FALSE;
+    bTestWaiting := FALSE;
+    bTestFinishPending := FALSE;
+    bStatusPulseBusy := FALSE;
+    bStatusFlowCaptureActive := FALSE;
+    byStatusActiveNozzleMask := 0;
+    fStatusTargetPressureBar := 0.0;
+    nHomingState := 0;
+    bStopBelongsToHome := FALSE;
+END_IF
+
+// Close a deterministic PLC-owned pulse after its requested tick count.
+IF bStatusPulseBusy AND NOT bPulseStartedThisScan THEN
+    udPulseTicksElapsed := udPulseTicksElapsed + 1;
+    IF udPulseTicksElapsed >= udPulseTicksTarget THEN
+        bStatusPulseBusy := FALSE;
+        bPulseFinishedThisScan := TRUE;
+        byStatusActiveNozzleMask := 0;
+        udStatusPulseDurationMs := udPulseTicksTarget * cTaskMs;
+        udStatusPulseDone := udStatusPulseDone + 1;
+    END_IF
+END_IF
+
+// Test sequence: wait after each pressure level, then issue the same pulse
+// path used by manual pulses.  The flow capture continues independently.
+IF bStatusTestRunning THEN
+    IF bTestFinishPending THEN
+        // Keep the run logically active until the final PLC-owned flow
+        // capture has published its summary.  The GUI can then archive the
+        // last impulse before it receives STOPPED.
+        IF NOT bStatusFlowCaptureActive THEN
+            bStatusTestRunning := FALSE;
+            bTestFinishPending := FALSE;
+            udStatusTestStopped := udStatusTestStopped + 1;
+        END_IF
+    ELSIF bPulseFinishedThisScan THEN
+        uiTestPulseCount := uiTestPulseCount + 1;
+        IF uiTestPulseCount >= uiTestRepeats THEN
+            IF uiTestCurrentStep >= uiTestEndStep THEN
+                bTestFinishPending := TRUE;
+                bTestWaiting := FALSE;
+            ELSE
+                uiTestCurrentStep := uiTestCurrentStep + 1;
+                uiTestPulseCount := 0;
+                fStatusTargetPressureBar := UINT_TO_LREAL(uiTestCurrentStep) / 10.0;
+                udTestWaitTicks := MAX(UDINT#1, udCmdTestInitialSettleMs / cTaskMs);
+                udTestWaitElapsed := 0;
+                bTestWaiting := TRUE;
+            END_IF
+        ELSE
+            udTestWaitTicks := MAX(UDINT#1, udCmdTestRepeatSettleMs / cTaskMs);
+            udTestWaitElapsed := 0;
+            bTestWaiting := TRUE;
+        END_IF
+    ELSIF bTestWaiting THEN
+        udTestWaitElapsed := udTestWaitElapsed + 1;
+        IF (udTestWaitElapsed >= udTestWaitTicks) AND NOT bStatusFlowCaptureActive THEN
+            bTestWaiting := FALSE;
+            byRequestedPulseMask := byTestValveMask;
+            bStartPulseRequest := TRUE;
+        END_IF
+    END_IF
+END_IF
+
+// Start a pulse only after all command/test logic has selected its mask.
+IF bStartPulseRequest AND NOT bStatusPulseBusy AND NOT bStatusFlowCaptureActive AND bStatusOutputsPermitted THEN
+    bStatusPulseBusy := TRUE;
+    bPulseStartedThisScan := TRUE;
+    byStatusActiveNozzleMask := byRequestedPulseMask AND cAllValveMask;
+    byStatusLastPulseMask := byStatusActiveNozzleMask;
+    udPulseTicksElapsed := 0;
+    udPulseTicksTarget := (udPulseDurationMs + cTaskMs - 1) / cTaskMs;
+    udStatusPulseStarted := udStatusPulseStarted + 1;
+
+    bStatusFlowCaptureActive := TRUE;
+    fStatusFlowBaselineNlMin := fStatusFlowNlMin;
+    fStatusFlowMaxNlMin := 0.0;
+    fStatusFlowVolumeL := 0.0;
+    udStatusFlowSamples := 0;
+    udStatusFlowDurationMs := 0;
+    udFlowQuietCount := 0;
+    bFlowPeakSeen := FALSE;
+END_IF
+
+// PLC-owned flow summary.  GUI ADS polls may be slower than the 5 ms task,
+// but volume, peak, and end condition are still calculated at PLC rate.
+IF bStatusFlowCaptureActive AND NOT bPulseStartedThisScan THEN
+    fCorrectedFlowNlMin := fStatusFlowNlMin - fStatusFlowBaselineNlMin;
+    IF fCorrectedFlowNlMin < 0.0 THEN
+        fCorrectedFlowNlMin := 0.0;
+    END_IF
+    IF fCorrectedFlowNlMin > fStatusFlowMaxNlMin THEN
+        fStatusFlowMaxNlMin := fCorrectedFlowNlMin;
+    END_IF
+    udStatusFlowSamples := udStatusFlowSamples + 1;
+    udStatusFlowDurationMs := udStatusFlowSamples * cTaskMs;
+    fStatusFlowVolumeL := fStatusFlowVolumeL + fCorrectedFlowNlMin * cTaskSeconds / 60.0;
+    IF fCorrectedFlowNlMin > fFlowThresholdNlMin THEN
+        bFlowPeakSeen := TRUE;
+        udFlowQuietCount := 0;
+    ELSIF bFlowPeakSeen AND (udStatusFlowSamples >= cFlowCaptureMinSamples) THEN
+        udFlowQuietCount := udFlowQuietCount + 1;
+    END_IF
+    IF (bFlowPeakSeen AND (udFlowQuietCount >= cFlowCaptureQuietSamples)) OR
+       (udStatusFlowSamples >= cFlowCaptureMaxSamples) THEN
+        bStatusFlowCaptureActive := FALSE;
+        udStatusFlowDone := udStatusFlowDone + 1;
+    END_IF
+END_IF
+
+// Direct EL4102 command: 0..32767 maps to 0..10 V.  The Arduino PWM-to-10 V
+// converter table is intentionally not used here.  Optional correction is a
+// commissioning setting, not a carried-over default.
+IF bStatusOutputsPermitted AND (fConfigRegulatorMaxPressureBar > 0.0) THEN
+    fCorrectedCommandBar := fStatusTargetPressureBar;
+    IF bConfigUseRegulatorCorrection AND (fConfigRegulatorGain > 0.0) THEN
+        fCorrectedCommandBar := (fStatusTargetPressureBar - fConfigRegulatorOffsetBar) /
+                                 fConfigRegulatorGain;
+    END_IF
+    fCorrectedCommandBar := LIMIT(0.0, fCorrectedCommandBar, fConfigRegulatorMaxPressureBar);
+    fCommandVoltageV := 10.0 * fCorrectedCommandBar / fConfigRegulatorMaxPressureBar;
+    fStatusRegulatorCommandVoltageV := fCommandVoltageV;
+    iStatusRegulatorOutputRaw := LREAL_TO_INT(LIMIT(0.0, fCommandVoltageV * 32767.0 / 10.0, 32767.0));
+ELSE
+    fStatusRegulatorCommandVoltageV := 0.0;
+    iStatusRegulatorOutputRaw := 0;
+END_IF
+iSetRegulatorPressure := iStatusRegulatorOutputRaw;
+
+// Physical valve outputs are assigned only from the PLC pulse state.  A STOP,
+// watchdog expiry, or lost output permit therefore closes all six together.
+bStatusValvesOpen := bStatusOutputsPermitted AND bStatusPulseBusy AND (byStatusActiveNozzleMask <> 0);
+bSetNozzleOn1 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#01) <> 0);
+bSetNozzleOn2 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#02) <> 0);
+bSetNozzleOn3 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#04) <> 0);
+bSetNozzleOn4 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#08) <> 0);
+bSetNozzleOn5 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#10) <> 0);
+bSetNozzleOn6 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#20) <> 0);
+
+// PLCopen motion calls are cyclic.  The EL1014 DI1 is the lower/home switch:
+// negative motion goes toward it.  A Home command starts MC_MoveVelocity in
+// that direction.  DI1 stops it at PLC task rate; only after MC_Stop reports
+// standstill is the stopped position established as machine position 0.
+// An operator stop sets nHomingState back to idle and therefore never zeros.
+IF (nHomingState = 2) AND fbStop.Done THEN
+    bHomeStopConsumedThisScan := TRUE;
+    bStopBelongsToHome := FALSE;
+    bExecZero := TRUE;
+    nHomingState := 3;
+END_IF
+
+// Stop only once per switch hit.  Continually holding MC_Stop.Execute TRUE
+// would keep the NC axis locked after standstill.
+IF bLimitSwitchPressed AND NOT bLimitStopIssued AND
+   (Axis1.Status.NegativeDirection OR (nHomingState = 1)) THEN
+    bExecStop := TRUE;
+    bLimitStopIssued := TRUE;
+    IF nHomingState = 1 THEN
+        nHomingState := 2;
+        bStopBelongsToHome := TRUE;
+    END_IF
+END_IF
+fbPower(
+    Axis := Axis1,
+    Enable := bCmdMotorEnable AND bStatusOutputsPermitted AND bConfigMotionEnabled,
+    Enable_Positive := TRUE,
+    Enable_Negative := TRUE,
+    Override := 100.0
+);
+fbMoveRelative(
+    Axis := Axis1,
+    Execute := bExecMoveRelative,
+    Distance := fCmdMotorRelativeMm,
+    Velocity := fCmdMotorVelocityMmS,
+    Acceleration := fCmdMotorAccelerationMmS2,
+    Deceleration := fCmdMotorDecelerationMmS2,
+    Jerk := 0.0,
+    BufferMode := MC_Aborting
+);
+fbMoveAbsolute(
+    Axis := Axis1,
+    Execute := bExecMoveAbsolute,
+    Position := fCmdMotorAbsoluteMm,
+    Velocity := fCmdMotorVelocityMmS,
+    Acceleration := fCmdMotorAccelerationMmS2,
+    Deceleration := fCmdMotorDecelerationMmS2,
+    Jerk := 0.0,
+    BufferMode := MC_Aborting
+);
+fbHomeJog(
+    Axis := Axis1,
+    Execute := bExecHomeJog,
+    Velocity := fCmdMotorVelocityMmS,
+    Acceleration := fCmdMotorAccelerationMmS2,
+    Deceleration := fCmdMotorDecelerationMmS2,
+    Jerk := 0.0,
+    Direction := MC_Negative_Direction,
+    BufferMode := MC_Aborting
+);
+fbSetZero(
+    Axis := Axis1,
+    Execute := bExecZero,
+    Position := 0.0,
+    HomingMode := MC_Direct,
+    BufferMode := MC_Aborting,
+    Options := stHomingOptions,
+    bCalibrationCam := FALSE
+);
+fbStop(
+    Axis := Axis1,
+    Execute := bExecStop,
+    Deceleration := fCmdMotorDecelerationMmS2,
+    Jerk := 0.0
+);
+fbReset(Axis := Axis1, Execute := bExecReset);
+
+// Do not leave the GUI permanently Busy if one stage of the home sequence
+// fails.  The MC error remains visible and must be cleared with Motor Reset.
+IF (nHomingState <> 0) AND
+   (fbHomeJog.Error OR fbStop.Error OR fbSetZero.Error) THEN
+    nHomingState := 0;
+    bStopBelongsToHome := FALSE;
+END_IF
+
+bStatusMotorEnabled := fbPower.Status;
+bStatusMotorBusy := fbMoveRelative.Busy OR fbMoveAbsolute.Busy OR fbHomeJog.Busy OR
+                    fbSetZero.Busy OR fbStop.Busy OR (nHomingState <> 0);
+fStatusMotorPositionMm := Axis1.NcToPlc.ActPos;
+bStatusMotorReferenced := Axis1.Status.Homed;
+bStatusMotorError := Axis1.Status.Error OR fbPower.Error OR fbMoveRelative.Error OR fbMoveAbsolute.Error OR
+                      fbHomeJog.Error OR fbSetZero.Error OR fbStop.Error OR fbReset.Error;
+IF fbPower.Error THEN
+    udStatusMotorErrorId := fbPower.ErrorId;
+ELSIF fbMoveRelative.Error THEN
+    udStatusMotorErrorId := fbMoveRelative.ErrorId;
+ELSIF fbMoveAbsolute.Error THEN
+    udStatusMotorErrorId := fbMoveAbsolute.ErrorId;
+ELSIF fbHomeJog.Error THEN
+    udStatusMotorErrorId := fbHomeJog.ErrorId;
+ELSIF fbSetZero.Error THEN
+    udStatusMotorErrorId := fbSetZero.ErrorId;
+ELSIF fbStop.Error THEN
+    udStatusMotorErrorId := fbStop.ErrorId;
+ELSIF fbReset.Error THEN
+    udStatusMotorErrorId := fbReset.ErrorId;
+ELSE
+    udStatusMotorErrorId := 0;
+END_IF
+
+IF fbMoveRelative.Done OR fbMoveAbsolute.Done THEN
+    udStatusMotorDone := udStatusMotorDone + 1;
+END_IF
+IF fbSetZero.Done THEN
+    IF nHomingState = 3 THEN
+        udStatusMotorHomeDone := udStatusMotorHomeDone + 1;
+        nHomingState := 0;
+    ELSE
+        udStatusMotorZeroDone := udStatusMotorZeroDone + 1;
+    END_IF
+END_IF
+IF fbStop.Done THEN
+    // The intermediate stop at the home switch is followed by MC_Direct and
+    // is reported as HOME_DONE, not as an operator STOPPED event.
+    IF NOT bStopBelongsToHome AND NOT bHomeStopConsumedThisScan THEN
+        udStatusMotorStopped := udStatusMotorStopped + 1;
+    END_IF
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

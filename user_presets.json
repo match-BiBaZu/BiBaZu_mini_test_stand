@@ -3,8 +3,17 @@
   "force_impulse_threshold": 0.1,
   "quantumx_host": "127.0.0.1",
   "quantumx_port": 5500,
+  "twincat_ams_net_id": "5.75.145.248.1.1",
+  "twincat_ip_address": "192.168.1.69",
+  "twincat_ads_port": 851,
   "nozzle_offset_mm": 114.8,
   "colibri_plate_distance_mm": 1.0,
+  "motor_center_position_mm": -7.0,
+  "colibri_probe_max_approach_mm": 10.0,
+  "colibri_probe_retract_mm": 0.05,
+  "colibri_probe_timeout_seconds": 30.0,
+  "colibri_probe_speed_mm_s": 2.0,
+  "colibri_probe_continuous": true,
   "sequence_save_root": "",
-  "platform_calibration_profile": "C:\\Users\\Shieff\\Downloads\\platform_calibration_20260730_203324.json"
+  "platform_calibration_profile": ""
 }

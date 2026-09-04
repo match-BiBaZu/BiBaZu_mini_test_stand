@@ -1,0 +1,257 @@
+<?xml version="1.0"?>
+<TcEventSources Version="2">
+	<Source>
+		<GUID>{28111931-0002-0000-5230-961B00001000}</GUID>
+		<Name LcId="1031">EL7062-0000 2K. Schrittmotor-Endstufe (48V, 3A)</Name>
+		<Name LcId="1033">EL7062-0000 2Ch. Stepper motor output stage (48V, 3A)</Name>
+		<Event>
+			<Id>16641</Id>
+			<Message LcId="1031">Verstärker-Übertemperatur</Message>
+			<Message LcId="1033">Amplifier-Overtemperature</Message>
+		</Event>
+		<Event>
+			<Id>16642</Id>
+			<Message LcId="1031">PDO-Konfiguration ist zur gewählten Betriebsart nicht kompatibel</Message>
+			<Message LcId="1033">PDO-configuration is incompatible to the selected mode of operation</Message>
+		</Event>
+		<Event>
+			<Id>16643</Id>
+			<Message LcId="1031">Unterspannung Us</Message>
+			<Message LcId="1033">Undervoltage Us</Message>
+		</Event>
+		<Event>
+			<Id>16644</Id>
+			<Message LcId="1031">Überspannung Us</Message>
+			<Message LcId="1033">Overvoltage Us</Message>
+		</Event>
+		<Event>
+			<Id>16651</Id>
+			<Message LcId="1031">Ausmaskierter Fehler erkannt</Message>
+			<Message LcId="1033">Error detected, but disabled by suppression mask</Message>
+		</Event>
+		<Event>
+			<Id>17408</Id>
+			<Message LcId="1031">Abgleichsdaten fehlerhaft/nicht vorhanden</Message>
+			<Message LcId="1033">Calibration data corrupted or missing</Message>
+		</Event>
+		<Event>
+			<Id>17425</Id>
+			<Message LcId="1031">Unterspannung DC-Zwischenkreis</Message>
+			<Message LcId="1033">DC-Link undervoltage</Message>
+		</Event>
+		<Event>
+			<Id>17426</Id>
+			<Message LcId="1031">Überspannung DC-Zwischenkreis</Message>
+			<Message LcId="1033">DC-Link overvoltage</Message>
+		</Event>
+		<Event>
+			<Id>17438</Id>
+			<Message LcId="1031">Ungültige Konfiguration der Touchprobe-Eingänge</Message>
+			<Message LcId="1033">Invalid configuration of touchprobe inputs</Message>
+		</Event>
+		<Event>
+			<Id>17444</Id>
+			<Message LcId="1031">Ungültiger Wert für Modes of operation</Message>
+			<Message LcId="1033">Modes of operation invalid</Message>
+		</Event>
+		<Event>
+			<Id>33027</Id>
+			<Message LcId="1031">Unterspannung Us</Message>
+			<Message LcId="1033">Undervoltage Us</Message>
+		</Event>
+		<Event>
+			<Id>33028</Id>
+			<Message LcId="1031">Verstärker-Übertemperatur</Message>
+			<Message LcId="1033">Amplifier-Overtemperature</Message>
+		</Event>
+		<Event>
+			<Id>33029</Id>
+			<Message LcId="1031">PD-Watchdog</Message>
+			<Message LcId="1033">PD-Watchdog</Message>
+		</Event>
+		<Event>
+			<Id>33092</Id>
+			<Message LcId="1031">Hardwarefehler ({0})</Message>
+			<Message LcId="1033">Hardware fault ({0})</Message>
+		</Event>
+		<Event>
+			<Id>33151</Id>
+			<Message LcId="1031">Fehler: 0x{0,X}, 0x{1,X}, 0x{2,X}</Message>
+			<Message LcId="1033">Error: 0x{0,X}, 0x{1,X}, 0x{2,X}</Message>
+		</Event>
+		<Event>
+			<Id>33200</Id>
+			<Message LcId="1031">Inhalt von PDO 0x{0,X} ist ungÃ¼ltig: Eintrag 0x{1,X}:{2,X} kann nicht verwendet werden</Message>
+			<Message LcId="1033">Content of PDO 0x{0,X} is invalid: Item 0x{1,X}:{2,X} cannot be mapped</Message>
+		</Event>
+		<Event>
+			<Id>33201</Id>
+			<Message LcId="1031">Inhalt von PDO 0x{0,X} ist ungÃ¼ltig: Eintrag 0x{1,X}:{2,X} hat eine falsche Lä®§e ({3} Bit)</Message>
+			<Message LcId="1033">Content of PDO 0x{0,X} is invalid: Item 0x{1,X}:{2,X} has an unsupported length ({3} bit)</Message>
+		</Event>
+		<Event>
+			<Id>33796</Id>
+			<Message LcId="1031">Motor-Überstrom</Message>
+			<Message LcId="1033">Overcurrent</Message>
+		</Event>
+		<Event>
+			<Id>33798</Id>
+			<Message LcId="1031">Unterspannung DC-Zwischenkreis</Message>
+			<Message LcId="1033">Undervoltage DC-Link</Message>
+		</Event>
+		<Event>
+			<Id>33799</Id>
+			<Message LcId="1031">Überspannung DC-Zwischenkreis</Message>
+			<Message LcId="1033">Overvoltage DC-Link</Message>
+		</Event>
+		<Event>
+			<Id>33802</Id>
+			<Message LcId="1031">Summenstrom überschritten</Message>
+			<Message LcId="1033">Overall current threshold exceeded</Message>
+		</Event>
+		<Event>
+			<Id>33803</Id>
+			<Message LcId="1031">Kommutierungsfehler</Message>
+			<Message LcId="1033">Commutation error</Message>
+		</Event>
+		<Event>
+			<Id>33804</Id>
+			<Message LcId="1031">Kabelbruch Motoranschluss</Message>
+			<Message LcId="1033">Motor not connected</Message>
+		</Event>
+		<Event>
+			<Id>33807</Id>
+			<Message LcId="1031">Der konfigurierte Commutation Type erfordert einen Encoder, aber die Feedback-Schnittstelle ist deaktiviert.</Message>
+			<Message LcId="1033">Configured Commutation Type requires an encoder, but the feedback interface is disabled.</Message>
+		</Event>
+		<Event>
+			<Id>33813</Id>
+			<Message LcId="1031">Ungültiger Modulo-Bereich</Message>
+			<Message LcId="1033">Invalid modulo range</Message>
+		</Event>
+		<Event>
+			<Id>33815</Id>
+			<Message LcId="1031">Maximale Drehfeldfrequenz überschritten</Message>
+			<Message LcId="1033">Maximum rotating field velocity exceeded</Message>
+		</Event>
+		<Event>
+			<Id>33823</Id>
+			<Message LcId="1031">Drehmomentbegrenzung zu gering</Message>
+			<Message LcId="1033">Torque limitation too low</Message>
+		</Event>
+		<Event>
+			<Id>33824</Id>
+			<Message LcId="1031">Teach-In Prozess {0} fehlgeschlagen</Message>
+			<Message LcId="1033">Teach-In Process ({0}) failed</Message>
+		</Event>
+		<Event>
+			<Id>33825</Id>
+			<Message LcId="1031">Teach-In Prozess Timeout (Zwischenkreis, ...)</Message>
+			<Message LcId="1033">Teach-In Process Timeout (DC-Link, ...)</Message>
+		</Event>
+		<Event>
+			<Id>33826</Id>
+			<Message LcId="1031">Antriebs-Konfiguration fehlt</Message>
+			<Message LcId="1033">Drive configuration missing</Message>
+		</Event>
+		<Event>
+			<Id>33827</Id>
+			<Message LcId="1031">Prozessdatenformat ungültig (Anzahl Singleturnbits+Multiturnbits != 32)</Message>
+			<Message LcId="1033">Invalid process data format (number of singleturn bits+multiturn bits != 32)</Message>
+		</Event>
+		<Event>
+			<Id>33857</Id>
+			<Message LcId="1031">Maximaler Schleppfehlerabstand überschritten</Message>
+			<Message LcId="1033">Maximum following error distance exceeded</Message>
+		</Event>
+		<Event>
+			<Id>33858</Id>
+			<Message LcId="1031">Encoder-Auflösung nicht ausreichend</Message>
+			<Message LcId="1033">Encoder-Resolution insufficient</Message>
+		</Event>
+		<Event>
+			<Id>33859</Id>
+			<Message LcId="1031">Kombination aus Mode of Operation und Commutation Type ist nicht zulässig</Message>
+			<Message LcId="1033">Combination of Mode of Operation and Commutation Type is invalid</Message>
+		</Event>
+		<Event>
+			<Id>33865</Id>
+			<Message LcId="1031">Sollposition außerhalb des Modulobereichs</Message>
+			<Message LcId="1033">Target position not in modulo range</Message>
+		</Event>
+		<Event>
+			<Id>33872</Id>
+			<Message LcId="1031">Ungültiger Start-Typ 0x{0,x}</Message>
+			<Message LcId="1033">Invalid start type 0x{0,x}</Message>
+		</Event>
+		<Event>
+			<Id>33873</Id>
+			<Message LcId="1031">Ungültiger Endschalter Zustand</Message>
+			<Message LcId="1033">Invalid limit switch level</Message>
+		</Event>
+		<Event>
+			<Id>33874</Id>
+			<Message LcId="1031">Antriebsfehler während der Positionierung</Message>
+			<Message LcId="1033">Drive error during positioning</Message>
+		</Event>
+		<Event>
+			<Id>33875</Id>
+			<Message LcId="1031">Latch-Einheit wird von mehreren Modulen zeitgleich genutzt</Message>
+			<Message LcId="1033">Latch unit will be used by multiple modules</Message>
+		</Event>
+		<Event>
+			<Id>33876</Id>
+			<Message LcId="1031">Antrieb nicht in Regelung</Message>
+			<Message LcId="1033">Drive not in control</Message>
+		</Event>
+		<Event>
+			<Id>33877</Id>
+			<Message LcId="1031"><![CDATA[Ungültiger Wert für "Target acceleration"]]></Message>
+			<Message LcId="1033"><![CDATA[Invalid value for "Target acceleration"]]></Message>
+		</Event>
+		<Event>
+			<Id>33878</Id>
+			<Message LcId="1031"><![CDATA[Ungültiger Wert für "Target deceleration"]]></Message>
+			<Message LcId="1033"><![CDATA[Invalid value for "Target deceleration"]]></Message>
+		</Event>
+		<Event>
+			<Id>33879</Id>
+			<Message LcId="1031"><![CDATA[Ungültiger Wert für "Target velocity"]]></Message>
+			<Message LcId="1033"><![CDATA[Invalid value for "Target velocity"]]></Message>
+		</Event>
+		<Event>
+			<Id>33880</Id>
+			<Message LcId="1031"><![CDATA[Ungültiger Wert für "Target position"]]></Message>
+			<Message LcId="1033"><![CDATA[Invalid value for "Target position"]]></Message>
+		</Event>
+		<Event>
+			<Id>33881</Id>
+			<Message LcId="1031">Emergency Stop ist aktiv</Message>
+			<Message LcId="1033">Emergency stop active</Message>
+		</Event>
+		<Event>
+			<Id>33882</Id>
+			<Message LcId="1031">Target position ist größer als der Modulofaktor</Message>
+			<Message LcId="1033">Target position exceeds Modulofactor</Message>
+		</Event>
+		<Event>
+			<Id>33883</Id>
+			<Message LcId="1031">Antrieb darf nicht in Regelung sein</Message>
+			<Message LcId="1033">Drive must be disabled</Message>
+		</Event>
+		<Event>
+			<Id>33885</Id>
+			<Message LcId="1031">Ungültiger Modulofaktor</Message>
+			<Message LcId="1033">Modulo factor invalid</Message>
+		</Event>
+		<Event>
+			<Id>33886</Id>
+			<Message LcId="1031">Ungültiges Zielpositionsfenster</Message>
+			<Message LcId="1033">Invalid target position window</Message>
+		</Event>
+		<Property>
+			<Name>DisplayTxtId</Name>
+			<Value>true</Value>
+		</Property>
+	</Source>
+</TcEventSources>

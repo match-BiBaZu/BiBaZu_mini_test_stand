@@ -6,6 +6,8 @@ obj/
 .arduino-cli/downloads/
 .arduino-cli/user/
 __pycache__/
+.venv/
+.uv-cache/
 Data/*
 !Data/Qf4i.csv
 !Data/Rk2i.csv
