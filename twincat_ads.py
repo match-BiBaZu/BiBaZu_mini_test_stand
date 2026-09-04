@@ -110,6 +110,11 @@ class TwinCatAdsClient:
         "MAIN.bStatusMotorBusy",
         "MAIN.bStatusMotorReferenced",
         "MAIN.bStatusMotorError",
+        "MAIN.bStatusMotorNotMoving",
+        "MAIN.bStatusMotorHasJob",
+        "MAIN.bStatusMotorInPositionArea",
+        "MAIN.bStatusMotorInTargetPosition",
+        "MAIN.bStatusMotorCommandsLocked",
         "MAIN.bStatusLimitSwitch",
         "MAIN.udStatusMotorErrorId",
         "MAIN.fStatusMotorPositionMm",
@@ -117,6 +122,11 @@ class TwinCatAdsClient:
         "MAIN.udStatusMotorHomeDone",
         "MAIN.udStatusMotorZeroDone",
         "MAIN.udStatusMotorStopped",
+        "MAIN.fConfigMotorMinPositionMm",
+        "MAIN.fConfigMotorMaxPositionMm",
+        "MAIN.fCmdMotorRelativeMm",
+        "MAIN.fCmdMotorAbsoluteMm",
+        "MAIN.nCmdType",
         "MAIN.udCmdAckSeq",
         "MAIN.nStatusError",
         "MAIN.udStatusErrorId",
@@ -153,6 +163,26 @@ class TwinCatAdsClient:
     def connected(self) -> bool:
         with self._lock:
             return self._connected
+
+    def set_debug_logger(self, debug_logger: Optional[Callable[[str], None]]) -> None:
+        """Attach or detach tracing while an ADS connection is already open."""
+
+        with self._lock:
+            self._debug_logger = debug_logger
+        if debug_logger:
+            snapshot = self._last_snapshot or {}
+            self._trace(
+                "ADS debug logging enabled "
+                f"position_mm={self._as_float(snapshot.get('MAIN.fStatusMotorPositionMm', 0.0)):.5f} "
+                f"referenced={int(bool(snapshot.get('MAIN.bStatusMotorReferenced', False)))} "
+                f"busy={int(bool(snapshot.get('MAIN.bStatusMotorBusy', False)))} "
+                f"has_job={int(bool(snapshot.get('MAIN.bStatusMotorHasJob', False)))} "
+                f"not_moving={int(bool(snapshot.get('MAIN.bStatusMotorNotMoving', False)))} "
+                f"in_position_area={int(bool(snapshot.get('MAIN.bStatusMotorInPositionArea', False)))} "
+                f"in_target={int(bool(snapshot.get('MAIN.bStatusMotorInTargetPosition', False)))} "
+                f"commands_locked={int(bool(snapshot.get('MAIN.bStatusMotorCommandsLocked', False)))} "
+                f"limit={int(bool(snapshot.get('MAIN.bStatusLimitSwitch', False)))}"
+            )
 
     def open(self) -> None:
         """Open the ADS route and begin status polling.
@@ -403,7 +433,7 @@ class TwinCatAdsClient:
                 self._arm_outputs()
                 # MAIN owns the fresh DI1 decision.  If the switch is already
                 # active it sets zero without moving; otherwise it begins the
-                # negative velocity jog.  Avoid deciding from a stale ADS poll.
+                # positive velocity jog.  Avoid deciding from a stale ADS poll.
                 self._send_transaction(Command.HOME, {})
             elif upper == "MOTOR_ZERO":
                 self._send_transaction(Command.ZERO, {})
@@ -436,6 +466,17 @@ class TwinCatAdsClient:
             self._emit_status(f"TwinCAT command rejected: {exc}")
             self._trace(f"ADS command rejected {command}: {exc}")
         else:
+            if upper in {"MOTOR_MOVE", "MOTOR_ABS", "MOTOR_HOME", "MOTOR_ZERO"}:
+                # The GUI locks its motion buttons as soon as it queues a
+                # command.  A very short move can start and finish between two
+                # ordinary ADS polls, so a Busy TRUE -> FALSE edge is not
+                # guaranteed to be observed.  Always reconcile the local lock
+                # with the acknowledged PLC state.  Completion counters still
+                # provide the detailed DONE/HOME_DONE/ZERO event.
+                snapshot = self._last_snapshot or {}
+                self._emit_line(
+                    f"MOTOR;BUSY;{1 if bool(snapshot.get('MAIN.bStatusMotorBusy', False)) else 0}"
+                )
             self._emit_status(f"Sent to TwinCAT: {command}")
 
     def _arm_outputs(self) -> None:
@@ -475,14 +516,53 @@ class TwinCatAdsClient:
                 next_heartbeat = now + HEARTBEAT_INTERVAL_SECONDS
             snapshot = self._read_snapshot()
             last_snapshot = snapshot
+            # Command acknowledgement and live status are independent.  The
+            # PLC may already have completed a short motion while an older or
+            # delayed runtime still has not echoed udCmdAckSeq.  Forward every
+            # snapshot so Busy FALSE / DONE can release the GUI immediately;
+            # keep waiting below only to validate the mailbox transaction.
+            if self.connected:
+                self._handle_snapshot(snapshot)
             if self._as_int(snapshot.get("MAIN.udCmdAckSeq", -1)) == sequence:
-                if self.connected:
-                    self._handle_snapshot(snapshot)
                 error = self._as_int(snapshot.get("MAIN.nStatusError", 0))
                 if error:
                     detail = self._as_int(snapshot.get("MAIN.udStatusErrorId", 0))
+                    description = self._command_error_description(error)
+                    context = ""
+                    if error in {22, 23, 26}:
+                        position = self._as_float(
+                            snapshot.get("MAIN.fStatusMotorPositionMm", 0.0)
+                        )
+                        command_type = self._as_int(snapshot.get("MAIN.nCmdType", 0))
+                        if command_type == Command.MOVE_RELATIVE:
+                            target = position + self._as_float(
+                                snapshot.get("MAIN.fCmdMotorRelativeMm", 0.0)
+                            )
+                        elif command_type == Command.MOVE_ABSOLUTE:
+                            target = self._as_float(
+                                snapshot.get("MAIN.fCmdMotorAbsoluteMm", position)
+                            )
+                        else:
+                            target = position
+                        minimum = self._as_float(
+                            snapshot.get("MAIN.fConfigMotorMinPositionMm", 0.0)
+                        )
+                        maximum = self._as_float(
+                            snapshot.get("MAIN.fConfigMotorMaxPositionMm", 2000.0)
+                        )
+                        context = (
+                            f"; position {position:.5f} mm, requested target {target:.5f} mm, "
+                            f"configured range {minimum:.5f}..{maximum:.5f} mm, "
+                            f"referenced={int(bool(snapshot.get('MAIN.bStatusMotorReferenced', False)))}, "
+                            f"busy={int(bool(snapshot.get('MAIN.bStatusMotorBusy', False)))}, "
+                            f"has_job={int(bool(snapshot.get('MAIN.bStatusMotorHasJob', False)))}, "
+                            f"in_target={int(bool(snapshot.get('MAIN.bStatusMotorInTargetPosition', False)))}, "
+                            f"commands_locked={int(bool(snapshot.get('MAIN.bStatusMotorCommandsLocked', False)))}, "
+                            f"DI1={int(bool(snapshot.get('MAIN.bStatusLimitSwitch', False)))}"
+                        )
                     raise AdsTransportError(
-                        f"PLC rejected command {sequence}: error {error}, detail {detail}."
+                        f"PLC rejected command {sequence}: error {error} "
+                        f"({description}), detail {detail}{context}."
                     )
                 return
             time.sleep(min(self._poll_interval_seconds, 0.005))
@@ -595,6 +675,24 @@ class TwinCatAdsClient:
         if self._changed(snapshot, previous, "MAIN.bStatusMotorBusy"):
             self._emit_line(
                 f"MOTOR;BUSY;{1 if bool(snapshot.get('MAIN.bStatusMotorBusy', False)) else 0}"
+            )
+        nc_state_symbols = (
+            "MAIN.bStatusMotorNotMoving",
+            "MAIN.bStatusMotorHasJob",
+            "MAIN.bStatusMotorInPositionArea",
+            "MAIN.bStatusMotorInTargetPosition",
+            "MAIN.bStatusMotorCommandsLocked",
+        )
+        if any(self._changed(snapshot, previous, symbol) for symbol in nc_state_symbols):
+            self._trace(
+                "ADS MOTOR NC state "
+                f"position_mm={self._as_float(snapshot.get('MAIN.fStatusMotorPositionMm', 0.0)):.5f} "
+                f"fb_busy={int(bool(snapshot.get('MAIN.bStatusMotorBusy', False)))} "
+                f"has_job={int(bool(snapshot.get('MAIN.bStatusMotorHasJob', False)))} "
+                f"not_moving={int(bool(snapshot.get('MAIN.bStatusMotorNotMoving', False)))} "
+                f"in_position_area={int(bool(snapshot.get('MAIN.bStatusMotorInPositionArea', False)))} "
+                f"in_target={int(bool(snapshot.get('MAIN.bStatusMotorInTargetPosition', False)))} "
+                f"commands_locked={int(bool(snapshot.get('MAIN.bStatusMotorCommandsLocked', False)))}"
             )
         if self._changed(snapshot, previous, "MAIN.udStatusMotorHomeDone"):
             self._emit_motor_position(snapshot, "HOME_DONE")
@@ -720,6 +818,18 @@ class TwinCatAdsClient:
         except (TypeError, ValueError):
             return 0.0
 
+    @staticmethod
+    def _command_error_description(error: int) -> str:
+        return {
+            20: "motion scaling/limits are not commissioned",
+            21: "motor is not enabled/armed",
+            22: "another motion command is still busy",
+            23: "software travel range violation",
+            24: "homing is not commissioned",
+            25: "axis is not referenced",
+            26: "motion would continue into the DI1 home switch",
+        }.get(error, "PLC command error")
+
     @classmethod
     def _integer(cls, value: str, label: str) -> int:
         try:
@@ -763,8 +873,15 @@ class TwinCatAdsClient:
             pass
 
     def _trace(self, text: str) -> None:
-        if self._debug_logger:
-            self._debug_logger(text)
+        with self._lock:
+            debug_logger = self._debug_logger
+        if debug_logger:
+            try:
+                debug_logger(text)
+            except Exception:
+                # Diagnostics must never be able to stop watchdog servicing or
+                # the ADS worker's fail-safe shutdown path.
+                pass
 
     def _close_connection(self) -> None:
         connection = self._connection

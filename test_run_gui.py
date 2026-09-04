@@ -50,6 +50,8 @@ REGULATOR_MAX_PRESSURE_BAR = 6.0
 TEST_PRESSURE_STEP_BAR = 0.1
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
+MOTOR_MIN_POSITION_MM = 0.0
+MOTOR_MAX_POSITION_MM = 2000.0
 # Arduino default: 400 full steps per second.
 MOTOR_LEGACY_DEFAULT_SPEED_MM_S = 400.0 * MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -531,8 +533,8 @@ class TestRunGui(tk.Tk):
             value=self._preset_float(
                 "motor_center_position_mm",
                 7.0,
-                0.0,
-                2000.0,
+                MOTOR_MIN_POSITION_MM,
+                MOTOR_MAX_POSITION_MM,
             )
         )
         self.motor_speed_var = tk.DoubleVar(value=MOTOR_LEGACY_DEFAULT_SPEED_MM_S)
@@ -1666,47 +1668,36 @@ class TestRunGui(tk.Tk):
         self.motor_speed_spinbox.pack(side=tk.LEFT, padx=(6, 4))
         ttk.Label(motor_motion_controls, text="mm/s").pack(side=tk.LEFT)
 
-        self.motor_reverse_button = ttk.Button(
+        self.motor_left_button = ttk.Button(
             motor_motion_controls,
-            text="Jog up",
-            command=self._motor_jog_reverse,
+            text="Jog left",
+            command=self._motor_jog_left,
             state=tk.DISABLED,
         )
-        self.motor_reverse_button.pack(side=tk.LEFT, padx=(18, 0))
-        self.motor_forward_button = ttk.Button(
+        self.motor_left_button.pack(side=tk.LEFT, padx=(18, 0))
+        self.motor_right_button = ttk.Button(
             motor_motion_controls,
-            text="Jog down",
-            command=self._motor_jog_forward,
+            text="Jog right",
+            command=self._motor_jog_right,
             state=tk.DISABLED,
         )
-        self.motor_forward_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.motor_right_button.pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Label(motor_motion_controls, text="Absolute").pack(side=tk.LEFT, padx=(18, 0))
-        self.motor_absolute_spinbox = ttk.Spinbox(
-            motor_motion_controls,
-            from_=0.0,
-            to=2000.0,
-            increment=1.0,
-            textvariable=self.motor_absolute_var,
-            width=8,
-            state=tk.DISABLED,
-        )
-        self.motor_absolute_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(motor_motion_controls, text="mm").pack(side=tk.LEFT)
-
-        self.motor_absolute_button = ttk.Button(
-            motor_motion_controls,
-            text="Go",
-            command=self._motor_move_absolute,
-            state=tk.DISABLED,
-        )
-        self.motor_absolute_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.motor_stop_button = ttk.Button(
+        self.motor_stop_button = tk.Button(
             motor_motion_controls,
             text="Stop motor",
             command=self._motor_stop,
             state=tk.DISABLED,
+            background="#c62828",
+            foreground="white",
+            activebackground="#8e0000",
+            activeforeground="white",
+            disabledforeground="#f2b8b5",
+            font=("Segoe UI", 9, "bold"),
+            relief=tk.RAISED,
+            borderwidth=1,
+            padx=8,
+            pady=2,
         )
         self.motor_stop_button.pack(side=tk.LEFT, padx=(8, 0))
 
@@ -1715,8 +1706,8 @@ class TestRunGui(tk.Tk):
         ttk.Label(motor_center_controls, text="Center position").pack(side=tk.LEFT)
         self.motor_center_position_spinbox = ttk.Spinbox(
             motor_center_controls,
-            from_=-2000.0,
-            to=0.0,
+            from_=MOTOR_MIN_POSITION_MM,
+            to=MOTOR_MAX_POSITION_MM,
             increment=0.1,
             textvariable=self.motor_center_position_var,
             width=8,
@@ -1737,10 +1728,8 @@ class TestRunGui(tk.Tk):
             self.motor_zero_button,
             self.motor_distance_spinbox,
             self.motor_speed_spinbox,
-            self.motor_reverse_button,
-            self.motor_forward_button,
-            self.motor_absolute_spinbox,
-            self.motor_absolute_button,
+            self.motor_left_button,
+            self.motor_right_button,
             self.motor_center_position_spinbox,
             self.motor_center_button,
             self.motor_stop_button,
@@ -2419,6 +2408,8 @@ class TestRunGui(tk.Tk):
             self.debug_log_path = path
         if self.colibri:
             self.colibri.set_debug_logger(self._write_debug_log)
+        if self.plc_controller:
+            self.plc_controller.set_debug_logger(self._write_debug_log)
         self.debug_log_button.configure(text="Stop debug log")
         self.debug_log_var.set(f"Debug log: {path}")
         self._write_debug_log("LOG started")
@@ -2434,6 +2425,8 @@ class TestRunGui(tk.Tk):
         self._write_debug_log("LOG stopped")
         if self.colibri:
             self.colibri.set_debug_logger(None)
+        if self.plc_controller:
+            self.plc_controller.set_debug_logger(None)
         with self.debug_log_lock:
             if self.debug_log_file:
                 self.debug_log_file.close()
@@ -3606,12 +3599,12 @@ class TestRunGui(tk.Tk):
             return None
         return speed_steps_s
 
-    def _motor_jog_forward(self):
-        # The mechanical convention for the Beckhoff stepper is Up = positive
-        # axis travel.  Keep the visible button label and ADS/PLC sign aligned.
+    def _motor_jog_left(self):
+        # DI1/home is physically left and is approached in the negative axis
+        # direction.  Motion to the right extends into the positive range.
         self._motor_jog(direction=-1)
 
-    def _motor_jog_reverse(self):
+    def _motor_jog_right(self):
         self._motor_jog(direction=1)
 
     def _motor_home(self):
@@ -3661,8 +3654,8 @@ class TestRunGui(tk.Tk):
         target_mm = self._validated_float(
             target_variable,
             value_name,
-            0.0,
-            2000.0,
+            MOTOR_MIN_POSITION_MM,
+            MOTOR_MAX_POSITION_MM,
         )
         speed_steps_s = self._apply_motor_speed()
         if target_mm is None or speed_steps_s is None:
@@ -6599,12 +6592,12 @@ class TestRunGui(tk.Tk):
         elif event == "HOME_DONE":
             self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper homed")
-            self.status_var.set("Stepper homed at lower limit switch")
+            self.status_var.set("Stepper homed at DI1 home limit switch")
         elif event in ("LIMIT", "LIMIT_STOP"):
             # DI1 is only the stop trigger.  Keep motion controls locked until
             # the PLC reports HOME_DONE (home + zero) or STOPPED (plain jog).
-            self.mode_var.set("Mode: stepper lower limit switch")
-            self.status_var.set("Stepper lower limit switch active; stopping")
+            self.mode_var.set("Mode: stepper home limit switch")
+            self.status_var.set("Stepper DI1 home limit switch active; stopping")
         elif event == "DONE":
             self._set_motor_motion_busy(False)
             self.mode_var.set("Mode: stepper done")

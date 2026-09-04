@@ -113,9 +113,14 @@ The EL7062 is driven through NC axis `Achse 1`, not an Arduino STEP/DIR loop.
 `bConfigMotionEnabled` and `bConfigHomingEnabled` default to `FALSE` on
 purpose. Before enabling either, configure the EL7062 motor current and
 scaling, NC soft limits, home behavior, and EL1014 pressed-state polarity. The
-PLC requires a referenced axis for travel moves and rejects a positive move
+PLC requires a referenced axis for travel moves and rejects a negative move
 when the home switch is already active. The EL1014 input is not a substitute
 for an independent safety circuit or E-stop.
+
+DI1/home is `0 mm`, the Home/Jog-left direction is negative, and extending to
+the right into the working area counts positive. The PLC placeholder software
+range is therefore `0..2000 mm`; replace `2000 mm` with the measured physical
+travel limit during commissioning.
 
 ### EL7062 channel 1 CoE settings
 
@@ -132,10 +137,13 @@ only after confirming the motor data sheet states a 1.5 A phase current:
 | `0x8010:72` Stand still torque limitation | Commission after a holding-torque test | Optional current reduction at standstill |
 
 `1.9971692 mm/rev` is a feed constant, not a separate `0x8011` motor field.
-For DMC, it belongs in the axis scaling: without another transmission ratio,
-`Axis1.Parameter.EncoderScalingFactor = 1.9971692 / 2^32`, approximately
-`4.650021903216839e-10 mm/increment`. The EL7062 DMC configuration objects
-are `0x8060` and `0x8061` for channel 1 (`0x8160`/`0x8161` for channel 2).
+The checked-in axis currently maps the standard FB/DRV position PDOs, not the
+DMC PDOs. Do not use the DMC `feed / 2^32` formula unless the PDO mode is also
+changed to DMC. With the standard 20-bit single-turn feedback, the provisional
+factor would be `1.9971692 / 2^20`, approximately
+`1.90464897155762e-6 mm/increment`. Confirm the configured single-turn bits and
+measure one physical motor revolution before activating that value; the
+checked-in `1e-5` axis value is not yet a commissioned physical scale.
 
 ## Commissioning checklist
 
@@ -148,9 +156,11 @@ are `0x8060` and `0x8061` for channel 1 (`0x8160`/`0x8161` for channel 2).
 5. Check EL3164 raw/scaled values against known sensor voltages.
 6. At low pressure, test every valve and a multi-nozzle mask.
 7. Verify 10, 50, and 500 ms pulses plus the PLC flow summary.
-8. At low speed, press Home and verify that the axis jogs down (negative),
-   DI1 stops it, and the stopped position becomes 0 mm. Repeat while pressing
-   Stop motor before DI1; the axis must stop without setting a new zero.
+8. At low speed, press Home and verify that the axis jogs left (negative
+   machine direction), DI1 stops it, and the stopped position becomes 0 mm.
+   Verify that extending to the right afterwards produces positive positions. Repeat while
+   pressing Stop motor before DI1; the axis must stop without setting a new
+   zero.
 9. Run and abort a short sweep; confirm every output becomes safe.
 10. Recheck Colibri and QuantumX force data.
 

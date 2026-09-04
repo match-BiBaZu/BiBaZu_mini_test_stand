@@ -104,6 +104,11 @@ VAR
     bStatusMotorBusy : BOOL := FALSE;
     bStatusMotorReferenced : BOOL := FALSE;
     bStatusMotorError : BOOL := FALSE;
+    bStatusMotorNotMoving : BOOL := TRUE;
+    bStatusMotorHasJob : BOOL := FALSE;
+    bStatusMotorInPositionArea : BOOL := FALSE;
+    bStatusMotorInTargetPosition : BOOL := FALSE;
+    bStatusMotorCommandsLocked : BOOL := FALSE;
     udStatusMotorErrorId : UDINT := 0;
     fStatusMotorPositionMm : LREAL := 0.0;
     udStatusMotorDone : UDINT := 0;
@@ -140,9 +145,10 @@ VAR
     bConfigLimitSwitchPressedHigh : BOOL := TRUE;
     bConfigMotionEnabled : BOOL := FALSE;
     bConfigHomingEnabled : BOOL := FALSE;
-    // Machine coordinate convention: home/lower limit is 0 mm and motion
-    // upwards is positive.  Commission the physical travel length before
-    // allowing production moves beyond this conservative 2000 mm limit.
+    // Machine coordinate convention: DI1/home is 0 mm.  Negative travel
+    // approaches DI1 on the left; positive travel extends right into the
+    // working area.  Commission the physical travel length before allowing
+    // production moves to the 2000 mm placeholder.
     fConfigMotorMinPositionMm : LREAL := 0.0;
     fConfigMotorMaxPositionMm : LREAL := 2000.0;
 
@@ -196,6 +202,7 @@ VAR
     nHomingState : USINT := 0;
     bStopBelongsToHome : BOOL := FALSE;
     bHomeStopConsumedThisScan : BOOL := FALSE;
+    fRequestedMotorTargetMm : LREAL := 0.0;
     fCorrectedFlowNlMin : LREAL := 0.0;
     fCorrectedCommandBar : LREAL := 0.0;
     fCommandVoltageV : LREAL := 0.0;
@@ -245,6 +252,11 @@ bStatusReady := TRUE;
 Axis1.ReadStatus();
 fStatusMotorPositionMm := Axis1.NcToPlc.ActPos;
 bStatusMotorReferenced := Axis1.Status.Homed;
+bStatusMotorNotMoving := Axis1.Status.NotMoving;
+bStatusMotorHasJob := Axis1.Status.HasJob;
+bStatusMotorInPositionArea := Axis1.Status.InPositionArea;
+bStatusMotorInTargetPosition := Axis1.Status.InTargetPosition;
+bStatusMotorCommandsLocked := Axis1.Status.MotionCommandsLocked;
 
 // Scale the two EL3164 channels.  0..32767 represents 0..10 V for the
 // terminal's default 0..10 V process image.
@@ -318,8 +330,8 @@ ELSE
 END_IF
 bStatusOutputsPermitted := bCmdOutputsEnable AND NOT bStatusWatchdogExpired;
 
-// The EL1014 is normally TRUE when a 24 V input is present.  Negative jogs
-// are allowed before referencing only to approach this lower/home switch.
+// The EL1014 is normally TRUE when a 24 V input is present.  Negative travel
+// approaches DI1/home; positive travel moves right into the working range.
 IF bConfigLimitSwitchPressedHigh THEN
     bLimitSwitchPressed := bReadLimitSwitch;
 ELSE
@@ -329,7 +341,7 @@ bStatusLimitSwitch := bLimitSwitchPressed;
 
 // MC_Stop must receive a falling Execute edge after the axis reaches
 // standstill, otherwise it keeps the NC axis locked.  Re-arm this one-shot
-// only after the mechanics have left the lower/home switch.
+// only after the mechanics have left the home switch.
 IF NOT bLimitSwitchPressed AND (nHomingState = 0) AND NOT fbStop.Busy THEN
     bLimitStopIssued := FALSE;
 END_IF
@@ -353,8 +365,8 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
         bStatusFlowCaptureActive := FALSE;
         byStatusActiveNozzleMask := 0;
         fStatusTargetPressureBar := 0.0;
-        // Publish acknowledgement only after the command result is complete.
-        udCmdAckSeq := udCmdSeq;
+        // The acknowledgement is published at the end of this PLC scan,
+        // after the motion function blocks and Busy status are updated.
     ELSE
         udConsumedCmdSeq := udCmdSeq;
         nStatusError := 0;
@@ -456,13 +468,38 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
                 nStatusError := 26; // do not command farther into the home switch
             // Relative commissioning jogs are allowed before a reference is
             // established.  Software travel limits are meaningful only once
-            // the lower/home position has been set.
-            ELSIF bStatusMotorReferenced AND
-                  ((fStatusMotorPositionMm + fCmdMotorRelativeMm < fConfigMotorMinPositionMm) OR
-                   (fStatusMotorPositionMm + fCmdMotorRelativeMm > fConfigMotorMaxPositionMm)) THEN
-                nStatusError := 23; // software travel range violation
-            ELSE
+            // the DI1/home position has been set.
+            ELSIF fConfigMotorMinPositionMm >= fConfigMotorMaxPositionMm THEN
+                nStatusError := 20; // invalid/uncommissioned software limits
+            ELSIF NOT bStatusMotorReferenced THEN
                 bExecMoveRelative := TRUE;
+            ELSE
+                fRequestedMotorTargetMm := fStatusMotorPositionMm + fCmdMotorRelativeMm;
+                // If the reported position is already outside the configured
+                // range, never lock out both directions.  Permit only a move
+                // that gets strictly closer to the range and cannot cross the
+                // opposite boundary.  This provides a controlled recovery
+                // without disabling the software travel limit.
+                IF fStatusMotorPositionMm < fConfigMotorMinPositionMm THEN
+                    IF (fRequestedMotorTargetMm <= fStatusMotorPositionMm) OR
+                       (fRequestedMotorTargetMm > fConfigMotorMaxPositionMm) THEN
+                        nStatusError := 23;
+                    ELSE
+                        bExecMoveRelative := TRUE;
+                    END_IF
+                ELSIF fStatusMotorPositionMm > fConfigMotorMaxPositionMm THEN
+                    IF (fRequestedMotorTargetMm >= fStatusMotorPositionMm) OR
+                       (fRequestedMotorTargetMm < fConfigMotorMinPositionMm) THEN
+                        nStatusError := 23;
+                    ELSE
+                        bExecMoveRelative := TRUE;
+                    END_IF
+                ELSIF (fRequestedMotorTargetMm < fConfigMotorMinPositionMm) OR
+                      (fRequestedMotorTargetMm > fConfigMotorMaxPositionMm) THEN
+                    nStatusError := 23; // software travel range violation
+                ELSE
+                    bExecMoveRelative := TRUE;
+                END_IF
             END_IF
 
         cCmdMoveAbsolute:
@@ -476,6 +513,8 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
                 nStatusError := 22;
             ELSIF bLimitSwitchPressed AND (fCmdMotorAbsoluteMm < fStatusMotorPositionMm) THEN
                 nStatusError := 26;
+            ELSIF fConfigMotorMinPositionMm >= fConfigMotorMaxPositionMm THEN
+                nStatusError := 20;
             ELSIF (fCmdMotorAbsoluteMm < fConfigMotorMinPositionMm) OR
                   (fCmdMotorAbsoluteMm > fConfigMotorMaxPositionMm) THEN
                 nStatusError := 23;
@@ -526,8 +565,8 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
         ELSE
             nStatusError := 255; // unsupported command type
         END_CASE
-        // Publish acknowledgement only after the command result is complete.
-        udCmdAckSeq := udCmdSeq;
+        // The acknowledgement is published at the end of this PLC scan,
+        // after the motion function blocks and Busy status are updated.
     END_IF
 END_IF
 
@@ -680,8 +719,8 @@ bSetNozzleOn4 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#08) <> 
 bSetNozzleOn5 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#10) <> 0);
 bSetNozzleOn6 := bStatusValvesOpen AND ((byStatusActiveNozzleMask AND 16#20) <> 0);
 
-// PLCopen motion calls are cyclic.  The EL1014 DI1 is the lower/home switch:
-// negative motion goes toward it.  A Home command starts MC_MoveVelocity in
+// PLCopen motion calls are cyclic.  Negative motion goes left toward EL1014 DI1.
+// A Home command starts MC_MoveVelocity in
 // that direction.  DI1 stops it at PLC task rate; only after MC_Stop reports
 // standstill is the stopped position established as machine position 0.
 // An operator stop sets nHomingState back to idle and therefore never zeros.
@@ -808,6 +847,12 @@ IF fbStop.Done THEN
         udStatusMotorStopped := udStatusMotorStopped + 1;
     END_IF
 END_IF
+
+// Publish the consumed mailbox sequence only after every command result and
+// motion status above belongs to the same completed PLC scan.  This prevents
+// an ADS client from acknowledging a move while it still sees the previous
+// scan's bStatusMotorBusy value.
+udCmdAckSeq := udConsumedCmdSeq;
 ]]></ST>
     </Implementation>
     <LineIds Name="MAIN">

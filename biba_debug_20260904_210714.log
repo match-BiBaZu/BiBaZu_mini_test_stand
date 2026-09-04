@@ -1,0 +1,9 @@
+2026-09-04T21:07:16.324 LOG started
+2026-09-04T21:07:16.324 GUI TwinCAT ADS endpoint='5.75.145.248.1.1 @ 192.168.1.69:851'
+2026-09-04T21:07:16.324 GUI Colibri port label='COM1 - Kommunikationsanschluss (COM1)' device='COM1'
+2026-09-04T21:07:16.324 GUI QuantumX endpoint=127.0.0.1:5500
+2026-09-04T21:07:17.970 GUI stepper jog distance_mm=-11.000 steps=-1102
+2026-09-04T21:07:18.253 GUI STATUS TwinCAT command rejected: PLC rejected command 9: error 23, detail 0.
+2026-09-04T21:07:19.674 GUI stepper jog distance_mm=11.000 steps=1102
+2026-09-04T21:07:19.900 GUI STATUS TwinCAT command rejected: PLC rejected command 10: error 23, detail 0.
+2026-09-04T21:07:41.368 LOG stopped

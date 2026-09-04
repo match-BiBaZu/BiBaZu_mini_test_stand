@@ -34,6 +34,30 @@ def measurement(weight_g, placement, force_1, force_2):
 
 
 class PlatformCalibrationTests(unittest.TestCase):
+    def test_stepper_left_right_and_home_direction_mapping(self):
+        class DummyGui:
+            _motor_jog_left = TestRunGui._motor_jog_left
+            _motor_jog_right = TestRunGui._motor_jog_right
+
+            def __init__(self):
+                self.directions = []
+
+            def _motor_jog(self, direction):
+                self.directions.append(direction)
+
+        gui = DummyGui()
+        gui._motor_jog_left()
+        gui._motor_jog_right()
+
+        self.assertEqual(gui.directions, [-1, 1])
+
+        plc_source = Path(
+            "BiBaZuMini/BiBaZuMini/Untitled2/POUs/MAIN.TcPOU"
+        ).read_text(encoding="utf-8")
+        home_call = plc_source.split("fbHomeJog(", 1)[1].split(");", 1)[0]
+        self.assertIn("Direction := MC_Negative_Direction", home_call)
+        self.assertIn("Axis1.Status.NegativeDirection", plc_source)
+
     def test_stepper_mm_to_steps_preserves_absolute_position_sign(self):
         self.assertEqual(TestRunGui._mm_to_steps(None, 0.0), 0)
         self.assertEqual(TestRunGui._mm_to_steps(None, -7.0), -701)
@@ -54,12 +78,14 @@ class PlatformCalibrationTests(unittest.TestCase):
             _motor_move_to_absolute_position = (
                 TestRunGui._motor_move_to_absolute_position
             )
+            _motor_command_allowed = TestRunGui._motor_command_allowed
             _validated_float = TestRunGui._validated_float
             _mm_to_steps = TestRunGui._mm_to_steps
 
             def __init__(self):
                 self.motor_enabled_var = Variable(True)
-                self.motor_center_position_var = Variable(-7.0)
+                self.motor_motion_busy = False
+                self.motor_center_position_var = Variable(7.0)
                 self.mode_var = Variable("")
                 self.commands = []
 
@@ -69,13 +95,16 @@ class PlatformCalibrationTests(unittest.TestCase):
             def _write_debug_log(self, _message):
                 pass
 
+            def _set_motor_motion_busy(self, busy):
+                self.motor_motion_busy = busy
+
             def _send(self, command):
                 self.commands.append(command)
                 return True
 
         gui = DummyGui()
         gui._motor_move_center()
-        self.assertEqual(gui.commands, ["MOTOR_ABS:-701"])
+        self.assertEqual(gui.commands, ["MOTOR_ABS:701"])
 
     def test_weight_parser_accepts_decimal_comma(self):
         self.assertEqual(parse_weight_grams("50,15"), 50.15)
