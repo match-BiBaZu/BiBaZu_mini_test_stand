@@ -433,7 +433,7 @@ class TwinCatAdsClient:
                 self._arm_outputs()
                 # MAIN owns the fresh DI1 decision.  If the switch is already
                 # active it sets zero without moving; otherwise it begins the
-                # positive velocity jog.  Avoid deciding from a stale ADS poll.
+                # negative velocity jog.  Avoid deciding from a stale ADS poll.
                 self._send_transaction(Command.HOME, {})
             elif upper == "MOTOR_ZERO":
                 self._send_transaction(Command.ZERO, {})

@@ -122,6 +122,12 @@ the right into the working area counts positive. The PLC placeholder software
 range is therefore `0..2000 mm`; replace `2000 mm` with the measured physical
 travel limit during commissioning.
 
+The mechanical center is stored as an absolute Stepper setting (currently
+`53 mm`) and is not edited in the normal motion row. `Center offset` is the
+operator input used by **Move center**: `0 mm` moves to the stored center,
+negative offsets move left, and positive offsets move right. For example,
+`-3 mm` moves to `50 mm`, three millimetres left of center.
+
 ### EL7062 channel 1 CoE settings
 
 For the two-phase NEMA 17 on EL7062 channel 1, set these direct CoE entries

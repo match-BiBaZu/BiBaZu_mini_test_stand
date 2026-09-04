@@ -42,6 +42,42 @@ VALVE_PULSE_DURATION_MS = 50.0
 PULSE_DURATION_MIN_MS = 10.0
 PULSE_DURATION_MAX_MS = 500.0
 PULSE_DURATION_STEP_MS = 10.0
+# Empirical starting values for the pneumatic "notes". Shorter pulses are
+# treated as higher notes. They are aligned to the 5 ms PLC task and kept in
+# one table so the melody can be tuned on the real nozzles.
+NOZZLE_MARCH_BEAT_MS = 600
+NOZZLE_MARCH_MIN_GAP_MS = 20
+NOZZLE_MARCH_PULSE_MS = {
+    "Eb4": 200,
+    "Gb4": 170,
+    "G4": 160,
+    "Bb4": 135,
+    "D5": 105,
+    "Eb5": 100,
+}
+# Recognisable opening motif. The second value is the time to the next event
+# in beats; None inserts a rest. The motif repeats until the operator stops it.
+NOZZLE_MARCH_SEQUENCE = (
+    ("G4", 1.0),
+    ("G4", 1.0),
+    ("G4", 1.0),
+    ("Eb4", 0.75),
+    ("Bb4", 0.25),
+    ("G4", 1.0),
+    ("Eb4", 0.75),
+    ("Bb4", 0.25),
+    ("G4", 2.0),
+    ("D5", 1.0),
+    ("D5", 1.0),
+    ("D5", 1.0),
+    ("Eb5", 0.75),
+    ("Bb4", 0.25),
+    ("Gb4", 1.0),
+    ("Eb4", 0.75),
+    ("Bb4", 0.25),
+    ("G4", 2.0),
+    (None, 1.0),
+)
 TEST_IMPULSE_PRETRIGGER_SECONDS = 0.1
 TEST_IMPULSE_PRESSURE_SETTLE_MS = 1000
 TEST_IMPULSE_MAX_CAPTURE_SECONDS = 5.0
@@ -532,11 +568,12 @@ class TestRunGui(tk.Tk):
         self.motor_center_position_var = tk.DoubleVar(
             value=self._preset_float(
                 "motor_center_position_mm",
-                7.0,
+                53.0,
                 MOTOR_MIN_POSITION_MM,
                 MOTOR_MAX_POSITION_MM,
             )
         )
+        self.motor_center_offset_var = tk.DoubleVar(value=0.0)
         self.motor_speed_var = tk.DoubleVar(value=MOTOR_LEGACY_DEFAULT_SPEED_MM_S)
         self.motor_position_var = tk.StringVar(value="Stepper position: --")
         self.motor_motion_busy = False
@@ -585,12 +622,21 @@ class TestRunGui(tk.Tk):
         self.active_sequence_archive = None
         self.sequence_finalize_after_id = None
         self.increment_dialog = None
+        self.stepper_settings_dialog = None
         self.increment_dialog_controls = []
         self.increment_dialog_pulse_buttons = []
         self.test_impulse_capture = None
         self.test_impulse_after_id = None
         self.test_impulse_settle_after_id = None
         self.test_impulse_start_timeout_id = None
+        self.nozzle_theme_playing = False
+        self.nozzle_theme_after_id = None
+        self.nozzle_theme_note_index = 0
+        self.nozzle_theme_note_started_monotonic = None
+        self.nozzle_theme_note_beats = 0.0
+        self.nozzle_theme_waiting_for_flow = False
+        self.nozzle_theme_mask = 0
+        self.nozzle_theme_saved_pulse_duration_ms = None
 
         self._build_ui()
         self._auto_load_platform_calibration()
@@ -1536,11 +1582,13 @@ class TestRunGui(tk.Tk):
         )
         self.test_impulse_button.pack(side=tk.LEFT, padx=(18, 0))
 
-        ttk.Button(
+        self.nozzle_theme_button = ttk.Button(
             pulse_controls,
-            text="Increment pressure…",
-            command=self._open_increment_pressure_settings,
-        ).pack(side=tk.LEFT, padx=(8, 0))
+            text="Play Imperial March",
+            command=self._toggle_nozzle_theme,
+            state=tk.DISABLED,
+        )
+        self.nozzle_theme_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.increment_pulse_button = ttk.Button(
             pulse_controls,
@@ -1637,6 +1685,12 @@ class TestRunGui(tk.Tk):
         )
         self.motor_zero_button.pack(side=tk.LEFT, padx=(8, 0))
 
+        ttk.Button(
+            motor_controls,
+            text="Stepper settings…",
+            command=self._open_stepper_settings,
+        ).pack(side=tk.RIGHT)
+
         motor_motion_controls = ttk.Frame(motor_group)
         motor_motion_controls.pack(fill=tk.X, pady=(6, 0))
 
@@ -1703,18 +1757,18 @@ class TestRunGui(tk.Tk):
 
         motor_center_controls = ttk.Frame(motor_group)
         motor_center_controls.pack(fill=tk.X, pady=(6, 0))
-        ttk.Label(motor_center_controls, text="Center position").pack(side=tk.LEFT)
-        self.motor_center_position_spinbox = ttk.Spinbox(
+        ttk.Label(motor_center_controls, text="Center offset").pack(side=tk.LEFT)
+        self.motor_center_offset_spinbox = ttk.Spinbox(
             motor_center_controls,
-            from_=MOTOR_MIN_POSITION_MM,
-            to=MOTOR_MAX_POSITION_MM,
+            from_=-2000.0,
+            to=2000.0,
             increment=0.1,
-            textvariable=self.motor_center_position_var,
+            textvariable=self.motor_center_offset_var,
             width=8,
             state=tk.DISABLED,
         )
-        self.motor_center_position_spinbox.pack(side=tk.LEFT, padx=(6, 4))
-        ttk.Label(motor_center_controls, text="mm").pack(side=tk.LEFT)
+        self.motor_center_offset_spinbox.pack(side=tk.LEFT, padx=(6, 4))
+        ttk.Label(motor_center_controls, text="mm (- left / + right)").pack(side=tk.LEFT)
         self.motor_center_button = ttk.Button(
             motor_center_controls,
             text="Move center",
@@ -1730,7 +1784,7 @@ class TestRunGui(tk.Tk):
             self.motor_speed_spinbox,
             self.motor_left_button,
             self.motor_right_button,
-            self.motor_center_position_spinbox,
+            self.motor_center_offset_spinbox,
             self.motor_center_button,
             self.motor_stop_button,
         ]
@@ -2151,6 +2205,89 @@ class TestRunGui(tk.Tk):
         dialog.geometry(f"+{x}+{y}")
         dialog.grab_set()
         dialog.focus_force()
+
+    def _open_stepper_settings(self):
+        if self.stepper_settings_dialog and self.stepper_settings_dialog.winfo_exists():
+            self.stepper_settings_dialog.lift()
+            self.stepper_settings_dialog.focus_force()
+            return
+
+        dialog = tk.Toplevel(self)
+        self.stepper_settings_dialog = dialog
+        dialog.title("Stepper Settings")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        center_position_var = tk.DoubleVar(value=self.motor_center_position_var.get())
+        ttk.Label(body, text="Center position (absolute)").grid(
+            row=0,
+            column=0,
+            sticky=tk.W,
+            pady=6,
+        )
+        center_position_spinbox = ttk.Spinbox(
+            body,
+            from_=MOTOR_MIN_POSITION_MM,
+            to=MOTOR_MAX_POSITION_MM,
+            increment=0.1,
+            textvariable=center_position_var,
+            width=10,
+        )
+        center_position_spinbox.grid(row=0, column=1, sticky=tk.W, padx=(12, 4), pady=6)
+        ttk.Label(body, text="mm").grid(row=0, column=2, sticky=tk.W, pady=6)
+
+        ttk.Label(
+            body,
+            text=(
+                "Absolute machine coordinate measured from Home/DI1. "
+                "Home is 0 mm and positions to the right are positive. "
+                "This protected value is the base used by Move center."
+            ),
+            wraplength=440,
+            foreground="#555555",
+            justify=tk.LEFT,
+        ).grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(6, 12))
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=2, column=0, columnspan=3, sticky=tk.E)
+
+        def close_dialog():
+            self.stepper_settings_dialog = None
+            dialog.destroy()
+
+        def save_center_position():
+            center_position = self._validated_float(
+                center_position_var,
+                "stepper center position",
+                MOTOR_MIN_POSITION_MM,
+                MOTOR_MAX_POSITION_MM,
+            )
+            if center_position is None:
+                return
+            self.motor_center_position_var.set(round(center_position, 3))
+            if not self._save_user_presets():
+                return
+            self.status_var.set(
+                f"Stepper center position saved: {center_position:.3f} mm"
+            )
+            close_dialog()
+
+        ttk.Button(buttons, text="Save", command=save_center_position).pack(
+            side=tk.LEFT,
+            padx=(0, 8),
+        )
+        ttk.Button(buttons, text="Cancel", command=close_dialog).pack(side=tk.LEFT)
+
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dialog.winfo_reqwidth()) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_reqheight()) // 2)
+        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        center_position_spinbox.focus_set()
 
     def _open_increment_pressure_settings(self):
         if self.increment_dialog and self.increment_dialog.winfo_exists():
@@ -3631,34 +3768,58 @@ class TestRunGui(tk.Tk):
             self._set_motor_motion_busy(True)
 
     def _motor_move_absolute(self):
-        self._motor_move_to_absolute_position(
+        target_mm = self._validated_float(
             self.motor_absolute_var,
             "motor absolute position",
-            "absolute",
+            MOTOR_MIN_POSITION_MM,
+            MOTOR_MAX_POSITION_MM,
         )
+        if target_mm is not None:
+            self._motor_move_to_absolute_position(target_mm, "absolute")
 
     def _motor_move_center(self):
-        self._motor_move_to_absolute_position(
+        center_position_mm = self._validated_float(
             self.motor_center_position_var,
             "motor center position",
-            "center",
+            MOTOR_MIN_POSITION_MM,
+            MOTOR_MAX_POSITION_MM,
+        )
+        center_offset_mm = self._validated_float(
+            self.motor_center_offset_var,
+            "motor center offset",
+            -2000.0,
+            2000.0,
+        )
+        if center_position_mm is None or center_offset_mm is None:
+            return
+
+        # Machine coordinates and the operator-facing offset use the same
+        # intuitive physical sign: negative is left, positive is right.
+        target_mm = center_position_mm + center_offset_mm
+        if not MOTOR_MIN_POSITION_MM <= target_mm <= MOTOR_MAX_POSITION_MM:
+            messagebox.showerror(
+                "Center target outside travel",
+                f"Center {center_position_mm:.3f} mm with offset "
+                f"{center_offset_mm:+.3f} mm results in {target_mm:.3f} mm. "
+                f"The allowed range is {MOTOR_MIN_POSITION_MM:.1f} to "
+                f"{MOTOR_MAX_POSITION_MM:.1f} mm.",
+            )
+            return
+
+        self._motor_move_to_absolute_position(
+            target_mm,
+            f"center offset {center_offset_mm:+.3f} mm",
         )
 
-    def _motor_move_to_absolute_position(self, target_variable, value_name, mode_name):
+    def _motor_move_to_absolute_position(self, target_mm, mode_name):
         if not self._motor_command_allowed():
             return
         if not self.motor_enabled_var.get():
             messagebox.showerror("Motor disabled", "Enable the stepper output before moving.")
             return
 
-        target_mm = self._validated_float(
-            target_variable,
-            value_name,
-            MOTOR_MIN_POSITION_MM,
-            MOTOR_MAX_POSITION_MM,
-        )
         speed_steps_s = self._apply_motor_speed()
-        if target_mm is None or speed_steps_s is None:
+        if speed_steps_s is None:
             return
 
         target_steps = self._mm_to_steps(target_mm)

@@ -8,7 +8,7 @@
   "twincat_ads_port": 851,
   "nozzle_offset_mm": 114.8,
   "colibri_plate_distance_mm": 1.0,
-  "motor_center_position_mm": -7.0,
+  "motor_center_position_mm": 0.0,
   "colibri_probe_max_approach_mm": 10.0,
   "colibri_probe_retract_mm": 0.05,
   "colibri_probe_timeout_seconds": 30.0,
