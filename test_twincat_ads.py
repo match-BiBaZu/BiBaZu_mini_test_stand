@@ -287,10 +287,10 @@ class TwinCatAdsMailboxTests(unittest.TestCase):
         )
         connection.values.update(
             {
-                "MAIN.fStatusMotorPositionMm": 1995.0,
+                "MAIN.fStatusMotorPositionMm": -1995.0,
                 "MAIN.bStatusMotorReferenced": True,
-                "MAIN.fConfigMotorMinPositionMm": 0.0,
-                "MAIN.fConfigMotorMaxPositionMm": 2000.0,
+                "MAIN.fConfigMotorMinPositionMm": -2000.0,
+                "MAIN.fConfigMotorMaxPositionMm": 0.0,
             }
         )
         client, messages = self._client(connection)
@@ -304,9 +304,9 @@ class TwinCatAdsMailboxTests(unittest.TestCase):
             if "command rejected" in message and "error 23" in message
         )
         self.assertIn("software travel range violation", rejection)
-        self.assertIn("position 1995.00000 mm", rejection)
-        self.assertIn("requested target 2006.00440 mm", rejection)
-        self.assertIn("configured range 0.00000..2000.00000 mm", rejection)
+        self.assertIn("position -1995.00000 mm", rejection)
+        self.assertIn("requested target -2006.00440 mm", rejection)
+        self.assertIn("configured range -2000.00000..0.00000 mm", rejection)
 
     def test_debug_logger_can_be_attached_detached_and_cannot_break_ads(self):
         connection = _FakeAdsConnection()

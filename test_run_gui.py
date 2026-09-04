@@ -86,8 +86,8 @@ REGULATOR_MAX_PRESSURE_BAR = 6.0
 TEST_PRESSURE_STEP_BAR = 0.1
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
-MOTOR_MIN_POSITION_MM = 0.0
-MOTOR_MAX_POSITION_MM = 2000.0
+MOTOR_MIN_POSITION_MM = -2000.0
+MOTOR_MAX_POSITION_MM = 0.0
 # Arduino default: 400 full steps per second.
 MOTOR_LEGACY_DEFAULT_SPEED_MM_S = 400.0 * MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -568,7 +568,7 @@ class TestRunGui(tk.Tk):
         self.motor_center_position_var = tk.DoubleVar(
             value=self._preset_float(
                 "motor_center_position_mm",
-                53.0,
+                -53.0,
                 MOTOR_MIN_POSITION_MM,
                 MOTOR_MAX_POSITION_MM,
             )
@@ -637,6 +637,7 @@ class TestRunGui(tk.Tk):
         self.nozzle_theme_waiting_for_flow = False
         self.nozzle_theme_mask = 0
         self.nozzle_theme_saved_pulse_duration_ms = None
+        self.nozzle_theme_stop_expected_pulse_error = False
 
         self._build_ui()
         self._auto_load_platform_calibration()
@@ -781,6 +782,7 @@ class TestRunGui(tk.Tk):
             or self.current_impulse is not None
             or self.test_impulse_capture is not None
             or self.pulse_in_progress
+            or self.nozzle_theme_playing
             or self.calibration_session is not None
             or self.colibri_touch_running
         )
@@ -2243,7 +2245,7 @@ class TestRunGui(tk.Tk):
             body,
             text=(
                 "Absolute machine coordinate measured from Home/DI1. "
-                "Home is 0 mm and positions to the right are positive. "
+                "Home is 0 mm and reported positions to the right are negative. "
                 "This protected value is the base used by Move center."
             ),
             wraplength=440,
@@ -2391,7 +2393,11 @@ class TestRunGui(tk.Tk):
         dialog.focus_force()
 
     def _update_increment_dialog_state(self):
-        enabled = self._plc_connected() and not self.pulse_in_progress
+        enabled = (
+            self._plc_connected()
+            and not self.pulse_in_progress
+            and not self.nozzle_theme_playing
+        )
         state = tk.NORMAL if enabled else tk.DISABLED
         for control in self.increment_dialog_controls:
             if control.winfo_exists():
@@ -2583,6 +2589,12 @@ class TestRunGui(tk.Tk):
 
     def _disconnect(self, status_message="Disconnected"):
         self._write_debug_log("TWINCAT ADS disconnect requested")
+        if self.nozzle_theme_playing:
+            self._stop_nozzle_theme(
+                send_stop=False,
+                restore_duration=False,
+                status=None,
+            )
         if self.sequence_finalize_after_id is not None:
             self.after_cancel(self.sequence_finalize_after_id)
             self.sequence_finalize_after_id = None
@@ -2707,6 +2719,9 @@ class TestRunGui(tk.Tk):
         return True
 
     def _start_test(self):
+        if self.nozzle_theme_playing:
+            messagebox.showwarning("Nozzle march active", "Stop the nozzle march before starting a test sequence.")
+            return
         if self.active_sequence_archive is not None:
             messagebox.showwarning(
                 "Test sequence active",
@@ -2719,6 +2734,7 @@ class TestRunGui(tk.Tk):
         if self.calibration_session is not None:
             messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
             return
+        self.nozzle_theme_stop_expected_pulse_error = False
         start_pressure = self._validated_pressure_step(self.test_start_pressure_var, "test start pressure")
         end_pressure = self._validated_pressure_step(self.test_end_pressure_var, "test end pressure")
         repeats = self._validated_repeats()
@@ -2752,6 +2768,9 @@ class TestRunGui(tk.Tk):
         self._send(f"START:{start_pressure:.2f}:{end_pressure:.2f}:{repeats}:{mask}")
 
     def _stop_test(self):
+        if self.nozzle_theme_playing:
+            self._stop_nozzle_theme()
+            return
         self.mode_var.set("Mode: idle")
         self._write_debug_log("GUI stop test")
         self._send("STOP")
@@ -2800,6 +2819,9 @@ class TestRunGui(tk.Tk):
         )
 
     def _start_test_impulse(self):
+        if self.nozzle_theme_playing:
+            messagebox.showwarning("Nozzle march active", "Stop the nozzle march before recording a test impulse.")
+            return
         if self.active_sequence_archive is not None:
             messagebox.showwarning(
                 "Test sequence active",
@@ -2815,6 +2837,7 @@ class TestRunGui(tk.Tk):
         if self.calibration_session is not None:
             messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
             return
+        self.nozzle_theme_stop_expected_pulse_error = False
         test_pressure = self._validated_pressure(
             self.target_pressure_var,
             "test impulse pressure",
@@ -3477,6 +3500,198 @@ class TestRunGui(tk.Tk):
         dialog.transient(self)
         dialog.lift()
 
+    def _toggle_nozzle_theme(self):
+        if self.nozzle_theme_playing:
+            self._stop_nozzle_theme()
+        else:
+            self._start_nozzle_theme()
+
+    def _start_nozzle_theme(self):
+        if not self._plc_connected():
+            messagebox.showerror("TwinCAT disconnected", "Connect TwinCAT before playing the nozzle march.")
+            return False
+        if self.active_sequence_archive is not None:
+            messagebox.showwarning(
+                "Test sequence active",
+                "Stop the current test sequence before playing the nozzle march.",
+            )
+            return False
+        if self.pulse_in_progress or self.test_impulse_capture is not None:
+            messagebox.showwarning("Pulse active", "Wait for the current pulse to finish first.")
+            return False
+        if self.current_impulse is not None and not self.current_impulse.get("plc_flow_complete", False):
+            messagebox.showwarning(
+                "Flow capture active",
+                "Wait for the PLC flow capture from the previous pulse to finish.",
+            )
+            return False
+        if self.calibration_session is not None:
+            messagebox.showwarning("Calibration in progress", "Finish or cancel calibration first.")
+            return False
+        if self.colibri_touch_running:
+            messagebox.showwarning("Force probe in progress", "Stop the force probe first.")
+            return False
+
+        mask = self._selected_nozzle_mask()
+        if mask == 0:
+            messagebox.showerror("No nozzle selected", "Select at least one nozzle for the nozzle march.")
+            return False
+        saved_duration_ms = self._validated_pulse_duration()
+        if saved_duration_ms is None:
+            return False
+        if not self._apply_pressure_settings() or not self._apply_flow_threshold_setting():
+            return False
+
+        # A completed manual pulse can still own the GUI's post-pulse capture
+        # window. Finalise it before music telemetry is deliberately ignored.
+        self._finalize_stale_impulse_before_save()
+        if self.current_impulse is not None:
+            self._finalize_impulse(self._flow_capture_end_time_ms(self.current_impulse))
+
+        self.nozzle_theme_playing = True
+        self.nozzle_theme_after_id = None
+        self.nozzle_theme_note_index = 0
+        self.nozzle_theme_note_started_monotonic = None
+        self.nozzle_theme_note_beats = 0.0
+        self.nozzle_theme_waiting_for_flow = False
+        self.nozzle_theme_mask = mask
+        self.nozzle_theme_saved_pulse_duration_ms = saved_duration_ms
+        self.nozzle_theme_stop_expected_pulse_error = False
+        self._set_nozzle_theme_controls(True)
+        self._write_debug_log(f"GUI nozzle march started mask={mask}")
+        self._play_next_nozzle_theme_event()
+        return True
+
+    def _play_next_nozzle_theme_event(self):
+        self.nozzle_theme_after_id = None
+        if not self.nozzle_theme_playing:
+            return
+        if not self._plc_connected():
+            self._stop_nozzle_theme(
+                send_stop=False,
+                restore_duration=False,
+                status="Nozzle march stopped: TwinCAT disconnected.",
+            )
+            return
+
+        event_index = self.nozzle_theme_note_index
+        note_name, beats = NOZZLE_MARCH_SEQUENCE[event_index]
+        self.nozzle_theme_note_index = (event_index + 1) % len(NOZZLE_MARCH_SEQUENCE)
+        if note_name is None:
+            self.mode_var.set("Mode: nozzle march | rest")
+            self.nozzle_theme_after_id = self.after(
+                round(beats * NOZZLE_MARCH_BEAT_MS),
+                self._play_next_nozzle_theme_event,
+            )
+            return
+
+        duration_ms = NOZZLE_MARCH_PULSE_MS[note_name]
+        self.nozzle_theme_note_started_monotonic = time.monotonic()
+        self.nozzle_theme_note_beats = beats
+        self.nozzle_theme_waiting_for_flow = True
+        self.pulse_in_progress = True
+        self.pending_increment_direction = 0
+        self.pending_flip_angle = -1
+        self.pending_pulse_mask = str(self.nozzle_theme_mask)
+        self.pending_pulse_duration_ms = duration_ms
+        self._set_pulse_buttons_enabled(False)
+        self._write_debug_log(
+            f"GUI nozzle march note={note_name} duration_ms={duration_ms} "
+            f"mask={self.nozzle_theme_mask}"
+        )
+        duration_sent = self._send(f"SET_PULSE_DURATION:{duration_ms}")
+        pulse_sent = duration_sent and self._send(f"PULSE:{self.nozzle_theme_mask}")
+        if not pulse_sent:
+            self._stop_nozzle_theme(status="Nozzle march stopped: the next pulse could not be queued.")
+            return
+        self.mode_var.set(
+            f"Mode: nozzle march | {note_name} | "
+            f"event {event_index + 1}/{len(NOZZLE_MARCH_SEQUENCE)}"
+        )
+        self.status_var.set(
+            f"Nozzle march playing {note_name}: {duration_ms} ms, mask {self.nozzle_theme_mask}."
+        )
+
+    def _schedule_next_nozzle_theme_event(self):
+        if not self.nozzle_theme_playing or not self.nozzle_theme_waiting_for_flow:
+            return
+        self.nozzle_theme_waiting_for_flow = False
+        note_start = self.nozzle_theme_note_started_monotonic or time.monotonic()
+        target_time = note_start + self.nozzle_theme_note_beats * NOZZLE_MARCH_BEAT_MS / 1000.0
+        remaining_ms = math.ceil((target_time - time.monotonic()) * 1000.0)
+        delay_ms = max(NOZZLE_MARCH_MIN_GAP_MS, remaining_ms)
+        self.nozzle_theme_after_id = self.after(delay_ms, self._play_next_nozzle_theme_event)
+
+    def _stop_nozzle_theme(
+        self,
+        send_stop=True,
+        restore_duration=True,
+        status=None,
+    ):
+        was_playing = self.nozzle_theme_playing
+        stop_interrupts_pulse = bool(
+            was_playing
+            and send_stop
+            and self._plc_connected()
+            and (self.pulse_in_progress or self.nozzle_theme_waiting_for_flow)
+        )
+        if self.nozzle_theme_after_id is not None:
+            self.after_cancel(self.nozzle_theme_after_id)
+            self.nozzle_theme_after_id = None
+        saved_duration_ms = self.nozzle_theme_saved_pulse_duration_ms
+        self.nozzle_theme_playing = False
+        self.nozzle_theme_waiting_for_flow = False
+        self.nozzle_theme_note_started_monotonic = None
+        self.nozzle_theme_note_beats = 0.0
+        self.nozzle_theme_mask = 0
+        self.nozzle_theme_saved_pulse_duration_ms = None
+        self.nozzle_theme_stop_expected_pulse_error = stop_interrupts_pulse
+        if was_playing:
+            self.pulse_in_progress = False
+            self.pending_increment_direction = 0
+            self.pending_flip_angle = -1
+            self.pending_pulse_mask = ""
+            self.pending_pulse_duration_ms = None
+            self.pending_pulse_start_monotonic = None
+            self.pending_pulse_start_utc_ns = None
+            if send_stop and self._plc_connected():
+                self._send("STOP")
+            if restore_duration and saved_duration_ms is not None and self._plc_connected():
+                self._send(f"SET_PULSE_DURATION:{saved_duration_ms:.3f}")
+            self._write_debug_log("GUI nozzle march stopped")
+        self._set_nozzle_theme_controls(False)
+        if was_playing:
+            self.mode_var.set("Mode: idle")
+        if status is not None:
+            self.status_var.set(status)
+        elif was_playing:
+            self.status_var.set(
+                "Nozzle march stopped; all TwinCAT outputs are safe "
+                "(pressure zero, motor power off)."
+            )
+
+    def _set_nozzle_theme_controls(self, running):
+        connected = self._plc_connected()
+        normal_state = tk.NORMAL if connected and not running else tk.DISABLED
+        for control in (
+            self.start_button,
+            self.target_pressure_spinbox,
+            self.apply_pressure_button,
+            self.flow_threshold_spinbox,
+            self.apply_flow_threshold_button,
+            self.starting_pressure_spinbox,
+            self.pressure_increment_spinbox,
+            self.reset_increment_button,
+            *self.nozzle_checkbuttons,
+        ):
+            control.configure(state=normal_state)
+        self.nozzle_theme_button.configure(
+            text="Stop Imperial March" if running else "Play Imperial March",
+            state=tk.NORMAL if connected else tk.DISABLED,
+        )
+        self._set_pulse_buttons_enabled(not running)
+        self._set_calibration_run_lock(running)
+
     def _increment_pulse(self):
         if self._validated_pressure(self.pressure_increment_var, "pressure increment") is None:
             return
@@ -3488,6 +3703,9 @@ class TestRunGui(tk.Tk):
         self._start_pulse(increment_direction=-1)
 
     def _start_pulse(self, increment_direction):
+        if self.nozzle_theme_playing:
+            messagebox.showwarning("Nozzle march active", "Stop the nozzle march before sending a manual pulse.")
+            return False
         if self.active_sequence_archive is not None:
             messagebox.showwarning(
                 "Test sequence active",
@@ -3497,6 +3715,7 @@ class TestRunGui(tk.Tk):
         if self.pulse_in_progress:
             messagebox.showwarning("Pulse active", "Wait for the current pulse to finish first.")
             return False
+        self.nozzle_theme_stop_expected_pulse_error = False
         mask = self._selected_nozzle_mask()
         if mask == 0:
             messagebox.showerror("No nozzle selected", "Select at least one nozzle for the pulse.")
@@ -3567,13 +3786,27 @@ class TestRunGui(tk.Tk):
         return mask
 
     def _set_pulse_buttons_enabled(self, enabled):
-        state = tk.NORMAL if enabled and self._plc_connected() and not self.pulse_in_progress else tk.DISABLED
+        state = (
+            tk.NORMAL
+            if enabled
+            and self._plc_connected()
+            and not self.pulse_in_progress
+            and not self.nozzle_theme_playing
+            else tk.DISABLED
+        )
         self.increment_pulse_button.configure(state=state)
         self.decrement_pulse_button.configure(state=state)
         self.pulse_duration_spinbox.configure(state=state)
         self.apply_pulse_duration_button.configure(state=state)
         test_impulse_state = state if self.test_impulse_capture is None else tk.DISABLED
         self.test_impulse_button.configure(state=test_impulse_state)
+        theme_state = (
+            tk.NORMAL
+            if self._plc_connected()
+            and (self.nozzle_theme_playing or (enabled and not self.pulse_in_progress))
+            else tk.DISABLED
+        )
+        self.nozzle_theme_button.configure(state=theme_state)
         self._update_increment_dialog_state()
 
     def _reset_increment(self):
@@ -3738,7 +3971,8 @@ class TestRunGui(tk.Tk):
 
     def _motor_jog_left(self):
         # DI1/home is physically left and is approached in the negative axis
-        # direction.  Motion to the right extends into the positive range.
+        # command direction.  The reported position nevertheless decreases
+        # when moving physically right.
         self._motor_jog(direction=-1)
 
     def _motor_jog_right(self):
@@ -3793,9 +4027,9 @@ class TestRunGui(tk.Tk):
         if center_position_mm is None or center_offset_mm is None:
             return
 
-        # Machine coordinates and the operator-facing offset use the same
-        # intuitive physical sign: negative is left, positive is right.
-        target_mm = center_position_mm + center_offset_mm
+        # The operator-facing offset is negative left / positive right, while
+        # the reported machine coordinate decreases to the right.
+        target_mm = center_position_mm - center_offset_mm
         if not MOTOR_MIN_POSITION_MM <= target_mm <= MOTOR_MAX_POSITION_MM:
             messagebox.showerror(
                 "Center target outside travel",
@@ -6138,6 +6372,12 @@ class TestRunGui(tk.Tk):
 
         self._capture_test_impulse_pressure(sample)
 
+        # The tune is an actuator demo, not a measurement run. Keep its rapid
+        # notes out of the normal impulse CSV/metric accumulator.
+        if self.nozzle_theme_playing:
+            self.last_valves_open = sample["valves_open"]
+            return
+
         valves_open = sample["valves_open"]
         if valves_open and not self.last_valves_open:
             if self.current_impulse:
@@ -6483,6 +6723,8 @@ class TestRunGui(tk.Tk):
             return
 
         if len(parts) >= 6 and parts[1] == "MANUAL":
+            if self.nozzle_theme_playing:
+                return
             setpoint = parts[3]
             pwm = parts[5]
             self.mode_var.set(f"Mode: manual pressure | target {setpoint} bar | PWM {pwm}")
@@ -6490,14 +6732,28 @@ class TestRunGui(tk.Tk):
 
     def _handle_flow_threshold_line(self, parts):
         if len(parts) >= 3 and parts[1] == "SET":
+            if self.nozzle_theme_playing:
+                return
             self.status_var.set(f"Flow Detection Threshold set to {parts[2]} l/min")
 
     def _handle_pulse_duration_line(self, parts):
         if len(parts) >= 3 and parts[1] == "SET":
+            if self.nozzle_theme_playing:
+                return
             self.status_var.set(f"Impulse duration set to {parts[2]} ms")
 
     def _handle_pulse_line(self, parts):
         if len(parts) >= 3 and parts[1] == "ERROR":
+            if self.nozzle_theme_stop_expected_pulse_error:
+                self.nozzle_theme_stop_expected_pulse_error = False
+                self._write_debug_log("GUI ignored expected pulse error after nozzle march STOP")
+                return
+            if self.nozzle_theme_playing:
+                self._stop_nozzle_theme(
+                    status="Nozzle march stopped: " + ";".join(parts),
+                )
+                self.nozzle_theme_stop_expected_pulse_error = False
+                return
             if self.test_impulse_capture is not None:
                 self._cancel_test_impulse_capture("Test impulse failed: " + ";".join(parts))
             self.pulse_in_progress = False
@@ -6518,20 +6774,35 @@ class TestRunGui(tk.Tk):
             )
             if self.current_impulse and not self.current_impulse.get("valve_mask"):
                 self.current_impulse["valve_mask"] = parts[2]
+            if self.nozzle_theme_playing and self.nozzle_theme_waiting_for_flow:
+                self.nozzle_theme_note_started_monotonic = (
+                    self.current_line_received_monotonic or time.monotonic()
+                )
+                self.mode_var.set(f"Mode: nozzle march | mask {parts[2]}")
+                return
             if self.test_impulse_capture is None:
                 self.mode_var.set(f"Mode: manual pulse running | mask {parts[2]}")
             return
 
         if len(parts) >= 3 and parts[1] == "FLOW_DONE":
+            if self.nozzle_theme_stop_expected_pulse_error:
+                return
             self._handle_flow_done_line(parts)
             return
 
         if len(parts) >= 3 and parts[1] == "DONE":
+            if self.nozzle_theme_stop_expected_pulse_error:
+                return
             is_test_impulse = self.test_impulse_capture is not None
+            is_nozzle_theme = (
+                self.nozzle_theme_playing
+                and self.nozzle_theme_waiting_for_flow
+            )
             pulse_duration_ms = self._pulse_duration_ms(parts)
             if is_test_impulse and pulse_duration_ms is not None:
                 self.test_impulse_capture["valve_open_duration_seconds"] = pulse_duration_ms / 1000.0
-            self._set_completed_pulse_duration(pulse_duration_ms)
+            if not is_nozzle_theme:
+                self._set_completed_pulse_duration(pulse_duration_ms)
 
             if not self.pulse_in_progress:
                 return
@@ -6539,6 +6810,11 @@ class TestRunGui(tk.Tk):
             self.pulse_in_progress = False
             completed_increment_direction = self.pending_increment_direction
             self.pending_increment_direction = 0
+            if is_nozzle_theme:
+                self._set_pulse_buttons_enabled(False)
+                self.mode_var.set("Mode: nozzle march | waiting for flow capture")
+                self.status_var.set("Nozzle march: note complete; waiting for PLC flow capture.")
+                return
             self._set_pulse_buttons_enabled(True)
             self.status_var.set(f"Pulse complete, mask {parts[2]}")
 
@@ -6553,6 +6829,11 @@ class TestRunGui(tk.Tk):
                 self.after(0, lambda valve_mask=parts[2]: self._show_completed_pulse_flip_angle_prompt(valve_mask))
 
     def _handle_flow_done_line(self, parts):
+        if self.nozzle_theme_playing and self.nozzle_theme_waiting_for_flow:
+            self._schedule_next_nozzle_theme_event()
+            self.status_var.set("Nozzle march playing; next note scheduled.")
+            return
+
         flow_sample_count = self._pulse_field_float(parts, "SAMPLES")
         max_flow = self._pulse_field_float(parts, "MAX_FLOW")
         volume_l = self._pulse_field_float(parts, "VOLUME_L")

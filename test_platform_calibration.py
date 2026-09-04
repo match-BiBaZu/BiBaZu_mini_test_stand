@@ -85,7 +85,7 @@ class PlatformCalibrationTests(unittest.TestCase):
             def __init__(self):
                 self.motor_enabled_var = Variable(True)
                 self.motor_motion_busy = False
-                self.motor_center_position_var = Variable(53.0)
+                self.motor_center_position_var = Variable(-53.0)
                 self.motor_center_offset_var = Variable(0.0)
                 self.mode_var = Variable("")
                 self.commands = []
@@ -104,9 +104,9 @@ class PlatformCalibrationTests(unittest.TestCase):
                 return True
 
         for offset_mm, expected_command in (
-            (0.0, "MOTOR_ABS:5308"),
-            (-3.0, "MOTOR_ABS:5007"),
-            (3.0, "MOTOR_ABS:5608"),
+            (0.0, "MOTOR_ABS:-5308"),
+            (-3.0, "MOTOR_ABS:-5007"),
+            (3.0, "MOTOR_ABS:-5608"),
         ):
             with self.subTest(center_offset_mm=offset_mm):
                 gui = DummyGui()

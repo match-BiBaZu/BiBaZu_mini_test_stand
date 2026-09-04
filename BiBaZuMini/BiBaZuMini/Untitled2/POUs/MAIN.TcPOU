@@ -145,12 +145,12 @@ VAR
     bConfigLimitSwitchPressedHigh : BOOL := TRUE;
     bConfigMotionEnabled : BOOL := FALSE;
     bConfigHomingEnabled : BOOL := FALSE;
-    // Machine coordinate convention: DI1/home is 0 mm.  Negative travel
-    // approaches DI1 on the left; positive travel extends right into the
-    // working area.  Commission the physical travel length before allowing
-    // production moves to the 2000 mm placeholder.
-    fConfigMotorMinPositionMm : LREAL := 0.0;
-    fConfigMotorMaxPositionMm : LREAL := 2000.0;
+    // Command convention: negative motion approaches DI1 on the left and
+    // positive motion extends right.  The current axis feedback reports the
+    // opposite coordinate sign, so DI1/home is 0 mm and the working range is
+    // negative. Commission the physical travel length before production.
+    fConfigMotorMinPositionMm : LREAL := -2000.0;
+    fConfigMotorMaxPositionMm : LREAL := 0.0;
 
     // NC axis.  Axis1.PlcToNc and Axis1.NcToPlc must both be linked to
     // "Achse 1" in the System Manager before the MC_* calls can operate.
@@ -474,7 +474,9 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
             ELSIF NOT bStatusMotorReferenced THEN
                 bExecMoveRelative := TRUE;
             ELSE
-                fRequestedMotorTargetMm := fStatusMotorPositionMm + fCmdMotorRelativeMm;
+                // Command and feedback position signs are opposite on this
+                // axis: a positive/right jog decreases the reported position.
+                fRequestedMotorTargetMm := fStatusMotorPositionMm - fCmdMotorRelativeMm;
                 // If the reported position is already outside the configured
                 // range, never lock out both directions.  Permit only a move
                 // that gets strictly closer to the range and cannot cross the
@@ -511,7 +513,7 @@ IF udCmdSeq <> udConsumedCmdSeq THEN
                 nStatusError := 25;
             ELSIF bStatusMotorBusy THEN
                 nStatusError := 22;
-            ELSIF bLimitSwitchPressed AND (fCmdMotorAbsoluteMm < fStatusMotorPositionMm) THEN
+            ELSIF bLimitSwitchPressed AND (fCmdMotorAbsoluteMm > fStatusMotorPositionMm) THEN
                 nStatusError := 26;
             ELSIF fConfigMotorMinPositionMm >= fConfigMotorMaxPositionMm THEN
                 nStatusError := 20;

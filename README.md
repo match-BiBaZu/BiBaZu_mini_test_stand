@@ -109,24 +109,35 @@ routes in both directions and ensure `TcAdsDll.dll` is available on the GUI PC.
 Bits 0 through 5 select nozzles 1 through 6. For example, mask `33` selects
 nozzles 1 and 6. The GUI and CSV output contain six nozzle columns.
 
+**Play Imperial March** uses the currently selected nozzle mask and repeats a
+short pneumatic melody until the same button is pressed again. Each note waits
+for the PLC pulse and flow capture to finish, so the GUI stays responsive and
+the PLC never receives overlapping pulses. Stopping sends the fail-safe
+`STOP` command, which closes the valves, resets pneumatic output pressure, and
+removes motor power.
+The empirical note widths can be tuned in `NOZZLE_MARCH_PULSE_MS` in
+`test_run_gui.py`; all values must remain within `10..500 ms` and on the PLC's
+5 ms task grid.
+
 The EL7062 is driven through NC axis `Achse 1`, not an Arduino STEP/DIR loop.
 `bConfigMotionEnabled` and `bConfigHomingEnabled` default to `FALSE` on
 purpose. Before enabling either, configure the EL7062 motor current and
 scaling, NC soft limits, home behavior, and EL1014 pressed-state polarity. The
-PLC requires a referenced axis for travel moves and rejects a negative move
+PLC requires a referenced axis for travel moves and rejects a negative jog
 when the home switch is already active. The EL1014 input is not a substitute
 for an independent safety circuit or E-stop.
 
-DI1/home is `0 mm`, the Home/Jog-left direction is negative, and extending to
-the right into the working area counts positive. The PLC placeholder software
-range is therefore `0..2000 mm`; replace `2000 mm` with the measured physical
-travel limit during commissioning.
+DI1/home is `0 mm`. The physical command convention is Home/Jog left =
+negative and Jog right = positive. The current axis feedback has the opposite
+coordinate sign: extending right into the working area reports negative
+positions. The PLC placeholder position range is therefore `-2000..0 mm`;
+replace `-2000 mm` with the measured physical travel limit during commissioning.
 
 The mechanical center is stored as an absolute Stepper setting (currently
-`53 mm`) and is not edited in the normal motion row. `Center offset` is the
+`-53 mm`) and is not edited in the normal motion row. `Center offset` is the
 operator input used by **Move center**: `0 mm` moves to the stored center,
 negative offsets move left, and positive offsets move right. For example,
-`-3 mm` moves to `50 mm`, three millimetres left of center.
+`-3 mm` moves to `-50 mm`, three millimetres left of center.
 
 ### EL7062 channel 1 CoE settings
 
@@ -164,7 +175,7 @@ checked-in `1e-5` axis value is not yet a commissioned physical scale.
 7. Verify 10, 50, and 500 ms pulses plus the PLC flow summary.
 8. At low speed, press Home and verify that the axis jogs left (negative
    machine direction), DI1 stops it, and the stopped position becomes 0 mm.
-   Verify that extending to the right afterwards produces positive positions. Repeat while
+   Verify that extending to the right afterwards produces negative positions. Repeat while
    pressing Stop motor before DI1; the axis must stop without setting a new
    zero.
 9. Run and abort a short sweep; confirm every output becomes safe.
