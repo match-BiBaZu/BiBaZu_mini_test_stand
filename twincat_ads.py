@@ -535,9 +535,7 @@ class TwinCatAdsClient:
                         )
                         command_type = self._as_int(snapshot.get("MAIN.nCmdType", 0))
                         if command_type == Command.MOVE_RELATIVE:
-                            # Physical command and reported coordinate signs are
-                            # opposite: a positive/right move lowers the position.
-                            target = position - self._as_float(
+                            target = position + self._as_float(
                                 snapshot.get("MAIN.fCmdMotorRelativeMm", 0.0)
                             )
                         elif command_type == Command.MOVE_ABSOLUTE:
@@ -547,10 +545,10 @@ class TwinCatAdsClient:
                         else:
                             target = position
                         minimum = self._as_float(
-                            snapshot.get("MAIN.fConfigMotorMinPositionMm", -2000.0)
+                            snapshot.get("MAIN.fConfigMotorMinPositionMm", 0.0)
                         )
                         maximum = self._as_float(
-                            snapshot.get("MAIN.fConfigMotorMaxPositionMm", 0.0)
+                            snapshot.get("MAIN.fConfigMotorMaxPositionMm", 2000.0)
                         )
                         context = (
                             f"; position {position:.5f} mm, requested target {target:.5f} mm, "

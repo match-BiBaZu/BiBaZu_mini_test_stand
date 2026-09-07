@@ -1573,7 +1573,7 @@ External Setpoint Generation:
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="1e-05" Inverse="true" MaxCount="#xffffffff">
+						<EncPara ScaleFactorNumerator="1e-05" MaxCount="#xffffffff">
 							<Inc RefSearchInverse="true"/>
 						</EncPara>
 						<Vars VarGrpType="1">
@@ -1851,7 +1851,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{F9E2FDE3-0C57-4882-A83C-8139661A492B}" Name="Untitled2" PrjFilePath="Untitled2\Untitled2.plcproj" TmcFilePath="Untitled2\Untitled2.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="Untitled2\Untitled2.tmc" TmcHash="{453A57EE-5C19-6919-7EA1-26F5A5B84EBD}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="Untitled2\Untitled2.tmc" TmcHash="{9A5EC3B1-3B23-B04D-BD0C-C69D3B5DE76D}">
 					<Name>Untitled2 Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">

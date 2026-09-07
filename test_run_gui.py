@@ -86,8 +86,9 @@ REGULATOR_MAX_PRESSURE_BAR = 6.0
 TEST_PRESSURE_STEP_BAR = 0.1
 MOTOR_MM_PER_STEP = 0.009985846
 MOTOR_STEPS_PER_MM = 1.0 / MOTOR_MM_PER_STEP
-MOTOR_MIN_POSITION_MM = -2000.0
-MOTOR_MAX_POSITION_MM = 0.0
+MOTOR_MIN_POSITION_MM = 0.0
+MOTOR_MAX_POSITION_MM = 2000.0
+MOTOR_RANGE_TOLERANCE_MM = 0.0001
 # Arduino default: 400 full steps per second.
 MOTOR_LEGACY_DEFAULT_SPEED_MM_S = 400.0 * MOTOR_MM_PER_STEP
 MAX_MOTOR_STEPS_PER_SECOND = 5000
@@ -568,7 +569,7 @@ class TestRunGui(tk.Tk):
         self.motor_center_position_var = tk.DoubleVar(
             value=self._preset_float(
                 "motor_center_position_mm",
-                -53.0,
+                53.0,
                 MOTOR_MIN_POSITION_MM,
                 MOTOR_MAX_POSITION_MM,
             )
@@ -2245,7 +2246,7 @@ class TestRunGui(tk.Tk):
             body,
             text=(
                 "Absolute machine coordinate measured from Home/DI1. "
-                "Home is 0 mm and reported positions to the right are negative. "
+                "Home is 0 mm and positions increase to the right. "
                 "This protected value is the base used by Move center."
             ),
             wraplength=440,
@@ -3970,9 +3971,8 @@ class TestRunGui(tk.Tk):
         return speed_steps_s
 
     def _motor_jog_left(self):
-        # DI1/home is physically left and is approached in the negative axis
-        # command direction.  The reported position nevertheless decreases
-        # when moving physically right.
+        # DI1/home is physically left at 0 mm. Negative motion approaches it;
+        # positive motion moves right into the configured working range.
         self._motor_jog(direction=-1)
 
     def _motor_jog_right(self):
@@ -4027,9 +4027,13 @@ class TestRunGui(tk.Tk):
         if center_position_mm is None or center_offset_mm is None:
             return
 
-        # The operator-facing offset is negative left / positive right, while
-        # the reported machine coordinate decreases to the right.
-        target_mm = center_position_mm - center_offset_mm
+        # The operator-facing offset and machine coordinate both use negative
+        # left / positive right.
+        target_mm = center_position_mm + center_offset_mm
+        if abs(target_mm - MOTOR_MIN_POSITION_MM) <= MOTOR_RANGE_TOLERANCE_MM:
+            target_mm = MOTOR_MIN_POSITION_MM
+        elif abs(target_mm - MOTOR_MAX_POSITION_MM) <= MOTOR_RANGE_TOLERANCE_MM:
+            target_mm = MOTOR_MAX_POSITION_MM
         if not MOTOR_MIN_POSITION_MM <= target_mm <= MOTOR_MAX_POSITION_MM:
             messagebox.showerror(
                 "Center target outside travel",
@@ -5873,6 +5877,10 @@ class TestRunGui(tk.Tk):
             return None
 
         value = min(max(value, minimum), maximum)
+        # IEEE-754 signed zero compares equal to zero, but normalizing it keeps
+        # motor entries, ADS commands, presets, and status text consistent.
+        if abs(value) <= MOTOR_RANGE_TOLERANCE_MM:
+            value = 0.0
         variable.set(round(value, 3))
         return value
 
@@ -7016,6 +7024,8 @@ class TestRunGui(tk.Tk):
             ref_index = parts.index("REF")
             position_steps = int(float(parts[pos_index + 1]))
             position_mm = float(parts[mm_index + 1])
+            if abs(position_mm) <= MOTOR_RANGE_TOLERANCE_MM:
+                position_mm = 0.0
             referenced = parts[ref_index + 1] not in ("0", "FALSE")
         except (ValueError, IndexError):
             self.status_var.set(";".join(parts))
